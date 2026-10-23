@@ -1,6 +1,15 @@
 """Loopback fixture for transport integration tests. No external service needed."""
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import time
+from socketserver import TCPServer
+
+class LoopbackServer(ThreadingHTTPServer):
+    def server_bind(self):
+        # Avoid HTTPServer's reverse-DNS lookup on hosted runner networks.
+        TCPServer.server_bind(self)
+        self.server_name = "127.0.0.1"
+        self.server_port = self.server_address[1]
+
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -31,6 +40,6 @@ class Handler(BaseHTTPRequestHandler):
 
 if __name__ == '__main__':
     import sys
-    server = ThreadingHTTPServer(('127.0.0.1', int(sys.argv[1]) if len(sys.argv) > 1 else 18749), Handler)
+    server = LoopbackServer(('127.0.0.1', int(sys.argv[1]) if len(sys.argv) > 1 else 18749), Handler)
     print(f'Listening on http://127.0.0.1:{server.server_port}', flush=True)
     server.serve_forever()

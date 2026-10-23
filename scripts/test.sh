@@ -14,25 +14,32 @@ if ! python3 - "$RILL_FIXTURE_PID" <<'PY'
 import os
 import sys
 import time
-import urllib.request
+import http.client
 
 pid = int(sys.argv[1])
-for attempt in range(50):
+deadline = time.monotonic() + 30
+last_error = "No response yet"
+while time.monotonic() < deadline:
     try:
         os.kill(pid, 0)
     except ProcessLookupError:
         sys.exit('The HTTP fixture exited before becoming ready.')
     try:
-        with urllib.request.urlopen('http://127.0.0.1:18749/json', timeout=0.2) as response:
-            if response.headers.get('X-Fixture') == 'Rill':
+        connection = http.client.HTTPConnection('127.0.0.1', 18749, timeout=0.5)
+        try:
+            connection.request('GET', '/json')
+            response = connection.getresponse()
+            if response.status == 200 and response.getheader('X-Fixture') == 'Rill':
                 time.sleep(0.1)
                 os.kill(pid, 0)
                 break
-    except (OSError, ValueError):
-        pass
+        finally:
+            connection.close()
+    except (OSError, ValueError, http.client.HTTPException) as error:
+        last_error = str(error)
     time.sleep(0.1)
 else:
-    sys.exit('The HTTP fixture did not become ready within five seconds.')
+    sys.exit(f'The HTTP fixture did not become ready within 30 seconds: {last_error}')
 PY
 then
   cat "$RILL_FIXTURE_LOG"
