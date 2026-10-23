@@ -5,7 +5,15 @@ The debug application builds successfully. Ten XCTest cases passed on the local 
 - Seven core cases: URL/query preparation, variables and Unicode, unresolved variables, disabled fields and CRLF header rejection, allowed schemes/embedded credentials, auth/body/timeout, atomic workspace round trip and duplicate identity rejection.
 - Three loopback integration cases: real HTTP response and assertions, oversized Content-Length rejection, and cancellation of an in-flight request.
 
-Start the fixture in one terminal:
+The same full-suite command used by GitHub Actions starts the fixture, waits for readiness, runs the tests, and stops the fixture on exit:
+
+```sh
+bash scripts/test.sh
+```
+
+CI uses the `macos-15` runner with Xcode 16.4. The workflow has read-only repository permissions and needs no repository secrets.
+
+To run the fixture manually instead, start it in one terminal:
 
 ```sh
 python3 scripts/http-fixture.py

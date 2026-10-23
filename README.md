@@ -42,8 +42,10 @@ Auth-tab credentials use Keychain service `app.rill.credentials`. Headers, URLs,
 ## Verification
 
 ```sh
-swift test
+bash scripts/test.sh
 ```
+
+GitHub Actions builds the release executable and runs the full test suite on macOS for pushes to `main`, pull requests, and manual runs. Python is used only for the loopback HTTP fixture; no Python packaging or PyPI workflow is needed.
 
 Ten cases cover request preparation, persistence, real loopback HTTP responses, cancellation and response limits. See [validation](docs/VALIDATION.md) for the fixture setup and the Xcode toolchain command.
 
