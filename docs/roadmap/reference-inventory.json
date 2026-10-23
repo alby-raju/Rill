@@ -1,0 +1,3101 @@
+{
+  "audit_date": "2026-10-24",
+  "reference_version": "Relay 1.0.0 supplied archive",
+  "archive_sha256": "81b0277a965807c78e458624371561ede86d43ee280771e7ad5e4d38afdeac11",
+  "rill_baseline_commit": "abd4371",
+  "scope": "Maintained production/test Java file entrypoints; non-generated product documentation; build/release/resource inputs. Generated Javadoc, third-party legal texts, IDE metadata and macOS metadata are excluded. Inventory membership is traceability, not behavioral proof.",
+  "sources": [
+    {
+      "path": "relay/BASELINE_TEST_SHA256.json",
+      "kind": "build-and-release-input",
+      "key": "BUILD",
+      "sha256": "59ab1abbe58d19daae310604b1189c54919030e147207bbe765f09e3330295f7",
+      "capability_ids": [
+        "BASE-05",
+        "BASE-07",
+        "REL-01",
+        "REL-04"
+      ]
+    },
+    {
+      "path": "relay/UI_SYSTEM.md",
+      "kind": "documentation",
+      "key": "DOC-UI",
+      "sha256": "55e7d28d44f1e73b60a428d127c402a3d9f34b8d30f3bc2a4d9fccb35e3add3f",
+      "capability_ids": [
+        "BASE-04",
+        "EDIT-04",
+        "EDIT-05",
+        "RESP-01",
+        "UX-01",
+        "UX-02"
+      ]
+    },
+    {
+      "path": "relay/VALIDATION.md",
+      "kind": "documentation",
+      "key": "DOC-VALIDATION",
+      "sha256": "fb61be1bb5f5e58d42a793dfc68529ca34b588cd32728fd43fe25488e6aae716",
+      "capability_ids": [
+        "EDIT-02",
+        "REL-03",
+        "REL-05",
+        "UX-03"
+      ]
+    },
+    {
+      "path": "relay/run-relay-cli.sh",
+      "kind": "build-and-release-input",
+      "key": "BUILD",
+      "sha256": "d8309b4e352a46a101d499db1635f4d14421136a81c5d42304ff3fa2602bb883",
+      "capability_ids": [
+        "BASE-05",
+        "BASE-07",
+        "REL-01",
+        "REL-04"
+      ]
+    },
+    {
+      "path": "relay/pom.xml",
+      "kind": "build-and-release-input",
+      "key": "BUILD",
+      "sha256": "adc02c5bc692ee207b39a5b27b38b9a2a25f02e6a58e6e7a818244382e931415",
+      "capability_ids": [
+        "BASE-05",
+        "BASE-07",
+        "REL-01",
+        "REL-04"
+      ]
+    },
+    {
+      "path": "relay/run-relay.sh",
+      "kind": "build-and-release-input",
+      "key": "BUILD",
+      "sha256": "0cfa9b91f2866174dcf5fcaae836a11602b986be603b21d060715344be511ed0",
+      "capability_ids": [
+        "BASE-05",
+        "BASE-07",
+        "REL-01",
+        "REL-04"
+      ]
+    },
+    {
+      "path": "relay/README.md",
+      "kind": "documentation",
+      "key": "DOC-README",
+      "sha256": "8f614fc86119f3568e461759b64333f2c47f9a2a3eae142f3e9d55a4b5e3a38b",
+      "capability_ids": [
+        "BASE-01"
+      ]
+    },
+    {
+      "path": "relay/ROADMAP.md",
+      "kind": "documentation",
+      "key": "DOC-ROADMAP",
+      "sha256": "bf554ca64f3365914ab5df239d6354893da982813fd9b66db47d972af29328b5",
+      "capability_ids": [
+        "BASE-02",
+        "BASE-03",
+        "HTTP-06",
+        "HTTP-07",
+        "MOCK-02",
+        "REL-05",
+        "RESP-04",
+        "RUN-01",
+        "RUN-02",
+        "RUN-03",
+        "RUN-04",
+        "SAFE-01",
+        "SAFE-02",
+        "SAFE-03",
+        "SPEC-03",
+        "SPEC-04",
+        "SPEC-05",
+        "SPEC-06",
+        "UX-02",
+        "WORK-04",
+        "WORK-05"
+      ]
+    },
+    {
+      "path": "relay/RELEASE_NOTES.md",
+      "kind": "documentation",
+      "key": "DOC-RELEASE",
+      "sha256": "53388a886adb7951faa55118066573030e641c983c982c547ebc695835c5414c",
+      "capability_ids": [
+        "BASE-07",
+        "EDIT-02",
+        "EDIT-05",
+        "REL-01",
+        "REL-04",
+        "UX-01",
+        "WORK-03",
+        "WORK-06"
+      ]
+    },
+    {
+      "path": "relay/DOCUMENTATION.md",
+      "kind": "documentation",
+      "key": "DOC-USER",
+      "sha256": "206f878828ad59e8ea5d8ff79aeb0de89564160abe6c9d1285993fc06be4b402",
+      "capability_ids": [
+        "AUTH-03",
+        "AUTH-04",
+        "BASE-01",
+        "CLI-01",
+        "EDIT-01",
+        "EDIT-04",
+        "GQL-01",
+        "HTTP-03",
+        "HTTP-04",
+        "IO-03",
+        "IO-04",
+        "MOCK-01",
+        "PERF-01",
+        "PLUGIN-01",
+        "RESP-01",
+        "RESP-03",
+        "RESP-05",
+        "SAFE-04",
+        "SHARE-01",
+        "SHARE-02",
+        "SPEC-01",
+        "SPEC-02",
+        "SPEC-03",
+        "STREAM-01",
+        "STREAM-02",
+        "TEST-01",
+        "TEST-02",
+        "TLS-01",
+        "TLS-02",
+        "UX-03",
+        "WORK-01",
+        "WORK-02",
+        "WORK-03",
+        "WORK-06",
+        "WORK-07",
+        "WORK-08",
+        "WORK-09"
+      ]
+    },
+    {
+      "path": "relay/package-mac.sh",
+      "kind": "build-and-release-input",
+      "key": "BUILD",
+      "sha256": "8c6fb5c89633733622d4ced03cd81a6b9dd8d5de4e6a92c7aa3b465a6be52e85",
+      "capability_ids": [
+        "BASE-05",
+        "BASE-07",
+        "REL-01",
+        "REL-04"
+      ]
+    },
+    {
+      "path": "relay/relay-desktop/pom.xml",
+      "kind": "build-and-release-input",
+      "key": "BUILD",
+      "sha256": "18f75ed3a32885b6192d5339f6c2765d60449e6df922549168ee74ca17af9211",
+      "capability_ids": [
+        "BASE-05",
+        "BASE-07",
+        "REL-01",
+        "REL-04"
+      ]
+    },
+    {
+      "path": "relay/relay-kafka-client/pom.xml",
+      "kind": "build-and-release-input",
+      "key": "BUILD",
+      "sha256": "df5c77f011c5eb10f83394225951e8190bbebd8babcf963c29e2dcea586f56ab",
+      "capability_ids": [
+        "BASE-05",
+        "BASE-07",
+        "REL-01",
+        "REL-04"
+      ]
+    },
+    {
+      "path": "relay/relay-kafka-client/README.md",
+      "kind": "documentation",
+      "key": "DOC-KAFKA",
+      "sha256": "00b5ab95039231c8be54df9b0436439a522d502328d22803d39234a19cc5592d",
+      "capability_ids": [
+        "KAFKA-02",
+        "REL-04"
+      ]
+    },
+    {
+      "path": "relay/relay-storage/pom.xml",
+      "kind": "build-and-release-input",
+      "key": "BUILD",
+      "sha256": "e6af027907fa2b8b503a871fb3b40a16c0886b6407dd8dd539fdf5eb717243a6",
+      "capability_ids": [
+        "BASE-05",
+        "BASE-07",
+        "REL-01",
+        "REL-04"
+      ]
+    },
+    {
+      "path": "relay/docs/RELEASE_PREPARATION.md",
+      "kind": "documentation",
+      "key": "DOC-RELEASE",
+      "sha256": "fcb2458af91c5fa5abe6bf29783625d5f31a7b1e53c6db54ec62677fab2bfb32",
+      "capability_ids": [
+        "BASE-07",
+        "EDIT-02",
+        "EDIT-05",
+        "REL-01",
+        "REL-04",
+        "UX-01",
+        "WORK-03",
+        "WORK-06"
+      ]
+    },
+    {
+      "path": "relay/docs/MODERN_WORKFLOWS.md",
+      "kind": "documentation",
+      "key": "DOC-MODERN",
+      "sha256": "27d3e8ae3890e360b7c9e402c8ebe0e5983dc52c2db9577b71e63f1af08fb056",
+      "capability_ids": [
+        "AMQP-01",
+        "CLI-05",
+        "CODE-01",
+        "CODE-02",
+        "CODE-03",
+        "CODE-04",
+        "DYN-01",
+        "EVENT-01",
+        "EVENT-02",
+        "GQL-02",
+        "GQL-03",
+        "GQL-04",
+        "GRPC-01",
+        "GRPC-02",
+        "GRPC-03",
+        "GRPC-04",
+        "GRPC-05",
+        "IO-04",
+        "IO-05",
+        "IO-06",
+        "IO-07",
+        "IO-08",
+        "IO-09",
+        "KAFKA-01",
+        "KAFKA-02",
+        "MQTT-02",
+        "RUN-05",
+        "RUN-06",
+        "SCAN-01",
+        "SCAN-02",
+        "SCRIPT-01",
+        "SCRIPT-02",
+        "SCRIPT-03",
+        "SCRIPT-04",
+        "SCRIPT-05",
+        "SPEC-07"
+      ]
+    },
+    {
+      "path": "relay/docs/TRANSPORT_DEPENDENCIES.md",
+      "kind": "documentation",
+      "key": "DOC-TRANSPORT",
+      "sha256": "579846e350b527be6fbcbba86b9e44a1228defe3e90d319f8e4c8724a6106525",
+      "capability_ids": [
+        "BASE-07",
+        "EVENT-02",
+        "KAFKA-01",
+        "KAFKA-02",
+        "MQTT-01",
+        "MQTT-03",
+        "TLS-03"
+      ]
+    },
+    {
+      "path": "relay/relay-core/pom.xml",
+      "kind": "build-and-release-input",
+      "key": "BUILD",
+      "sha256": "fa936c594b66b0ee58b32062ef059feb6840f23027caf0319a96591a23395a0c",
+      "capability_ids": [
+        "BASE-05",
+        "BASE-07",
+        "REL-01",
+        "REL-04"
+      ]
+    },
+    {
+      "path": "relay/scripts/release_audit.py",
+      "kind": "build-and-release-input",
+      "key": "BUILD",
+      "sha256": "ec763b56a4eb61eeb74118908a707a6ac147a331302cb9b8ad87b9f557186aae",
+      "capability_ids": [
+        "BASE-05",
+        "BASE-07",
+        "REL-01",
+        "REL-04"
+      ]
+    },
+    {
+      "path": "relay/scripts/JavadocCoverage.java",
+      "kind": "build-and-release-input",
+      "key": "BUILD",
+      "sha256": "c694ad0c5dcb5f1b4179bf7bc0a0dcf9728a854b1516eff791a04e3c3ac661a0",
+      "capability_ids": [
+        "BASE-05",
+        "BASE-07",
+        "REL-01",
+        "REL-04"
+      ]
+    },
+    {
+      "path": "relay/relay-cli/pom.xml",
+      "kind": "build-and-release-input",
+      "key": "BUILD",
+      "sha256": "7bfdbc6f26efc4a1bcfebe3ee1db6ef7d313aba22864764dca2cd176ce3527e9",
+      "capability_ids": [
+        "BASE-05",
+        "BASE-07",
+        "REL-01",
+        "REL-04"
+      ]
+    },
+    {
+      "path": "relay/packaging/macos/README.md",
+      "kind": "documentation",
+      "key": "DOC-PACKAGING",
+      "sha256": "21461e455f69a9dd52b3ed44f5a47beab3312b173f3daef1a971054620dae94a",
+      "capability_ids": [
+        "REL-01",
+        "REL-02",
+        "REL-03"
+      ]
+    },
+    {
+      "path": "relay/relay-desktop/src/main/java/module-info.java",
+      "kind": "production-entrypoint",
+      "key": "BUILD",
+      "sha256": "1b5a9ebcaa244efca714b6003c53f10e2f9d2ba104542d25565c92c9eadf11f4",
+      "capability_ids": [
+        "BASE-05",
+        "BASE-07",
+        "REL-01",
+        "REL-04"
+      ]
+    },
+    {
+      "path": "relay/relay-storage/src/main/java/module-info.java",
+      "kind": "production-entrypoint",
+      "key": "BUILD",
+      "sha256": "14eb9d5cd2e4dcfdc4803e7c86a0fe2d645bd2acb249f9e8d9914a32b19aa41b",
+      "capability_ids": [
+        "BASE-05",
+        "BASE-07",
+        "REL-01",
+        "REL-04"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/module-info.java",
+      "kind": "production-entrypoint",
+      "key": "BUILD",
+      "sha256": "484e539d258c7a63ddccd195e22842ad142b7f68ea680d373eb31e1d127c54c9",
+      "capability_ids": [
+        "BASE-05",
+        "BASE-07",
+        "REL-01",
+        "REL-04"
+      ]
+    },
+    {
+      "path": "relay/relay-cli/src/main/java/module-info.java",
+      "kind": "production-entrypoint",
+      "key": "BUILD",
+      "sha256": "d576f32de9c00255f98199184ed69c4c7314ca5fea235affb6f93112da8633ef",
+      "capability_ids": [
+        "BASE-05",
+        "BASE-07",
+        "REL-01",
+        "REL-04"
+      ]
+    },
+    {
+      "path": "relay/relay-desktop/src/main/resources/app/relay/desktop/relay.css",
+      "kind": "build-and-release-input",
+      "key": "BUILD",
+      "sha256": "fc5adddaecd48e63f13ab5a5839d532c13d30c7ec115eda2ca1746c3896c69ce",
+      "capability_ids": [
+        "BASE-05",
+        "BASE-07",
+        "REL-01",
+        "REL-04"
+      ]
+    },
+    {
+      "path": "relay/relay-desktop/src/main/resources/app/relay/desktop/relay-icon.png",
+      "kind": "build-and-release-input",
+      "key": "BUILD",
+      "sha256": "1865dd480e644a968abffbbe3720375ce4e5763990de6290ae8447786c16acdd",
+      "capability_ids": [
+        "BASE-05",
+        "BASE-07",
+        "REL-01",
+        "REL-04"
+      ]
+    },
+    {
+      "path": "relay/relay-desktop/src/main/java/app/relay/desktop/RelayApplication.java",
+      "kind": "production-entrypoint",
+      "key": "UI",
+      "sha256": "4c167c2eec878ce416b1207417a87f77f36231a44e7eedd8564f013bcc0d028b",
+      "capability_ids": [
+        "AMQP-01",
+        "AUTH-05",
+        "BASE-04",
+        "EDIT-01",
+        "EDIT-02",
+        "EDIT-03",
+        "EVENT-02",
+        "RESP-01",
+        "RESP-02",
+        "RESP-03",
+        "SAFE-03",
+        "TLS-03",
+        "WORK-02",
+        "WORK-04"
+      ]
+    },
+    {
+      "path": "relay/relay-storage/src/test/java/app/relay/storage/FileWorkspaceStoreTest.java",
+      "kind": "test-file",
+      "key": "TEST-storage",
+      "sha256": "c951fcbb9c77af3c55c581f54cf9d438e7c94c9401585f306c93041c108c7e4d",
+      "capability_ids": [
+        "HTTP-05",
+        "IO-09",
+        "SAFE-01",
+        "SAFE-02",
+        "SAFE-03",
+        "SAFE-04",
+        "SCRIPT-01",
+        "SPEC-03",
+        "WORK-01",
+        "WORK-02",
+        "WORK-03",
+        "WORK-05",
+        "WORK-08"
+      ]
+    },
+    {
+      "path": "relay/relay-storage/src/test/java/app/relay/storage/RecoveryWorkflowTest.java",
+      "kind": "test-file",
+      "key": "TEST-storage",
+      "sha256": "e14f7ae5e02d48b464eb59322c43343a4c0f4f2c79e62baee8754f749c7d9e1d",
+      "capability_ids": [
+        "HTTP-05",
+        "IO-09",
+        "SAFE-01",
+        "SAFE-02",
+        "SAFE-03",
+        "SAFE-04",
+        "SCRIPT-01",
+        "SPEC-03",
+        "WORK-01",
+        "WORK-02",
+        "WORK-03",
+        "WORK-05",
+        "WORK-08"
+      ]
+    },
+    {
+      "path": "relay/relay-storage/src/test/java/app/relay/storage/ScriptPersistenceTest.java",
+      "kind": "test-file",
+      "key": "TEST-storage",
+      "sha256": "42a2041a2df3702961eff3961d3f018de97d33dd648633cdfce2484c2bb1dbb9",
+      "capability_ids": [
+        "HTTP-05",
+        "IO-09",
+        "SAFE-01",
+        "SAFE-02",
+        "SAFE-03",
+        "SAFE-04",
+        "SCRIPT-01",
+        "SPEC-03",
+        "WORK-01",
+        "WORK-02",
+        "WORK-03",
+        "WORK-05",
+        "WORK-08"
+      ]
+    },
+    {
+      "path": "relay/relay-storage/src/main/java/app/relay/storage/StorageException.java",
+      "kind": "production-entrypoint",
+      "key": "STORE",
+      "sha256": "23d287b032c37a1810d685d9d4b5d8a7b437299db9c90b528eaaef4bf0635cb8",
+      "capability_ids": [
+        "BASE-02",
+        "IO-01",
+        "RESP-04",
+        "SAFE-01",
+        "WORK-01",
+        "WORK-07"
+      ]
+    },
+    {
+      "path": "relay/relay-storage/src/main/java/app/relay/storage/SimplePropertyFile.java",
+      "kind": "production-entrypoint",
+      "key": "STORE",
+      "sha256": "cc0fe4650b812c86c6e3e28b8a4b869baf0f9bc2ffa26da1d7d456166ee2a405",
+      "capability_ids": [
+        "BASE-02",
+        "IO-01",
+        "RESP-04",
+        "SAFE-01",
+        "WORK-01",
+        "WORK-07"
+      ]
+    },
+    {
+      "path": "relay/relay-storage/src/main/java/app/relay/storage/FileWorkspaceStore.java",
+      "kind": "production-entrypoint",
+      "key": "STORE",
+      "sha256": "2fa71a8fcd2d4bd9d4bca401c9da249ca14eda56837e97d0edb53f9daa74808e",
+      "capability_ids": [
+        "BASE-02",
+        "IO-01",
+        "RESP-04",
+        "SAFE-01",
+        "WORK-01",
+        "WORK-07"
+      ]
+    },
+    {
+      "path": "relay/relay-storage/src/main/java/app/relay/storage/WorkspaceBackup.java",
+      "kind": "production-entrypoint",
+      "key": "STORE",
+      "sha256": "5871739fd8bd1cc3a4db473592c9e79384d62e102af06893d3a4a534f68b6b32",
+      "capability_ids": [
+        "BASE-02",
+        "IO-01",
+        "RESP-04",
+        "SAFE-01",
+        "WORK-01",
+        "WORK-07"
+      ]
+    },
+    {
+      "path": "relay/relay-storage/src/main/java/app/relay/storage/SupportBundle.java",
+      "kind": "production-entrypoint",
+      "key": "STORE",
+      "sha256": "03c1e09fbb421205aa5c3127b7e342d7a0d8ddf4ce2a1cdf4e80022da5844ad2",
+      "capability_ids": [
+        "BASE-02",
+        "IO-01",
+        "RESP-04",
+        "SAFE-01",
+        "WORK-01",
+        "WORK-07"
+      ]
+    },
+    {
+      "path": "relay/relay-cli/src/main/java/app/relay/cli/RelayCli.java",
+      "kind": "production-entrypoint",
+      "key": "CLI",
+      "sha256": "0b6feee15e8d70e797e8b6564f08cfb0ff2cc75b165dad33d2b93fa746a498b5",
+      "capability_ids": [
+        "AUTH-06",
+        "CLI-01",
+        "CLI-02",
+        "CLI-03",
+        "CLI-04",
+        "CLI-05",
+        "GRPC-05",
+        "PLUGIN-01",
+        "SHARE-01",
+        "SHARE-03"
+      ]
+    },
+    {
+      "path": "relay/relay-desktop/src/test/java/app/relay/desktop/ui/InputSuggestionsTest.java",
+      "kind": "test-file",
+      "key": "TEST-ui",
+      "sha256": "6d6c1d92dff30f5fe63c1ef912e16ecbe3f3346027b3006f059f96c8bc00e72a",
+      "capability_ids": [
+        "EDIT-03"
+      ]
+    },
+    {
+      "path": "relay/relay-desktop/src/test/java/app/relay/desktop/ui/ThemeControllerTest.java",
+      "kind": "test-file",
+      "key": "TEST-ui",
+      "sha256": "e5003aed0bed2a4c1847016e31682fe638e4367438c561272e39a07ae64c20f1",
+      "capability_ids": [
+        "EDIT-03"
+      ]
+    },
+    {
+      "path": "relay/relay-desktop/src/main/java/app/relay/desktop/ui/RelaySaveBrowser.java",
+      "kind": "production-entrypoint",
+      "key": "UI",
+      "sha256": "4afcbbb17bf11d2f8a35d6b03a61ca387967e3a0b31f68f108496862bf4e62f6",
+      "capability_ids": [
+        "AMQP-01",
+        "AUTH-05",
+        "BASE-04",
+        "EDIT-01",
+        "EDIT-02",
+        "EDIT-03",
+        "EVENT-02",
+        "RESP-01",
+        "RESP-02",
+        "RESP-03",
+        "SAFE-03",
+        "TLS-03",
+        "WORK-02",
+        "WORK-04"
+      ]
+    },
+    {
+      "path": "relay/relay-desktop/src/main/java/app/relay/desktop/ui/DraftRecovery.java",
+      "kind": "production-entrypoint",
+      "key": "UI",
+      "sha256": "5f5078d67e1636b9bce4b8e3a26141b032d9a43dd91e533d06a9611920336071",
+      "capability_ids": [
+        "AMQP-01",
+        "AUTH-05",
+        "BASE-04",
+        "EDIT-01",
+        "EDIT-02",
+        "EDIT-03",
+        "EVENT-02",
+        "RESP-01",
+        "RESP-02",
+        "RESP-03",
+        "SAFE-03",
+        "TLS-03",
+        "WORK-02",
+        "WORK-04"
+      ]
+    },
+    {
+      "path": "relay/relay-desktop/src/main/java/app/relay/desktop/ui/KeyValueEditor.java",
+      "kind": "production-entrypoint",
+      "key": "UI",
+      "sha256": "43ca7be0ef330cad19c0952348e02f90703710792853fc2bb26679542383970d",
+      "capability_ids": [
+        "AMQP-01",
+        "AUTH-05",
+        "BASE-04",
+        "EDIT-01",
+        "EDIT-02",
+        "EDIT-03",
+        "EVENT-02",
+        "RESP-01",
+        "RESP-02",
+        "RESP-03",
+        "SAFE-03",
+        "TLS-03",
+        "WORK-02",
+        "WORK-04"
+      ]
+    },
+    {
+      "path": "relay/relay-desktop/src/main/java/app/relay/desktop/ui/AuthPane.java",
+      "kind": "production-entrypoint",
+      "key": "UI",
+      "sha256": "f7f6998af74efc7800af909c457ba272fa95478f82e1a0a89a785bc9adc0bf34",
+      "capability_ids": [
+        "AMQP-01",
+        "AUTH-05",
+        "BASE-04",
+        "EDIT-01",
+        "EDIT-02",
+        "EDIT-03",
+        "EVENT-02",
+        "RESP-01",
+        "RESP-02",
+        "RESP-03",
+        "SAFE-03",
+        "TLS-03",
+        "WORK-02",
+        "WORK-04"
+      ]
+    },
+    {
+      "path": "relay/relay-desktop/src/main/java/app/relay/desktop/ui/ToolForms.java",
+      "kind": "production-entrypoint",
+      "key": "UI",
+      "sha256": "cb7ef6dd47b4313c8e280eeaa34c79bdfabe8b13d2828876acf8fba3f04f6f04",
+      "capability_ids": [
+        "AMQP-01",
+        "AUTH-05",
+        "BASE-04",
+        "EDIT-01",
+        "EDIT-02",
+        "EDIT-03",
+        "EVENT-02",
+        "RESP-01",
+        "RESP-02",
+        "RESP-03",
+        "SAFE-03",
+        "TLS-03",
+        "WORK-02",
+        "WORK-04"
+      ]
+    },
+    {
+      "path": "relay/relay-desktop/src/main/java/app/relay/desktop/ui/ThemeController.java",
+      "kind": "production-entrypoint",
+      "key": "UI",
+      "sha256": "1ae0e4c074d03d3da00f560d6be8f395bcd0cfd846fc792b8cfdd379df5f6489",
+      "capability_ids": [
+        "AMQP-01",
+        "AUTH-05",
+        "BASE-04",
+        "EDIT-01",
+        "EDIT-02",
+        "EDIT-03",
+        "EVENT-02",
+        "RESP-01",
+        "RESP-02",
+        "RESP-03",
+        "SAFE-03",
+        "TLS-03",
+        "WORK-02",
+        "WORK-04"
+      ]
+    },
+    {
+      "path": "relay/relay-desktop/src/main/java/app/relay/desktop/ui/StructuredTextView.java",
+      "kind": "production-entrypoint",
+      "key": "UI",
+      "sha256": "3251d5543cb1757f76a17c724b38a58bb202a6376e21daa8ca3ff6fd4dfc4fa3",
+      "capability_ids": [
+        "AMQP-01",
+        "AUTH-05",
+        "BASE-04",
+        "EDIT-01",
+        "EDIT-02",
+        "EDIT-03",
+        "EVENT-02",
+        "RESP-01",
+        "RESP-02",
+        "RESP-03",
+        "SAFE-03",
+        "TLS-03",
+        "WORK-02",
+        "WORK-04"
+      ]
+    },
+    {
+      "path": "relay/relay-desktop/src/main/java/app/relay/desktop/ui/SnippetsPane.java",
+      "kind": "production-entrypoint",
+      "key": "UI",
+      "sha256": "96b859cff58dbee2930f3978adbd9e582f387c9f27f0e96cf6849f880883afa7",
+      "capability_ids": [
+        "AMQP-01",
+        "AUTH-05",
+        "BASE-04",
+        "EDIT-01",
+        "EDIT-02",
+        "EDIT-03",
+        "EVENT-02",
+        "RESP-01",
+        "RESP-02",
+        "RESP-03",
+        "SAFE-03",
+        "TLS-03",
+        "WORK-02",
+        "WORK-04"
+      ]
+    },
+    {
+      "path": "relay/relay-desktop/src/main/java/app/relay/desktop/ui/CodeTypography.java",
+      "kind": "production-entrypoint",
+      "key": "UI",
+      "sha256": "90ae3108ed239091ff33caf829862219d70b5dc7a5b887a93ddeee0684bca0cb",
+      "capability_ids": [
+        "AMQP-01",
+        "AUTH-05",
+        "BASE-04",
+        "EDIT-01",
+        "EDIT-02",
+        "EDIT-03",
+        "EVENT-02",
+        "RESP-01",
+        "RESP-02",
+        "RESP-03",
+        "SAFE-03",
+        "TLS-03",
+        "WORK-02",
+        "WORK-04"
+      ]
+    },
+    {
+      "path": "relay/relay-desktop/src/main/java/app/relay/desktop/ui/EventToolsPane.java",
+      "kind": "production-entrypoint",
+      "key": "UI",
+      "sha256": "58c58df4dda19f539e6ae45816eb4effec4bc2ed543cf129b3c9de17cffe339a",
+      "capability_ids": [
+        "AMQP-01",
+        "AUTH-05",
+        "BASE-04",
+        "EDIT-01",
+        "EDIT-02",
+        "EDIT-03",
+        "EVENT-02",
+        "RESP-01",
+        "RESP-02",
+        "RESP-03",
+        "SAFE-03",
+        "TLS-03",
+        "WORK-02",
+        "WORK-04"
+      ]
+    },
+    {
+      "path": "relay/relay-desktop/src/main/java/app/relay/desktop/ui/TestsPane.java",
+      "kind": "production-entrypoint",
+      "key": "UI",
+      "sha256": "d38d91d84f880a0fc3abe839c0cbca2694c3b9035d7bdce4e0b5f15cfe198cf0",
+      "capability_ids": [
+        "AMQP-01",
+        "AUTH-05",
+        "BASE-04",
+        "EDIT-01",
+        "EDIT-02",
+        "EDIT-03",
+        "EVENT-02",
+        "RESP-01",
+        "RESP-02",
+        "RESP-03",
+        "SAFE-03",
+        "TLS-03",
+        "WORK-02",
+        "WORK-04"
+      ]
+    },
+    {
+      "path": "relay/relay-desktop/src/main/java/app/relay/desktop/ui/MatrixPane.java",
+      "kind": "production-entrypoint",
+      "key": "UI",
+      "sha256": "034258ad75c549bd3f5774d8cae27531c1dc74e88d230d7c6455aa8550566edf",
+      "capability_ids": [
+        "AMQP-01",
+        "AUTH-05",
+        "BASE-04",
+        "EDIT-01",
+        "EDIT-02",
+        "EDIT-03",
+        "EVENT-02",
+        "RESP-01",
+        "RESP-02",
+        "RESP-03",
+        "SAFE-03",
+        "TLS-03",
+        "WORK-02",
+        "WORK-04"
+      ]
+    },
+    {
+      "path": "relay/relay-desktop/src/main/java/app/relay/desktop/ui/UiMotion.java",
+      "kind": "production-entrypoint",
+      "key": "UI",
+      "sha256": "fa09d8fa4e552e6bcbaa3590f7d9060b982a1c50b186e5fd63302f0c5cd13afa",
+      "capability_ids": [
+        "AMQP-01",
+        "AUTH-05",
+        "BASE-04",
+        "EDIT-01",
+        "EDIT-02",
+        "EDIT-03",
+        "EVENT-02",
+        "RESP-01",
+        "RESP-02",
+        "RESP-03",
+        "SAFE-03",
+        "TLS-03",
+        "WORK-02",
+        "WORK-04"
+      ]
+    },
+    {
+      "path": "relay/relay-desktop/src/main/java/app/relay/desktop/ui/BodySyntaxDecorator.java",
+      "kind": "production-entrypoint",
+      "key": "UI",
+      "sha256": "2a9c90ceda328ff052add379761bfd728963e6fff627a0f7b58981c9ab69789d",
+      "capability_ids": [
+        "AMQP-01",
+        "AUTH-05",
+        "BASE-04",
+        "EDIT-01",
+        "EDIT-02",
+        "EDIT-03",
+        "EVENT-02",
+        "RESP-01",
+        "RESP-02",
+        "RESP-03",
+        "SAFE-03",
+        "TLS-03",
+        "WORK-02",
+        "WORK-04"
+      ]
+    },
+    {
+      "path": "relay/relay-desktop/src/main/java/app/relay/desktop/ui/SecurityScanPane.java",
+      "kind": "production-entrypoint",
+      "key": "UI",
+      "sha256": "8b743467c7aff9dc3e900c833d4292803dc92a2f20be96db10353801b21f20f9",
+      "capability_ids": [
+        "AMQP-01",
+        "AUTH-05",
+        "BASE-04",
+        "EDIT-01",
+        "EDIT-02",
+        "EDIT-03",
+        "EVENT-02",
+        "RESP-01",
+        "RESP-02",
+        "RESP-03",
+        "SAFE-03",
+        "TLS-03",
+        "WORK-02",
+        "WORK-04"
+      ]
+    },
+    {
+      "path": "relay/relay-desktop/src/main/java/app/relay/desktop/ui/InputSuggestions.java",
+      "kind": "production-entrypoint",
+      "key": "UI",
+      "sha256": "bad93a668466787021ddc6c00a7d8b9939b6b60d17188b26748b85d8fdb0d434",
+      "capability_ids": [
+        "AMQP-01",
+        "AUTH-05",
+        "BASE-04",
+        "EDIT-01",
+        "EDIT-02",
+        "EDIT-03",
+        "EVENT-02",
+        "RESP-01",
+        "RESP-02",
+        "RESP-03",
+        "SAFE-03",
+        "TLS-03",
+        "WORK-02",
+        "WORK-04"
+      ]
+    },
+    {
+      "path": "relay/relay-desktop/src/main/java/app/relay/desktop/ui/RelayIcon.java",
+      "kind": "production-entrypoint",
+      "key": "UI",
+      "sha256": "9f9753a960d98908102a80d1fac8fc0ca153bcad4224aa2f9ae0f413744bf398",
+      "capability_ids": [
+        "AMQP-01",
+        "AUTH-05",
+        "BASE-04",
+        "EDIT-01",
+        "EDIT-02",
+        "EDIT-03",
+        "EVENT-02",
+        "RESP-01",
+        "RESP-02",
+        "RESP-03",
+        "SAFE-03",
+        "TLS-03",
+        "WORK-02",
+        "WORK-04"
+      ]
+    },
+    {
+      "path": "relay/relay-desktop/src/main/java/app/relay/desktop/ui/RequestWorkspace.java",
+      "kind": "production-entrypoint",
+      "key": "UI",
+      "sha256": "cd8b3af3004f3e74d3eb6ad1ca2cc42457d56310060fb1155d32c61f1479b961",
+      "capability_ids": [
+        "AMQP-01",
+        "AUTH-05",
+        "BASE-04",
+        "EDIT-01",
+        "EDIT-02",
+        "EDIT-03",
+        "EVENT-02",
+        "RESP-01",
+        "RESP-02",
+        "RESP-03",
+        "SAFE-03",
+        "TLS-03",
+        "WORK-02",
+        "WORK-04"
+      ]
+    },
+    {
+      "path": "relay/relay-desktop/src/main/java/app/relay/desktop/ui/MultipartBodyEditor.java",
+      "kind": "production-entrypoint",
+      "key": "UI",
+      "sha256": "00b7cee74c5c2d16ffecf61d2cbe0a4a6ac5be192d03cae737df4ae684f306e2",
+      "capability_ids": [
+        "AMQP-01",
+        "AUTH-05",
+        "BASE-04",
+        "EDIT-01",
+        "EDIT-02",
+        "EDIT-03",
+        "EVENT-02",
+        "RESP-01",
+        "RESP-02",
+        "RESP-03",
+        "SAFE-03",
+        "TLS-03",
+        "WORK-02",
+        "WORK-04"
+      ]
+    },
+    {
+      "path": "relay/relay-desktop/src/main/java/app/relay/desktop/ui/CollectionRunnerPane.java",
+      "kind": "production-entrypoint",
+      "key": "UI",
+      "sha256": "a27da06166f4eb10ffc82f8c41dd640963af10d28ca3ca7b2dde341801825c35",
+      "capability_ids": [
+        "AMQP-01",
+        "AUTH-05",
+        "BASE-04",
+        "EDIT-01",
+        "EDIT-02",
+        "EDIT-03",
+        "EVENT-02",
+        "RESP-01",
+        "RESP-02",
+        "RESP-03",
+        "SAFE-03",
+        "TLS-03",
+        "WORK-02",
+        "WORK-04"
+      ]
+    },
+    {
+      "path": "relay/relay-desktop/src/main/java/app/relay/desktop/ui/ResponseHeadersView.java",
+      "kind": "production-entrypoint",
+      "key": "UI",
+      "sha256": "e1597537be25adac9c2e9c6b67313a502df39a6e449abb649989cfcef4c6e733",
+      "capability_ids": [
+        "AMQP-01",
+        "AUTH-05",
+        "BASE-04",
+        "EDIT-01",
+        "EDIT-02",
+        "EDIT-03",
+        "EVENT-02",
+        "RESP-01",
+        "RESP-02",
+        "RESP-03",
+        "SAFE-03",
+        "TLS-03",
+        "WORK-02",
+        "WORK-04"
+      ]
+    },
+    {
+      "path": "relay/relay-desktop/src/main/java/app/relay/desktop/ui/ExchangeDetailPane.java",
+      "kind": "production-entrypoint",
+      "key": "UI",
+      "sha256": "c257c0bdd6c854e29c3289b72f14d879d054eea4159087aefc90c7392fb28a9a",
+      "capability_ids": [
+        "AMQP-01",
+        "AUTH-05",
+        "BASE-04",
+        "EDIT-01",
+        "EDIT-02",
+        "EDIT-03",
+        "EVENT-02",
+        "RESP-01",
+        "RESP-02",
+        "RESP-03",
+        "SAFE-03",
+        "TLS-03",
+        "WORK-02",
+        "WORK-04"
+      ]
+    },
+    {
+      "path": "relay/relay-desktop/src/main/java/app/relay/desktop/ui/AdvancedToolsPane.java",
+      "kind": "production-entrypoint",
+      "key": "UI",
+      "sha256": "f1ad92ef54c5a780481a6e5bf7290af50a29dc9714a3b821c090a68aef6c69e8",
+      "capability_ids": [
+        "AMQP-01",
+        "AUTH-05",
+        "BASE-04",
+        "EDIT-01",
+        "EDIT-02",
+        "EDIT-03",
+        "EVENT-02",
+        "RESP-01",
+        "RESP-02",
+        "RESP-03",
+        "SAFE-03",
+        "TLS-03",
+        "WORK-02",
+        "WORK-04"
+      ]
+    },
+    {
+      "path": "relay/relay-desktop/src/main/java/app/relay/desktop/ui/RelayShell.java",
+      "kind": "production-entrypoint",
+      "key": "UI",
+      "sha256": "314181f9ab8b510ce723e69510330e5c9798a187b6b233e4a7f9c7f7ad4464bc",
+      "capability_ids": [
+        "AMQP-01",
+        "AUTH-05",
+        "BASE-04",
+        "EDIT-01",
+        "EDIT-02",
+        "EDIT-03",
+        "EVENT-02",
+        "RESP-01",
+        "RESP-02",
+        "RESP-03",
+        "SAFE-03",
+        "TLS-03",
+        "WORK-02",
+        "WORK-04"
+      ]
+    },
+    {
+      "path": "relay/relay-desktop/src/main/java/app/relay/desktop/ui/RelayFileBrowser.java",
+      "kind": "production-entrypoint",
+      "key": "UI",
+      "sha256": "f962d0da54f68f93da9aca4499a5fece14771c28f09f84d8f74178dd218bbeda",
+      "capability_ids": [
+        "AMQP-01",
+        "AUTH-05",
+        "BASE-04",
+        "EDIT-01",
+        "EDIT-02",
+        "EDIT-03",
+        "EVENT-02",
+        "RESP-01",
+        "RESP-02",
+        "RESP-03",
+        "SAFE-03",
+        "TLS-03",
+        "WORK-02",
+        "WORK-04"
+      ]
+    },
+    {
+      "path": "relay/relay-desktop/src/main/java/app/relay/desktop/ui/ResponsePane.java",
+      "kind": "production-entrypoint",
+      "key": "UI",
+      "sha256": "7a8c6232d533bdef806e59d03626d5ecef1da0cd530e2b3c056d2dc52ac92dfa",
+      "capability_ids": [
+        "AMQP-01",
+        "AUTH-05",
+        "BASE-04",
+        "EDIT-01",
+        "EDIT-02",
+        "EDIT-03",
+        "EVENT-02",
+        "RESP-01",
+        "RESP-02",
+        "RESP-03",
+        "SAFE-03",
+        "TLS-03",
+        "WORK-02",
+        "WORK-04"
+      ]
+    },
+    {
+      "path": "relay/relay-desktop/src/main/java/app/relay/desktop/ui/NumericInputs.java",
+      "kind": "production-entrypoint",
+      "key": "UI",
+      "sha256": "e8ccd9e0a6f0a8c694406e017a3511f445728f71d74a0763da4cf2b5d4285058",
+      "capability_ids": [
+        "AMQP-01",
+        "AUTH-05",
+        "BASE-04",
+        "EDIT-01",
+        "EDIT-02",
+        "EDIT-03",
+        "EVENT-02",
+        "RESP-01",
+        "RESP-02",
+        "RESP-03",
+        "SAFE-03",
+        "TLS-03",
+        "WORK-02",
+        "WORK-04"
+      ]
+    },
+    {
+      "path": "relay/relay-desktop/src/main/java/app/relay/desktop/ui/NativeGrpcPane.java",
+      "kind": "production-entrypoint",
+      "key": "UI",
+      "sha256": "bcbb029d27d1d5c02d6fd0a7ea9a3cc0790bcb55de439ccb559882097eab5747",
+      "capability_ids": [
+        "AMQP-01",
+        "AUTH-05",
+        "BASE-04",
+        "EDIT-01",
+        "EDIT-02",
+        "EDIT-03",
+        "EVENT-02",
+        "RESP-01",
+        "RESP-02",
+        "RESP-03",
+        "SAFE-03",
+        "TLS-03",
+        "WORK-02",
+        "WORK-04"
+      ]
+    },
+    {
+      "path": "relay/relay-desktop/src/main/java/app/relay/desktop/ui/RelayFileBrowserModel.java",
+      "kind": "production-entrypoint",
+      "key": "UI",
+      "sha256": "cf52a5038b3008e165c20af3767634b0dcc2e1342a16e5f084ae739e6bbf6091",
+      "capability_ids": [
+        "AMQP-01",
+        "AUTH-05",
+        "BASE-04",
+        "EDIT-01",
+        "EDIT-02",
+        "EDIT-03",
+        "EVENT-02",
+        "RESP-01",
+        "RESP-02",
+        "RESP-03",
+        "SAFE-03",
+        "TLS-03",
+        "WORK-02",
+        "WORK-04"
+      ]
+    },
+    {
+      "path": "relay/relay-desktop/src/main/java/app/relay/desktop/ui/BoundedTimeline.java",
+      "kind": "production-entrypoint",
+      "key": "UI",
+      "sha256": "0b90add368a9097034f249bc9927e21c9e48999cdb43a2db057de1ddd3ebc62b",
+      "capability_ids": [
+        "AMQP-01",
+        "AUTH-05",
+        "BASE-04",
+        "EDIT-01",
+        "EDIT-02",
+        "EDIT-03",
+        "EVENT-02",
+        "RESP-01",
+        "RESP-02",
+        "RESP-03",
+        "SAFE-03",
+        "TLS-03",
+        "WORK-02",
+        "WORK-04"
+      ]
+    },
+    {
+      "path": "relay/relay-desktop/src/main/java/app/relay/desktop/ui/RequestTabHost.java",
+      "kind": "production-entrypoint",
+      "key": "UI",
+      "sha256": "958c67b56509a23456d0dc4c9d55cdfa2531cf39849a166bbd4e1616c6fae6cb",
+      "capability_ids": [
+        "AMQP-01",
+        "AUTH-05",
+        "BASE-04",
+        "EDIT-01",
+        "EDIT-02",
+        "EDIT-03",
+        "EVENT-02",
+        "RESP-01",
+        "RESP-02",
+        "RESP-03",
+        "SAFE-03",
+        "TLS-03",
+        "WORK-02",
+        "WORK-04"
+      ]
+    },
+    {
+      "path": "relay/relay-desktop/src/main/java/app/relay/desktop/ui/DocumentationPane.java",
+      "kind": "production-entrypoint",
+      "key": "UI",
+      "sha256": "3031278d12ee4e5849045c1dd92f7503eb110ad4878711c210716da7d3fbde93",
+      "capability_ids": [
+        "AMQP-01",
+        "AUTH-05",
+        "BASE-04",
+        "EDIT-01",
+        "EDIT-02",
+        "EDIT-03",
+        "EVENT-02",
+        "RESP-01",
+        "RESP-02",
+        "RESP-03",
+        "SAFE-03",
+        "TLS-03",
+        "WORK-02",
+        "WORK-04"
+      ]
+    },
+    {
+      "path": "relay/relay-desktop/src/main/java/app/relay/desktop/ui/EcosystemPane.java",
+      "kind": "production-entrypoint",
+      "key": "UI",
+      "sha256": "f6b3702cac9f01ef482bf78a6f6f9095ef1224d883a555039b712eafc9b1bb90",
+      "capability_ids": [
+        "AMQP-01",
+        "AUTH-05",
+        "BASE-04",
+        "EDIT-01",
+        "EDIT-02",
+        "EDIT-03",
+        "EVENT-02",
+        "RESP-01",
+        "RESP-02",
+        "RESP-03",
+        "SAFE-03",
+        "TLS-03",
+        "WORK-02",
+        "WORK-04"
+      ]
+    },
+    {
+      "path": "relay/relay-desktop/src/main/java/app/relay/desktop/ui/WorkspaceSidebar.java",
+      "kind": "production-entrypoint",
+      "key": "UI",
+      "sha256": "c9a8164ddd633bc8d1eae7b25bfe51557e78a6f5bbc0e0a198751cccd6bf173b",
+      "capability_ids": [
+        "AMQP-01",
+        "AUTH-05",
+        "BASE-04",
+        "EDIT-01",
+        "EDIT-02",
+        "EDIT-03",
+        "EVENT-02",
+        "RESP-01",
+        "RESP-02",
+        "RESP-03",
+        "SAFE-03",
+        "TLS-03",
+        "WORK-02",
+        "WORK-04"
+      ]
+    },
+    {
+      "path": "relay/relay-desktop/src/main/java/app/relay/desktop/ui/BodyTextEditor.java",
+      "kind": "production-entrypoint",
+      "key": "UI",
+      "sha256": "52d98fc77cf1dbe75258b5cd25453b699eea1842b545be01d57717a8dd1b7f67",
+      "capability_ids": [
+        "AMQP-01",
+        "AUTH-05",
+        "BASE-04",
+        "EDIT-01",
+        "EDIT-02",
+        "EDIT-03",
+        "EVENT-02",
+        "RESP-01",
+        "RESP-02",
+        "RESP-03",
+        "SAFE-03",
+        "TLS-03",
+        "WORK-02",
+        "WORK-04"
+      ]
+    },
+    {
+      "path": "relay/relay-desktop/src/main/java/app/relay/desktop/ui/UtilityDrawer.java",
+      "kind": "production-entrypoint",
+      "key": "UI",
+      "sha256": "dcbc6ff6c87faeadf598a9064eaeb12a231cb0e0b3e3be67390fb229cce3ae56",
+      "capability_ids": [
+        "AMQP-01",
+        "AUTH-05",
+        "BASE-04",
+        "EDIT-01",
+        "EDIT-02",
+        "EDIT-03",
+        "EVENT-02",
+        "RESP-01",
+        "RESP-02",
+        "RESP-03",
+        "SAFE-03",
+        "TLS-03",
+        "WORK-02",
+        "WORK-04"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/test/java/app/relay/core/importer/JsonCollectionImporterTest.java",
+      "kind": "test-file",
+      "key": "TEST-importer",
+      "sha256": "31df04c2f090bebbcc0e41662c05f4f9e6085b802efc6adde7603ff84a6c9181",
+      "capability_ids": [
+        "IO-03",
+        "IO-04",
+        "IO-05"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/test/java/app/relay/core/scripting/ScriptRuntimeTest.java",
+      "kind": "test-file",
+      "key": "TEST-scripting",
+      "sha256": "5e4a22b6bd95a26732e1b3d8d8ac97dba61f790859a9b3d1d514e94e9c858f2d",
+      "capability_ids": [
+        "DYN-01",
+        "SCRIPT-01",
+        "SCRIPT-02",
+        "SCRIPT-03",
+        "SCRIPT-04",
+        "SCRIPT-05"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/test/java/app/relay/core/scripting/DynamicTemplatesTest.java",
+      "kind": "test-file",
+      "key": "TEST-scripting",
+      "sha256": "8f4e4734bdd2859256fed752b72d6ca689fd358f40c6200fcd3bd380f9c7d8ac",
+      "capability_ids": [
+        "DYN-01",
+        "SCRIPT-01",
+        "SCRIPT-02",
+        "SCRIPT-03",
+        "SCRIPT-04",
+        "SCRIPT-05"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/test/java/app/relay/core/auth/AuthApplierTest.java",
+      "kind": "test-file",
+      "key": "TEST-auth",
+      "sha256": "da5fa4a010e0bf5e8c5133d90886771bdb7069d5dd4be0572765650a6a75182b",
+      "capability_ids": [
+        "AUTH-01"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/test/java/app/relay/core/runner/ExecutionPolicyTest.java",
+      "kind": "test-file",
+      "key": "TEST-runner",
+      "sha256": "50822838bac527a9f47af5ee68b3386ecec93f61f25ced517a936206cd2cc80a",
+      "capability_ids": [
+        "RUN-01",
+        "RUN-02",
+        "RUN-03",
+        "RUN-04",
+        "TEST-02"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/test/java/app/relay/core/runner/CollectionRunnerTest.java",
+      "kind": "test-file",
+      "key": "TEST-runner",
+      "sha256": "45aeeba2beaad97e09e1f72793ca02199c37be1135be4c9826c8328ea824028a",
+      "capability_ids": [
+        "RUN-01",
+        "RUN-02",
+        "RUN-03",
+        "RUN-04",
+        "TEST-02"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/test/java/app/relay/core/openapi/ContractValidationTest.java",
+      "kind": "test-file",
+      "key": "TEST-openapi",
+      "sha256": "dbd06296620cfd3fe0d654f7b760af2c8b492649a1762504c8819542710e837a",
+      "capability_ids": [
+        "BASE-03",
+        "SPEC-01",
+        "SPEC-02",
+        "SPEC-03",
+        "SPEC-04",
+        "SPEC-06"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/test/java/app/relay/core/openapi/OpenApiSynchronizerTest.java",
+      "kind": "test-file",
+      "key": "TEST-openapi",
+      "sha256": "0330ca8f80e384e2aa4d5c260c60c4fed547a5a4071b7b1b6b7285aba068aaff",
+      "capability_ids": [
+        "BASE-03",
+        "SPEC-01",
+        "SPEC-02",
+        "SPEC-03",
+        "SPEC-04",
+        "SPEC-06"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/test/java/app/relay/core/openapi/OpenApiDocumentParserTest.java",
+      "kind": "test-file",
+      "key": "TEST-openapi",
+      "sha256": "51f8aecbb52f580ac6fd0fe13c6cf8059a8288a073d078e972bb221d2bcd460f",
+      "capability_ids": [
+        "BASE-03",
+        "SPEC-01",
+        "SPEC-02",
+        "SPEC-03",
+        "SPEC-04",
+        "SPEC-06"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/test/java/app/relay/core/v2/RoadmapCapabilitiesTest.java",
+      "kind": "test-file",
+      "key": "TEST-v2",
+      "sha256": "d3b11ba2dad95765343833c143885aef057bf3e706c0db961aa9da7d0bfb05f4",
+      "capability_ids": [
+        "AUTH-03",
+        "GQL-01",
+        "MOCK-01",
+        "PERF-01",
+        "RESP-05",
+        "SHARE-02",
+        "WORK-08"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/test/java/app/relay/core/testing/JsonTextLayoutTest.java",
+      "kind": "test-file",
+      "key": "TEST-testing",
+      "sha256": "77f1ed2e9764710c4c018fb239448d4f572ff4f04c6f74831d6277a5d8c9a6f1",
+      "capability_ids": [
+        "EDIT-01",
+        "TEST-01",
+        "TEST-02"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/test/java/app/relay/core/testing/ResponseAssertionEngineTest.java",
+      "kind": "test-file",
+      "key": "TEST-testing",
+      "sha256": "8b64119ef17e08010ffcf271470ed8a2e437673514c65408c4dc5f95102c7b86",
+      "capability_ids": [
+        "EDIT-01",
+        "TEST-01",
+        "TEST-02"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/test/java/app/relay/core/http/JdkHttpRequestExecutorTest.java",
+      "kind": "test-file",
+      "key": "TEST-http",
+      "sha256": "6ba188cca6ecef499fab32f2e90d838c2e2bf33880692d915843c02bbac7e925",
+      "capability_ids": [
+        "BASE-03",
+        "HTTP-01",
+        "HTTP-02",
+        "HTTP-04",
+        "HTTP-05",
+        "HTTP-07"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/test/java/app/relay/core/http/RequestPreparerTest.java",
+      "kind": "test-file",
+      "key": "TEST-http",
+      "sha256": "7cc4e2f4b0fb90e5575dc2b68140825a0ec8c68f12cc1045cea0e0e993df5fae",
+      "capability_ids": [
+        "BASE-03",
+        "HTTP-01",
+        "HTTP-02",
+        "HTTP-04",
+        "HTTP-05",
+        "HTTP-07"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/test/java/app/relay/core/http/UrlBuilderTest.java",
+      "kind": "test-file",
+      "key": "TEST-http",
+      "sha256": "297c81831e869eca8e68bef8f822c3709ffe3c3ae85f47659659ac67b6cc4232",
+      "capability_ids": [
+        "BASE-03",
+        "HTTP-01",
+        "HTTP-02",
+        "HTTP-04",
+        "HTTP-05",
+        "HTTP-07"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/test/java/app/relay/core/http/ResponseBudgetTest.java",
+      "kind": "test-file",
+      "key": "TEST-http",
+      "sha256": "731fe1f6e0dd2696f3335bdeeb69bd1cafaf566b299d8e1d28b53a6802e94152",
+      "capability_ids": [
+        "BASE-03",
+        "HTTP-01",
+        "HTTP-02",
+        "HTTP-04",
+        "HTTP-05",
+        "HTTP-07"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/test/java/app/relay/core/variables/VariableResolverTest.java",
+      "kind": "test-file",
+      "key": "TEST-variables",
+      "sha256": "b3283439089d5bb10c257a9a4948c498bd5a0485167efc3c055646832dc823c3",
+      "capability_ids": [
+        "AUTH-03",
+        "WORK-09"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/test/java/app/relay/core/modern/MqttLoopbackTest.java",
+      "kind": "test-file",
+      "key": "TEST-modern",
+      "sha256": "428e1d13cbb4871aa1837548df0a35cee82c0b487c270ac53ac575da06dc4aba",
+      "capability_ids": [
+        "CODE-02",
+        "CODE-03",
+        "CODE-04",
+        "EVENT-01",
+        "GQL-03",
+        "GQL-04",
+        "GRPC-01",
+        "GRPC-02",
+        "GRPC-03",
+        "IO-05",
+        "IO-07",
+        "IO-08",
+        "MQTT-01",
+        "MQTT-02",
+        "MQTT-03",
+        "RUN-05",
+        "RUN-06",
+        "SCAN-01",
+        "SCAN-02",
+        "SCRIPT-03",
+        "SPEC-07"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/test/java/app/relay/core/modern/ModernWorkflowsTest.java",
+      "kind": "test-file",
+      "key": "TEST-modern",
+      "sha256": "5ee72901831a326e57ff10531159da64f07f9e641e028d714fdbb19347243fdd",
+      "capability_ids": [
+        "CODE-02",
+        "CODE-03",
+        "CODE-04",
+        "EVENT-01",
+        "GQL-03",
+        "GQL-04",
+        "GRPC-01",
+        "GRPC-02",
+        "GRPC-03",
+        "IO-05",
+        "IO-07",
+        "IO-08",
+        "MQTT-01",
+        "MQTT-02",
+        "MQTT-03",
+        "RUN-05",
+        "RUN-06",
+        "SCAN-01",
+        "SCAN-02",
+        "SCRIPT-03",
+        "SPEC-07"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/test/java/app/relay/core/modern/GraphQlWorkflowTest.java",
+      "kind": "test-file",
+      "key": "TEST-modern",
+      "sha256": "13a7f4859ffd294e893c5dfc20d783a1745f7104de135092afcd9946df787f6d",
+      "capability_ids": [
+        "CODE-02",
+        "CODE-03",
+        "CODE-04",
+        "EVENT-01",
+        "GQL-03",
+        "GQL-04",
+        "GRPC-01",
+        "GRPC-02",
+        "GRPC-03",
+        "IO-05",
+        "IO-07",
+        "IO-08",
+        "MQTT-01",
+        "MQTT-02",
+        "MQTT-03",
+        "RUN-05",
+        "RUN-06",
+        "SCAN-01",
+        "SCAN-02",
+        "SCRIPT-03",
+        "SPEC-07"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/test/java/app/relay/core/modern/MqttTransportTest.java",
+      "kind": "test-file",
+      "key": "TEST-modern",
+      "sha256": "4271a7ff4fd9271aea4e0834c62c0bba19dc2b5040a8f583f1836c6e46e0900f",
+      "capability_ids": [
+        "CODE-02",
+        "CODE-03",
+        "CODE-04",
+        "EVENT-01",
+        "GQL-03",
+        "GQL-04",
+        "GRPC-01",
+        "GRPC-02",
+        "GRPC-03",
+        "IO-05",
+        "IO-07",
+        "IO-08",
+        "MQTT-01",
+        "MQTT-02",
+        "MQTT-03",
+        "RUN-05",
+        "RUN-06",
+        "SCAN-01",
+        "SCAN-02",
+        "SCRIPT-03",
+        "SPEC-07"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/test/java/app/relay/core/modern/NativeGrpcTest.java",
+      "kind": "test-file",
+      "key": "TEST-modern",
+      "sha256": "6f03e819daaffa76e93ee240866f0829a534087a3cd6946449c936582859e17c",
+      "capability_ids": [
+        "CODE-02",
+        "CODE-03",
+        "CODE-04",
+        "EVENT-01",
+        "GQL-03",
+        "GQL-04",
+        "GRPC-01",
+        "GRPC-02",
+        "GRPC-03",
+        "IO-05",
+        "IO-07",
+        "IO-08",
+        "MQTT-01",
+        "MQTT-02",
+        "MQTT-03",
+        "RUN-05",
+        "RUN-06",
+        "SCAN-01",
+        "SCAN-02",
+        "SCRIPT-03",
+        "SPEC-07"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/test/java/app/relay/core/export/RequestCommandExporterTest.java",
+      "kind": "test-file",
+      "key": "TEST-export",
+      "sha256": "7d0a6c5106919b9ecfe69d9c60986b37cc861b8c9b1048b327243c25b6569138",
+      "capability_ids": [
+        "CODE-01",
+        "HTTP-04",
+        "HTTP-05",
+        "IO-02",
+        "IO-04"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/test/java/app/relay/core/export/WorkspaceJsonExporterTest.java",
+      "kind": "test-file",
+      "key": "TEST-export",
+      "sha256": "5a9c1cb4ad1999e96f68e09e6484c173b7bd0519ce9fc8815032acb7fc12bd12",
+      "capability_ids": [
+        "CODE-01",
+        "HTTP-04",
+        "HTTP-05",
+        "IO-02",
+        "IO-04"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/visualization/ResponseVisualizer.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-visualization",
+      "sha256": "a9418bb6242daba49cb0ecffef467a829911de5ae1c0026e2bec5cc178f0bcd1",
+      "capability_ids": [
+        "RESP-02"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/visualization/ResponseFormat.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-visualization",
+      "sha256": "fa92913673df553ae72ae78a9ca4ddb493ed346123425fb69b3326d79a5a8867",
+      "capability_ids": [
+        "RESP-02"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/importer/RequestCommandImporter.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-importer",
+      "sha256": "60f77c2f52a893406ed04b35aac9aa069894b6f73ba2c9db9a86f4857a4d11bd",
+      "capability_ids": [
+        "IO-02",
+        "IO-06"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/importer/JsonCollectionImporter.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-importer",
+      "sha256": "be47f7c4452815a673fa8be2d1999312336dfd612204d0b3c199abe8fe56e247",
+      "capability_ids": [
+        "IO-02",
+        "IO-06"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/importer/CollectionImportPlan.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-importer",
+      "sha256": "c22bc0969421a2e0fe3dba31e9e739ac581df11b521992930aa71543cf801c03",
+      "capability_ids": [
+        "IO-02",
+        "IO-06"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/importer/EcosystemFormats.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-importer",
+      "sha256": "56fa0c473ab01a12d29b7b2238da486443437ef8874a6c55009e1bffa75dcbf5",
+      "capability_ids": [
+        "IO-02",
+        "IO-06"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/importer/ImportedRequest.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-importer",
+      "sha256": "9744303f07554590bb46bbffbb2318133a7b8dc78108453d0d2854d3b4d2665b",
+      "capability_ids": [
+        "IO-02",
+        "IO-06"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/oauth/OAuth2Service.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-oauth",
+      "sha256": "c5688cac55652a103e8debf8640e2f712491fe586d4b89b49f81a40f1ab2985b",
+      "capability_ids": [
+        "AUTH-04",
+        "AUTH-05"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/oauth/OAuthToken.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-oauth",
+      "sha256": "30966c55f2ad960dce73960954e007c83870202209abfa091150319d6fe9a4b0",
+      "capability_ids": [
+        "AUTH-04",
+        "AUTH-05"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/oauth/Pkce.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-oauth",
+      "sha256": "be1d839971851fa533f9d61ac09bb3328c0bf1267771880dd021c070ac953616",
+      "capability_ids": [
+        "AUTH-04",
+        "AUTH-05"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/oauth/OAuth2Profile.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-oauth",
+      "sha256": "081e6e47075b20cca0445e5c1d2e04230955dbb9f858f92a602b4f05df89b84d",
+      "capability_ids": [
+        "AUTH-04",
+        "AUTH-05"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/scripting/ScriptRuntime.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-scripting",
+      "sha256": "6690c02e9f0621549c97fad09f88fbe58d4b0bffd534d9adb2eb334970bc3183",
+      "capability_ids": [
+        "SCRIPT-01",
+        "SCRIPT-02",
+        "SCRIPT-03",
+        "SCRIPT-04",
+        "SCRIPT-05"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/scripting/ScriptConfig.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-scripting",
+      "sha256": "a48f8c468ff3aa895b422c173175114662d68a3393467e6779779a808da74af5",
+      "capability_ids": [
+        "SCRIPT-01",
+        "SCRIPT-02",
+        "SCRIPT-03",
+        "SCRIPT-04",
+        "SCRIPT-05"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/scripting/ScriptWorker.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-scripting",
+      "sha256": "0d13d300a0d3977c24d0cd98feb3f426a34c04aa81c701039fc4ee6d758abb9d",
+      "capability_ids": [
+        "SCRIPT-01",
+        "SCRIPT-02",
+        "SCRIPT-03",
+        "SCRIPT-04",
+        "SCRIPT-05"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/grpc/GrpcResult.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-grpc",
+      "sha256": "228c924da2c36dc03b7e509d4df2c18a493488bcaa23b9109da941a6d3b22de7",
+      "capability_ids": [
+        "GRPC-01",
+        "GRPC-02",
+        "GRPC-03",
+        "GRPC-04",
+        "GRPC-05"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/grpc/GrpcCall.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-grpc",
+      "sha256": "8ecee71136e136aefe61aa9c52ec28d4f523af740661999b318f318bf18e42ab",
+      "capability_ids": [
+        "GRPC-01",
+        "GRPC-02",
+        "GRPC-03",
+        "GRPC-04",
+        "GRPC-05"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/grpc/NativeGrpcClient.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-grpc",
+      "sha256": "ca57e91f863ce99ccad279db24c288a819111d7f680b094e1ca51c3aacb7db76",
+      "capability_ids": [
+        "GRPC-01",
+        "GRPC-02",
+        "GRPC-03",
+        "GRPC-04",
+        "GRPC-05"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/grpc/ProtoDefinitions.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-grpc",
+      "sha256": "58d5d19e0ad72b73a1c237b916eb86f52091cbc59e045405d798b016087bc8df",
+      "capability_ids": [
+        "GRPC-01",
+        "GRPC-02",
+        "GRPC-03",
+        "GRPC-04",
+        "GRPC-05"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/grpc/GrpcurlClient.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-grpc",
+      "sha256": "35dad296de3f628b5fb9e3d1e872cbd8647c3e3c2bc1cc37477a54d7a69a8d9c",
+      "capability_ids": [
+        "GRPC-01",
+        "GRPC-02",
+        "GRPC-03",
+        "GRPC-04",
+        "GRPC-05"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/security/SecurityScanner.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-security",
+      "sha256": "e43c22d4e1a26a9b7989d5e93dccbe9bd634dcf78a855034f92cc37defb6c089",
+      "capability_ids": [
+        "SCAN-01"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/auth/AuthProfile.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-auth",
+      "sha256": "b0517bd4158f87298d6a5c57c28107a6e2bf980fbcfb79324d01e5259cf035e6",
+      "capability_ids": [
+        "AUTH-01",
+        "AUTH-02"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/auth/ApiKeyLocation.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-auth",
+      "sha256": "907773de0b605c640df4cd89db2b9d201636be63df78d84916fb6b5a6eb7c025",
+      "capability_ids": [
+        "AUTH-01",
+        "AUTH-02"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/auth/AuthConfig.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-auth",
+      "sha256": "7ab99c967c255f2ef0231f8ee11e5d61df550ed1a647429821ddea4ba21adc24",
+      "capability_ids": [
+        "AUTH-01",
+        "AUTH-02"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/auth/AuthType.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-auth",
+      "sha256": "30669d4c958cd44310fc20a22d5137e829aecaa825763fb0f14fd7fcde8eaf84",
+      "capability_ids": [
+        "AUTH-01",
+        "AUTH-02"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/auth/AuthApplier.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-auth",
+      "sha256": "96dcfd3b28b3dd87b54459598015129c2ac4ed3af80a8f9c5d2ab04941c23371",
+      "capability_ids": [
+        "AUTH-01",
+        "AUTH-02"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/secrets/EnvironmentSecretStore.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-secrets",
+      "sha256": "ae16bae7c03b872e627e1c3520287aa50d22694a6c1f06a753f1832f8018937e",
+      "capability_ids": [
+        "AUTH-03",
+        "AUTH-06"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/secrets/SecretStore.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-secrets",
+      "sha256": "a9834c671a9b324c6fe8cf3bb048cfafbfd38435ed8024fec2c40239c3d338db",
+      "capability_ids": [
+        "AUTH-03",
+        "AUTH-06"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/secrets/CompositeSecretStore.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-secrets",
+      "sha256": "9974ba053f3c8359206a5dd0edcbb91cd7d0a78a0de0f3436e1be85e73f103b6",
+      "capability_ids": [
+        "AUTH-03",
+        "AUTH-06"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/secrets/NativeSecretStore.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-secrets",
+      "sha256": "1f16f6918ed7a26db4a052f5a39f03da9cce7f21132c4bcac659f84aea96ddea",
+      "capability_ids": [
+        "AUTH-03",
+        "AUTH-06"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/runner/CiReports.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-runner",
+      "sha256": "5f765a50da2940f834e04ee794f9c6e2b172a1dd67459c83fb64b897d9e1c1ce",
+      "capability_ids": [
+        "RUN-05"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/runner/RequestRunResult.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-runner",
+      "sha256": "4e5784df24a808aafda1b835aef4f16f8cc5ae6e9846661f0b8eb3511198cd83",
+      "capability_ids": [
+        "RUN-05"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/runner/RequestFactory.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-runner",
+      "sha256": "80d73b6cac11c4125dbfd4ba236b9c94536367e2afa509f29bdd0fe8b71b0ae7",
+      "capability_ids": [
+        "RUN-05"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/runner/RunCancellation.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-runner",
+      "sha256": "497c6c6d77cb9297a93a3a219ca01cb6380a4c4a3f3e6eb8ad19ac88cbfca62c",
+      "capability_ids": [
+        "RUN-05"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/runner/RunReport.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-runner",
+      "sha256": "36a132843bfffb3a6fa22bc7bcde7a9495f102f84ebf21b84b1573fe5022db42",
+      "capability_ids": [
+        "RUN-05"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/runner/RunOptions.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-runner",
+      "sha256": "7a6351fd693ee009270f0decece09f9d6ffc4230ae39efc986e76cad7d39e3c7",
+      "capability_ids": [
+        "RUN-05"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/runner/CollectionRunResult.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-runner",
+      "sha256": "0ddd67b94e62e42cf78dc48a74ed0e00c67bd5674ed4e37dea2bb8579af47dc6",
+      "capability_ids": [
+        "RUN-05"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/runner/CollectionRunner.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-runner",
+      "sha256": "9ce078d41b6c6316b38de2018ecf9c9fcf40e6b247022cc6d8161def6c78e551",
+      "capability_ids": [
+        "RUN-05"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/runner/EnvironmentMatrix.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-runner",
+      "sha256": "2a462260d572015f68e3eaee259bd6e911c1a2ee31c36b5f9b46e0261e9ee7a6",
+      "capability_ids": [
+        "RUN-05"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/mock/RelayMockServer.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-mock",
+      "sha256": "f2d4a69a82203cde87b5c75037a872b32e9ed52d8ab366650c2a47c0b1c67045",
+      "capability_ids": [
+        "MOCK-01",
+        "MOCK-02"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/mock/MockRouteGenerator.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-mock",
+      "sha256": "ad5072d4d716e08d97e082e3903109be79f6cf5f78bbac0f887e6f1d802ad58c",
+      "capability_ids": [
+        "MOCK-01",
+        "MOCK-02"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/mock/MockRoute.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-mock",
+      "sha256": "24decf6c07c449aeaba7c75f1e2f07554298bd65982a1a9545afe75a56fc60cf",
+      "capability_ids": [
+        "MOCK-01",
+        "MOCK-02"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/stream/WebSocketEvent.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-stream",
+      "sha256": "d3f52e29685e7eee0d250dda00d2c4501879ef3eaadc920449837e55a8dfc41a",
+      "capability_ids": [
+        "STREAM-01",
+        "STREAM-02"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/stream/SseClient.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-stream",
+      "sha256": "e124027b33c20d525d70584ad2b9a25e39b8056f3e9cdb07de5a8d2da7e25ead",
+      "capability_ids": [
+        "STREAM-01",
+        "STREAM-02"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/stream/SseEvent.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-stream",
+      "sha256": "6dbf8830156c020fcc528b4b6fd10f1fe2a97361403687fac8af08e57af7bfd3",
+      "capability_ids": [
+        "STREAM-01",
+        "STREAM-02"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/stream/RelayWebSocketClient.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-stream",
+      "sha256": "173b266ab38a86abe4535274a0d1a62a137d44e545d509726dea8daec431d25e",
+      "capability_ids": [
+        "STREAM-01",
+        "STREAM-02"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/workspace/Environment.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-workspace",
+      "sha256": "0fbcf95f66480aa23f70d641346d15a560a47c50d65b5beb95edfe89e4a052db",
+      "capability_ids": [
+        "AUTH-02",
+        "RESP-04"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/workspace/SavedRequest.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-workspace",
+      "sha256": "2b2866be29155d5a909e2d508065cce794dd9d333e23c9f7a6d48b0623704647",
+      "capability_ids": [
+        "AUTH-02",
+        "RESP-04"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/workspace/EnvironmentResolver.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-workspace",
+      "sha256": "5744f4cc30be1f0a1689e5fd70e00d7988ce767d8bc4b23cec46b211ce43727d",
+      "capability_ids": [
+        "AUTH-02",
+        "RESP-04"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/workspace/ExchangeSnapshot.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-workspace",
+      "sha256": "6b64fae15b9824b8bdefa484231f2c04a602d53d32cb1c2c6f30ec5eccd5678a",
+      "capability_ids": [
+        "AUTH-02",
+        "RESP-04"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/workspace/HistoryRecord.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-workspace",
+      "sha256": "a8bc045776b37832b0349245885cebbf520c8b0bb9aa6172e5bb6d8b0c97482d",
+      "capability_ids": [
+        "AUTH-02",
+        "RESP-04"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/workspace/Workspace.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-workspace",
+      "sha256": "5c960843ed12bb2cb586dda56ad63a4b59f4a866cf1cc3e421d41d987a9e4e89",
+      "capability_ids": [
+        "AUTH-02",
+        "RESP-04"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/plugin/PluginContext.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-plugin",
+      "sha256": "30f3b2781470bdabc7c1e74b68bd3afa6d5170d464a9724c92ac982c18567791",
+      "capability_ids": [
+        "PLUGIN-01"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/plugin/RelayPlugin.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-plugin",
+      "sha256": "67f4238f9c0944150cb8461c1158f271fbbe23766826ff93dbdc508e68b93704",
+      "capability_ids": [
+        "PLUGIN-01"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/plugin/PluginLoader.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-plugin",
+      "sha256": "5d1edd29dec4072999daddf14a2aaa192d0dd8306e378ded18f56759ca111cd0",
+      "capability_ids": [
+        "PLUGIN-01"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/plugin/PluginDescriptor.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-plugin",
+      "sha256": "0cf45697d3b09ca798fb3aa916308648a8f858fb909bff3850c4f65b58d6149b",
+      "capability_ids": [
+        "PLUGIN-01"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/diff/ResponseDiffEngine.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-diff",
+      "sha256": "de1546f35ef7aad2cdc7b6f6f8e39344e4b7d15a094d15e9a4b205afd20b1611",
+      "capability_ids": [
+        "RESP-05"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/diff/ResponseDiff.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-diff",
+      "sha256": "6aaf1c86fa8198d3513b6f5b7e7b916d7cfbcc6bb36cda23067e18be3be0c44b",
+      "capability_ids": [
+        "RESP-05"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/protocol/EventConnection.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-protocol",
+      "sha256": "7798ce906aa236294f3fc52776be6acd9d7f28d0835a695d3d66ea59b3ff6d66",
+      "capability_ids": [
+        "MQTT-01"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/protocol/CloudEvents.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-protocol",
+      "sha256": "4cabe7aa972970272b681090f957dc85462ac64713e004865dc22810e0db2809",
+      "capability_ids": [
+        "MQTT-01"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/protocol/MqttWebSocketBridge.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-protocol",
+      "sha256": "132fc1cc0e6f5d2ddcb9e26195d60cacac89355f85d50f9075bd38bb152dbed7",
+      "capability_ids": [
+        "MQTT-01"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/protocol/MqttSession.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-protocol",
+      "sha256": "f8208507c94cc2c8d27312649e8430bd4c568a95a514c4deb951654bd73d3ccc",
+      "capability_ids": [
+        "MQTT-01"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/openapi/OpenApiRequestGenerator.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-openapi",
+      "sha256": "09c78282dd889108c0d9ffbd1ec5917cbea6593b65554b03b6a30f1ac19176fc",
+      "capability_ids": [
+        "SPEC-05"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/openapi/OpenApiSyncPlan.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-openapi",
+      "sha256": "42080a4794a467291cbe28e6fa6d53513ff34fe2a184fefcacf40c51d7ae3c8c",
+      "capability_ids": [
+        "SPEC-05"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/openapi/OpenApiSourceProfile.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-openapi",
+      "sha256": "410da0f9113bcd60245d0f99d5092276ea6ed84cb2b32d4965ebf12cf4b21e67",
+      "capability_ids": [
+        "SPEC-05"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/openapi/OpenApiDocumentParser.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-openapi",
+      "sha256": "61e8acb29b8623b2228b6c9bf5ea4e1dcecc61fd844cbf25e1196825a83cb151",
+      "capability_ids": [
+        "SPEC-05"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/openapi/StructuredDataParser.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-openapi",
+      "sha256": "a71b7c3c88a5100fdd8666cca02204273630dd5b30996688bb8ed68cdabe1ead",
+      "capability_ids": [
+        "SPEC-05"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/openapi/OpenApiSynchronizer.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-openapi",
+      "sha256": "47d1108fbbcad601dcdb64adc1e4700a5b06d988f7b73269971154470c2eb7c5",
+      "capability_ids": [
+        "SPEC-05"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/openapi/ContractTestGenerator.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-openapi",
+      "sha256": "3bc20847386b1cae344ffeb81ca70f179de47fc265788e47872376eab46b3345",
+      "capability_ids": [
+        "SPEC-05"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/openapi/OpenApiDefinition.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-openapi",
+      "sha256": "f9d96a224e75b224bc8309eb2ec42fd0e9752b5f5a6b6489c08124ce280b04f9",
+      "capability_ids": [
+        "SPEC-05"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/openapi/OpenApiImportPlan.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-openapi",
+      "sha256": "4febc5a7c3eddaecd61b52ec14015825c8ec8a15b8e45625abcc9c6baf3358a8",
+      "capability_ids": [
+        "SPEC-05"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/openapi/OpenApiOperation.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-openapi",
+      "sha256": "de952e99709cc9dde6738c9b6076fa32ae8cf07386f3064096f03916fd485736",
+      "capability_ids": [
+        "SPEC-05"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/openapi/OpenApiImportService.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-openapi",
+      "sha256": "a41877282528f556e943bd378f6e88b447a94f2720b65f778e4f76d7921d437a",
+      "capability_ids": [
+        "SPEC-05"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/openapi/OpenApiParameterLocation.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-openapi",
+      "sha256": "104a0b048a348813240d9b06177b393e2cca10a9cc8a09a6404565b69ee82ec7",
+      "capability_ids": [
+        "SPEC-05"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/openapi/OpenApiContract.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-openapi",
+      "sha256": "e3e6bfb869aeba8025ee2991af6cdb7a19683f6762d228b2088f3de99ce666c1",
+      "capability_ids": [
+        "SPEC-05"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/openapi/OpenApiParameter.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-openapi",
+      "sha256": "ea646dab18b0150bc69584d39c57adb4953ce2604caf5e9d3ba0abbae88fd531",
+      "capability_ids": [
+        "SPEC-05"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/openapi/OpenApiDiff.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-openapi",
+      "sha256": "e12874ab6fbfd4a9041c5325623cad41cc6e283a40792bf07d6a5a228579c022",
+      "capability_ids": [
+        "SPEC-05"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/openapi/OpenApiSourceLoader.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-openapi",
+      "sha256": "3c76e88c9a3cefce0642e5cfd227d2cb0737001dd073b749509a9bb022d15f73",
+      "capability_ids": [
+        "SPEC-05"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/search/SearchResult.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-search",
+      "sha256": "cf0ff9c638ed7bee88c1417f3483cf1e8852d649c99639facda3afb8afacf5c8",
+      "capability_ids": [
+        "WORK-06"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/search/GlobalSearch.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-search",
+      "sha256": "6f8b49663697918c9ee2428017dd68302216a86329735f5fd59783bbe5b0966c",
+      "capability_ids": [
+        "WORK-06"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/testing/VariableExtraction.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-testing",
+      "sha256": "11ec9ad1d15585f3f0a9dfacd8a7a13e7fc78585ddf6b80734f0296b4bb33fed",
+      "capability_ids": [
+        "EDIT-01",
+        "TEST-01",
+        "TEST-02"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/testing/ResponseAssertionEngine.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-testing",
+      "sha256": "e03c2da2b45874523939aa81a97cde121f653e8d0f80f3deda35360a75740106",
+      "capability_ids": [
+        "EDIT-01",
+        "TEST-01",
+        "TEST-02"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/testing/ExtractionType.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-testing",
+      "sha256": "695b18faec8e8d72b347efadf96834d772ca94be1963bc53d42be013439e5923",
+      "capability_ids": [
+        "EDIT-01",
+        "TEST-01",
+        "TEST-02"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/testing/AssertionResult.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-testing",
+      "sha256": "600f1c9cbd818a166de4a2d8643719505d9fa11f9a82dd0532a0180f6cd6d254",
+      "capability_ids": [
+        "EDIT-01",
+        "TEST-01",
+        "TEST-02"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/testing/AssertionDefinition.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-testing",
+      "sha256": "24f60ad8193357f7ba953d4a3e9cda654c3983e38ca0deed7b25b58ef231df1d",
+      "capability_ids": [
+        "EDIT-01",
+        "TEST-01",
+        "TEST-02"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/testing/ResponseExtractor.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-testing",
+      "sha256": "e2609b0f2978022548d62f0d2803676df488ff1c9540850b0477f75358397152",
+      "capability_ids": [
+        "EDIT-01",
+        "TEST-01",
+        "TEST-02"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/testing/AssertionType.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-testing",
+      "sha256": "fa9c1713e16e2fda2234fec48e91126b32f41b6939c1180417232d9b4886ef9a",
+      "capability_ids": [
+        "EDIT-01",
+        "TEST-01",
+        "TEST-02"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/testing/JsonPath.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-testing",
+      "sha256": "80dc82c22e1fc161417dcc638c9ccef624ea22ffd0dcb235e7a20d53fcc54ea3",
+      "capability_ids": [
+        "EDIT-01",
+        "TEST-01",
+        "TEST-02"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/testing/MinimalJson.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-testing",
+      "sha256": "7674f4bc8f4b856b50abfd99682cdd111723a6bddf0b6952cb3f6379c7e56c4d",
+      "capability_ids": [
+        "EDIT-01",
+        "TEST-01",
+        "TEST-02"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/testing/JsonTextLayout.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-testing",
+      "sha256": "31d0244cb78deb344f46d5cd28f7b8a05ac0a327bb37fff32d83554cf9b8a374",
+      "capability_ids": [
+        "EDIT-01",
+        "TEST-01",
+        "TEST-02"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/collab/WorkspaceShareClient.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-collab",
+      "sha256": "bdfcccaed58e437983cc920a865ce348338435e461e7b596eccb7c39e6951dfe",
+      "capability_ids": [
+        "SHARE-01",
+        "SHARE-02",
+        "SHARE-03"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/collab/GitWorkspaceService.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-collab",
+      "sha256": "0e7c8103569776e72c8516fd32624e2955dac519ab6a34143d170cd711fe1026",
+      "capability_ids": [
+        "SHARE-01",
+        "SHARE-02",
+        "SHARE-03"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/collab/WorkspaceShareServer.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-collab",
+      "sha256": "62550f045da0d58a6fc6a4c245c6414753b0cf1724dc876ae422055ccaf552c7",
+      "capability_ids": [
+        "SHARE-01",
+        "SHARE-02",
+        "SHARE-03"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/collab/GitWorkspaceStatus.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-collab",
+      "sha256": "7c93bdbcf5a05f3ce91f5d81a42fd651d401ec2218ec47aa5e52e3d13db727f7",
+      "capability_ids": [
+        "SHARE-01",
+        "SHARE-02",
+        "SHARE-03"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/tls/TlsProfile.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-tls",
+      "sha256": "0e4810f9df53c58ff6a8fe9fefc58455ba7cf6fba0c690750c1fae88d78faa16",
+      "capability_ids": [
+        "TLS-01",
+        "TLS-02",
+        "TLS-03"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/tls/TlsHttpClientFactory.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-tls",
+      "sha256": "06061b88ba4fc6c3b81bb0cb0990e18e317561a79bf2154d4a123006b5f38b88",
+      "capability_ids": [
+        "TLS-01",
+        "TLS-02",
+        "TLS-03"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/http/RequestExecutionException.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-http",
+      "sha256": "6c5c0bb3561b1eceacd4b3b149e11ff0692342308d22c624fe285cf3567972d1",
+      "capability_ids": [
+        "HTTP-01",
+        "HTTP-03"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/http/ApiRequest.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-http",
+      "sha256": "0dc26cfc09ca0729c55aac4352658c3c1216e864849d8f748fca595bb8242a2b",
+      "capability_ids": [
+        "HTTP-01",
+        "HTTP-03"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/http/BodyMode.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-http",
+      "sha256": "b2b473e568ee3f163a1af0585f3104c278009937384a67e01c4d63a5ed2be480",
+      "capability_ids": [
+        "HTTP-01",
+        "HTTP-03"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/http/RequestPreparer.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-http",
+      "sha256": "e08db297396c65e4d7f9acc6e64a08ddba688facfec12c7d01b9418dd9f6da9a",
+      "capability_ids": [
+        "HTTP-01",
+        "HTTP-03"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/http/ApiResponse.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-http",
+      "sha256": "393a736409efac50f20ae7b572d479c43acef784068829d84716f5dd0050c382",
+      "capability_ids": [
+        "HTTP-01",
+        "HTTP-03"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/http/PreparedRequest.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-http",
+      "sha256": "d71ccb1b4cd03db30b30ca30c7ef9ae566301aef7d6a250b896d9d73648c40fd",
+      "capability_ids": [
+        "HTTP-01",
+        "HTTP-03"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/http/LimitedBodySubscriber.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-http",
+      "sha256": "8e8096742ac4ea9b605b30d36f477d03d7b252e86d4969da1fd42ff77e0afc21",
+      "capability_ids": [
+        "HTTP-01",
+        "HTTP-03"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/http/HttpMethod.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-http",
+      "sha256": "ae8d5a08ddd7ca8f7d2d72f1883b2f9e4c6b630aef9cd2edca434bbc4962e7ea",
+      "capability_ids": [
+        "HTTP-01",
+        "HTTP-03"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/http/RequestBody.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-http",
+      "sha256": "19c9af2fac556ba41d07cab77b90012d76bbf2a4e9c7764b3954f9f8804e0108",
+      "capability_ids": [
+        "HTTP-01",
+        "HTTP-03"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/http/JdkHttpRequestExecutor.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-http",
+      "sha256": "404c3f2f5f099590e4e2d241c85ffbd984d1457aa795544fe601aba3cd0b66c5",
+      "capability_ids": [
+        "HTTP-01",
+        "HTTP-03"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/http/RequestExecutor.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-http",
+      "sha256": "149a7469a1b02b32a733b5be4aa66ecaf09f074a359933c00a9b20987822f3c0",
+      "capability_ids": [
+        "HTTP-01",
+        "HTTP-03"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/http/ResponseLimitExceededException.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-http",
+      "sha256": "f5ec7f2f796696faa855e9da4275108f6c70979ad7d4c18f935c6c231473b320",
+      "capability_ids": [
+        "HTTP-01",
+        "HTTP-03"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/http/UrlBuilder.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-http",
+      "sha256": "c05f67f34898146afa50cb16de9e912be8f8c2268c5787b9112b93296e54175d",
+      "capability_ids": [
+        "HTTP-01",
+        "HTTP-03"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/http/Header.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-http",
+      "sha256": "d27e9fb3377fe52456b79099625c45f660b8626b9a6417e6ea5dc859222b3bc1",
+      "capability_ids": [
+        "HTTP-01",
+        "HTTP-03"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/http/QueryParameter.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-http",
+      "sha256": "201b89539ca003402e09b89f76d33d7080fff35a39fd1b89446ee1089967d423",
+      "capability_ids": [
+        "HTTP-01",
+        "HTTP-03"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/http/MultipartPart.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-http",
+      "sha256": "384707ddd7830f59f31571c854e6bc1b02de97fcca9563072211da82ced54e40",
+      "capability_ids": [
+        "HTTP-01",
+        "HTTP-03"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/variables/DynamicTemplates.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-variables",
+      "sha256": "d1d0b8f7b294b551452b58ef634e04b52170d93e0ee476b084fac19428e9229e",
+      "capability_ids": [
+        "AUTH-03",
+        "DYN-01",
+        "WORK-09"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/variables/VariableResolutionException.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-variables",
+      "sha256": "b69de40be11cabe4b5e54a4af90275725f4a73e2f23537d8a05e6d7f56ff3197",
+      "capability_ids": [
+        "AUTH-03",
+        "DYN-01",
+        "WORK-09"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/variables/VariableResolver.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-variables",
+      "sha256": "330b1342299dd1ad1464ebae2b581abb6f74f67c41f2f744922e6640379dc185",
+      "capability_ids": [
+        "AUTH-03",
+        "DYN-01",
+        "WORK-09"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/graphql/GraphQlSchema.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-graphql",
+      "sha256": "47ba54978bbf2767bdc3b829b6173aa455311396800974d29ff2dc486294aa3e",
+      "capability_ids": [
+        "GQL-01",
+        "GQL-02"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/graphql/GraphQlRequestBuilder.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-graphql",
+      "sha256": "29cd5f5774f4c3b5e2c1778fd81cb75724876f6403ad5878531f995807bdbcf8",
+      "capability_ids": [
+        "GQL-01",
+        "GQL-02"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/graphql/GraphQlSubscription.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-graphql",
+      "sha256": "93f31da567dabe5be2dc6231172868129849b6c1780dd4adf3883115ce02d840",
+      "capability_ids": [
+        "GQL-01",
+        "GQL-02"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/diagnostics/RequestInspector.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-diagnostics",
+      "sha256": "138611169d1a72a75ecd33ead7fa4f14231a5eb575502b07f032dcac645a384a",
+      "capability_ids": [
+        "HTTP-02",
+        "RESP-03"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/templates/RequestTemplates.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-templates",
+      "sha256": "e3d9d09fdb502ebf723ae4839ec1100dd78ba55f73b2db20b3919ecabf70970f",
+      "capability_ids": [
+        "WORK-10"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/templates/RequestTemplate.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-templates",
+      "sha256": "2b68ba5c2e2c9dc4115553e20f6dc2adcdd217d9d89cf46e49e4a9e2244c593f",
+      "capability_ids": [
+        "WORK-10"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/export/RequestCommandExporter.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-export",
+      "sha256": "26a4470d3e473df893348e446ece43c45bd9213ade46272ff7c3156fac504d87",
+      "capability_ids": [
+        "CODE-01",
+        "CODE-02",
+        "CODE-03",
+        "IO-02"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/export/CodeSnippets.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-export",
+      "sha256": "0bfa0d08f2d32039e7c7ad2c8b05b9e73ad695618c2517b0a8f35a1f3d712510",
+      "capability_ids": [
+        "CODE-01",
+        "CODE-02",
+        "CODE-03",
+        "IO-02"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/export/WorkspaceJsonExporter.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-export",
+      "sha256": "c0845501de14778c07fabd784fd8b50e939fbb100eff2cb85628273a5967b912",
+      "capability_ids": [
+        "CODE-01",
+        "CODE-02",
+        "CODE-03",
+        "IO-02"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/performance/LoadTestResult.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-performance",
+      "sha256": "3b269afd02416b28c8ce74563b73e8d846034f4a5be6133024cd52aaa68b8657",
+      "capability_ids": [
+        "PERF-01"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/performance/LoadTestConfig.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-performance",
+      "sha256": "7acd4f1e7130899cae5a30a7da563d96931d73f024168ad24ea84d59ba614f77",
+      "capability_ids": [
+        "PERF-01"
+      ]
+    },
+    {
+      "path": "relay/relay-core/src/main/java/app/relay/core/performance/LoadTestRunner.java",
+      "kind": "production-entrypoint",
+      "key": "CORE-performance",
+      "sha256": "66eb7911333316c16d4609b004e49f001c20a51e9662372b2f74f73bd1db5155",
+      "capability_ids": [
+        "PERF-01"
+      ]
+    }
+  ],
+  "local_evidence": [
+    {
+      "key": "RILL-CI",
+      "path": ".github/workflows/swift.yml"
+    },
+    {
+      "key": "RILL-TESTS",
+      "path": "Tests/RillCoreTests/TransportTests.swift"
+    },
+    {
+      "key": "RILL-STORE",
+      "path": "Sources/Rill/WorkbenchStore.swift"
+    },
+    {
+      "key": "RILL-RULES",
+      "url": "https://github.com/alby-raju/Rill/rules/25746710"
+    }
+  ]
+}

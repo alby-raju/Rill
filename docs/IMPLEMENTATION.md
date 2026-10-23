@@ -1,5 +1,7 @@
 # Implementation status
 
+For the complete delivery plan, use the [roadmap](../ROADMAP.md) and [capability register](roadmap/CAPABILITIES.md). This page is a summary of the current build, not the complete backlog.
+
 ## Product direction
 
 A focused request workspace replaces the original application's many drawers. Muted native surfaces, a sea-green accent, method colors and monospaced payloads separate navigation, composition and inspection. The response lives below the composer in a resizable split so long URLs and JSON retain width. The initial screen uses real empty states rather than fabricated activity.

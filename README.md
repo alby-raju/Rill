@@ -49,6 +49,10 @@ GitHub Actions builds the release executable and runs the full test suite on mac
 
 Ten cases cover request preparation, persistence, real loopback HTTP responses, cancellation and response limits. See [validation](docs/VALIDATION.md) for the fixture setup and the Xcode toolchain command.
 
+## Roadmap
+
+See the [phased roadmap](ROADMAP.md), [122-capability register](docs/roadmap/CAPABILITIES.md) and [acceptance journeys](docs/roadmap/ACCEPTANCE.md) for the path to Relay-level workflow breadth. The audit records missing functionality and supported-subset boundaries without incorporating the original code.
+
 ## Scope
 
 This is the first working native foundation, not full parity with the old application. See [implementation status](docs/IMPLEMENTATION.md) for remaining work. No original Java source, scripts, assets, tests or dependencies were copied or translated into this project. The supplied archive's user documentation was read to identify workflows.

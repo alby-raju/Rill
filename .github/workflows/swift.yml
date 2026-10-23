@@ -31,6 +31,8 @@ jobs:
           xcodebuild -version
           swift --version
           python3 --version
+      - name: Validate roadmap traceability
+        run: python3 scripts/audit-roadmap.py
       - name: Build release executable
         run: swift build --configuration release
       - name: Run unit and loopback integration tests
