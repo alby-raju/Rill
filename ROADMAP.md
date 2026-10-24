@@ -16,7 +16,7 @@ The inventory demonstrates that every scoped file has a roadmap owner. It does n
 
 ## Current position
 
-Rill has a SwiftUI workspace, basic HTTP request composition/execution, inherited environments, Basic/Bearer credentials in Keychain, status/body checks, Rill JSON import/export and opt-in durable response snapshots. Its 144 automated tests and the GitHub macOS build/test workflow pass. The UI, installed app, Keychain prompts and advanced protocol interoperability have not been manually signed off.
+Rill has a SwiftUI workspace, basic HTTP request composition/execution, inherited environments, Basic/Bearer credentials in Keychain, status/body checks, Rill JSON import/export and opt-in durable response snapshots. Its 148 automated tests and the GitHub macOS build/test workflow pass. The UI, installed app, Keychain prompts and advanced protocol interoperability have not been manually signed off.
 
 This is a narrow foundation, not a percentage-complete implementation of Relay. Some apparent similarities are incomplete: a raw form-encoded body is not a structured form editor; selecting a GraphQL content payload is not an IDE; saving JSON is not a recoverable workspace; generic headers do not replace reusable API-key/OAuth/TLS tools.
 
