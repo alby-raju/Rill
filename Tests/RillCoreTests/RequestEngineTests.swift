@@ -35,7 +35,7 @@ final class RequestEngineTests: XCTestCase {
     func testAuthBodyAndTimeout() throws {
         var request = RequestDraft(); request.url = "https://example.com"; request.method = .POST
         request.auth = .basic; request.username = "name"; request.credential = "pass"
-        request.body = "{\"test\":true}"; request.timeout = 999
+        request.body = "{\"test\":true}"; request.timeout = 300
         let prepared = try RequestEngine.prepare(request, environment: nil)
         XCTAssertEqual(prepared.value(forHTTPHeaderField: "Authorization"), "Basic bmFtZTpwYXNz")
         XCTAssertEqual(prepared.httpBody, Data(request.body.utf8))

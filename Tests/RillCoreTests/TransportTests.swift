@@ -101,4 +101,25 @@ import XCTest
         XCTAssertEqual(exchange.preparedRequest?.bodyBytes, data.count)
     }
 
+    func testDecompressedBytesRespectDownloadAndIndependentPreviewLimits() async throws {
+        let budget = try ResponseBudget(downloadBytes: 4096, previewBytes: 128)
+        let exact = try await RequestEngine.execute(draft("/gzip/4096"), environment: nil, budget: budget)
+        XCTAssertEqual(exact.body.count, 4096); XCTAssertTrue(exact.previewIsTruncated); XCTAssertEqual(exact.previewText(pretty: false).count, 128)
+        XCTAssertEqual(exact.events?.count, 3)
+        do { _ = try await RequestEngine.execute(draft("/gzip/4097"), environment: nil, budget: budget); XCTFail("Decompression exceeded budget") }
+        catch RillError.responseTooLarge { }
+    }
+    func testTimeoutDiffersFromCancellationAndChunkedBodyCancels() async throws {
+        var timeout = try draft("/slow"); timeout.timeout = 1
+        do { _ = try await RequestEngine.execute(timeout, environment: nil); XCTFail("Stalled headers did not time out") }
+        catch let error as URLError { XCTAssertEqual(error.code, .timedOut) }
+        let chunks = try draft("/slow-chunks"), started = Date()
+        let task = Task { try await RequestEngine.execute(chunks, environment: nil) }
+        try await Task.sleep(for: .milliseconds(100)); task.cancel()
+        do { _ = try await task.value; XCTFail("Stalled body was not cancelled") }
+        catch is CancellationError { }
+        catch let error as URLError { XCTAssertEqual(error.code, .cancelled) }
+        XCTAssertLessThan(Date().timeIntervalSince(started), 3)
+    }
+
 }

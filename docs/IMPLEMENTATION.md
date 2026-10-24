@@ -15,7 +15,7 @@ The archive documents a much larger product than this first native build. These 
 - OpenAPI/Swagger, Postman, Insomnia, Bruno, HAR and cURL import/conversion.
 - Cookie management.
 
-[M2](milestones/M2.md) adds structured forms, API-key auth, streaming file/multipart uploads and prepared request inspection. Interoperability and installed-app acceptance remain partial.
+[M2](milestones/M2.md) adds structured forms, API-key auth, streaming file/multipart uploads and prepared request inspection, safe response previews, opt-in durable snapshots and semantic JSON comparison. Interoperability and installed-app acceptance remain partial.
 - GraphQL IDE/introspection/subscriptions; ordinary GraphQL HTTP POST can be composed manually.
 - WebSocket, SSE, gRPC, MQTT, Kafka and AMQP clients.
 - Collection runner, extraction/chaining, scripting, matrix/load tests and CI reports.

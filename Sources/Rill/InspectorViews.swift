@@ -24,24 +24,32 @@ struct ResponseView: View {
                 VStack(spacing: 12) { ProgressView().controlSize(.small); Text("Following the request…").font(.callout).foregroundStyle(.secondary) }.frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let exchange {
                 HStack {
-                    Picker("Response section", selection: $section) { Text("Body").tag("Body"); Text("Headers (\(exchange.headers.count))").tag("Headers"); Text("Checks (\(exchange.checks.count))").tag("Checks"); Text("Request").tag("Request") }.pickerStyle(.segmented).frame(maxWidth: 440)
+                    Picker("Response section", selection: $section) { Text("Body").tag("Body"); Text("Headers (\(exchange.headers.count))").tag("Headers"); Text("Checks (\(exchange.checks.count))").tag("Checks"); Text("Request").tag("Request"); Text("Timeline").tag("Timeline") }.pickerStyle(.segmented).frame(maxWidth: 550)
                     Spacer()
                     if section == "Body" { Toggle("Pretty JSON", isOn: $pretty).toggleStyle(.checkbox); Button { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(exchange.previewIsTruncated ? exchange.text : pretty ? exchange.prettyText : exchange.text, forType: .string) } label: { Image(systemName: "doc.on.doc") }.help("Copy response body"); Button { export(exchange) } label: { Image(systemName: "square.and.arrow.up") }.help("Export response") }
                 }.font(.caption).padding(.horizontal, 20).padding(.vertical, 10)
                 if section == "Body" {
                     if exchange.previewIsTruncated {
-                        Text("Preview limited to 512 KiB. Export or copy the raw body for the complete response.")
+                        Text("Preview limited to \(ByteCountFormatter.string(fromByteCount: Int64(exchange.previewByteLimit), countStyle: .file)). Export or copy retained bytes to inspect more.")
                             .font(.caption).foregroundStyle(.secondary).padding(.horizontal, 20)
                     }
-                    ScrollView([.vertical, .horizontal]) { Text(exchange.previewText(pretty: pretty)).font(.system(size: fontSize, design: .monospaced)).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .topLeading).padding(20) }.frame(maxWidth: .infinity, maxHeight: .infinity)
+                    ResponseBodyPreview(exchange: exchange, pretty: pretty, fontSize: fontSize).id(exchange.id)
                 } else if section == "Headers" {
                     List(exchange.headers) { field in HStack(alignment: .top) { Text(field.name).fontWeight(.medium).frame(width: 190, alignment: .leading); Text(field.value).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading); Button { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(field.value, forType: .string) } label: { Image(systemName: "doc.on.doc") }.buttonStyle(.plain).help("Copy header value") }.font(.system(size: 11, design: .monospaced)) }
+                } else if section == "Timeline" {
+                    VStack(alignment: .leading, spacing: 12) {
+                        ForEach(exchange.events ?? []) { event in HStack { Text(String(format: "%.1f ms", event.elapsed * 1000)).frame(width: 100, alignment: .leading); Text(event.title) } }
+                        Text("Monotonic elapsed transport milestones. Local preparation precedes this timeline; DNS, connection and TLS phases are not separately measured.").font(.caption).foregroundStyle(.secondary)
+                    }.font(.system(size: fontSize, design: .monospaced)).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).padding(20)
                 } else if section == "Request" {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 12) {
                             Text("Effective response URL: " + exchange.url).textSelection(.enabled)
                             if let summary = exchange.preparedRequest {
                                 Text(summary.method + " " + summary.url).textSelection(.enabled)
+                                Text("TLS: " + (summary.tlsPolicy ?? "System trust"))
+                                if let limit = exchange.downloadLimit { Text("Download budget: " + ByteCountFormatter.string(fromByteCount: Int64(limit), countStyle: .file)) }
+                                Button("Export redacted prepared request…") { exportPrepared(summary) }
                                 Text("Prepared body: \(summary.bodyBytes.map { String($0) + " bytes" } ?? "none")")
                                 ForEach(summary.headers) { field in Text(field.name + ": " + field.value).textSelection(.enabled) }
                             }
@@ -61,6 +69,14 @@ struct ResponseView: View {
                     Text("⌘ ↵").font(.system(size: 12, design: .monospaced)).foregroundStyle(.tertiary).padding(.top, 3)
                 }.frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+        }
+    }
+    private func exportPrepared(_ summary: PreparedRequestSummary) {
+        let panel = NSSavePanel(); panel.nameFieldStringValue = "prepared-request.json"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        Task {
+            do { try await Task.detached { try summary.write(to: url) }.value }
+            catch { NSAlert(error: error).runModal() }
         }
     }
     private func export(_ exchange: Exchange) {
@@ -101,11 +117,36 @@ struct EnvironmentEditor: View {
     }
 }
 struct HistoryView: View {
+    @ViewState<String?> private var comparison: String?
+    @ViewState<Bool> private var comparing = false
+    @ViewState<Task<Void, Never>?> private var comparisonTask: Task<Void, Never>? = nil
     @EnvironmentObject var store: WorkbenchStore
     @SwiftUI.Environment(\.dismiss) var dismiss
     var body: some View {
         VStack(spacing: 16) {
-            HStack { Text("Session history").font(.title2.weight(.semibold)); Spacer(); Button("Clear") { store.workspace.history.removeAll(); store.inspectedHistoryID = nil }; Button("Done") { dismiss() }.keyboardShortcut(.defaultAction) }
+            HStack { Text("Response history").font(.title2.weight(.semibold)); Spacer(); Button("Clear") { store.clearHistory() }; Button("Done") { dismiss() }.keyboardShortcut(.defaultAction) }
+            HStack {
+                Text(store.historyStatus).font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                if let selected = store.workspace.history.first(where: { $0.id == store.inspectedHistoryID }) {
+                    Menu(comparing ? "Comparing…" : "Compare JSON with…") {
+                        ForEach(store.workspace.history.filter { $0.id != selected.id }) { other in
+                            Button(other.requestName + " · " + other.date.formatted(date: .omitted, time: .standard)) {
+                                comparing = true
+                                comparisonTask?.cancel()
+                                comparisonTask = Task {
+                                    let worker = Task.detached { try ResponseComparator.compare(selected, other).text }
+                                    do {
+                                        let result = try await withTaskCancellationHandler { try await worker.value } onCancel: { worker.cancel() }
+                                        if !Task.isCancelled { comparison = result }
+                                    } catch { if !Task.isCancelled { comparison = error.localizedDescription } }
+                                    comparing = false
+                                }
+                            }
+                        }
+                    }.disabled(comparing)
+                }
+            }
             HSplitView {
                 List(selection: $store.inspectedHistoryID) {
                     ForEach(store.workspace.history) { exchange in
@@ -118,6 +159,13 @@ struct HistoryView: View {
                 ResponseView(exchange: store.workspace.history.first { $0.id == store.inspectedHistoryID }, running: false).frame(minWidth: 500)
             }
         }.padding(24).frame(width: 1000, height: 600)
+        .onDisappear { comparisonTask?.cancel() }
+        .sheet(isPresented: Binding(get: { comparison != nil }, set: { if !$0 { comparison = nil } })) {
+            VStack {
+                HStack { Text("Semantic JSON comparison").font(.title2); Spacer(); Button("Done") { comparison = nil }.keyboardShortcut(.defaultAction) }
+                ScrollView([.vertical, .horizontal]) { Text(comparison ?? "").font(.system(.body, design: .monospaced)).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading) }
+            }.padding(24).frame(width: 750, height: 550)
+        }
     }
 }
 struct RequestSearch: View {

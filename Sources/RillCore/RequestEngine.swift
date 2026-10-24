@@ -7,7 +7,7 @@ public enum RillError: LocalizedError {
         case .unsupportedBodyMethod: "GET and HEAD bodies are not supported by this transport. Choose None or another method."
         case .invalidAPIKey: "Enter a nonempty API-key name."
         case .invalidLimits: "Response download limits must be between 1 byte and 256 MiB."
-        case .invalidTimeout: "Request timeout must be a finite positive number."
+        case .invalidTimeout: "Request timeout must be between 1 and 300 seconds."
         case .duplicateHeader: "Repeated request headers are not yet supported. Combine them explicitly only when permitted by the API."
         case .invalidURL: "Enter a valid http:// or https:// URL."
         case .missingVariable(let name): "No value found for {{\(name)}} in the selected environment."
@@ -19,11 +19,12 @@ public enum RillError: LocalizedError {
 }
 public struct ResponseBudget: Sendable {
     public let downloadBytes: Int
+    public let previewBytes: Int
     public static let standard = ResponseBudget(uncheckedBytes: ResourceLimits.responseBytes)
-    private init(uncheckedBytes: Int) { downloadBytes = uncheckedBytes }
-    public init(downloadBytes: Int) throws {
-        guard (1...(256 * 1024 * 1024)).contains(downloadBytes) else { throw RillError.invalidLimits }
-        self.downloadBytes = downloadBytes
+    private init(uncheckedBytes: Int) { downloadBytes = uncheckedBytes; previewBytes = ResourceLimits.previewBytes }
+    public init(downloadBytes: Int, previewBytes: Int = ResourceLimits.previewBytes) throws {
+        guard (1...(256 * 1024 * 1024)).contains(downloadBytes), (128...(8 * 1024 * 1024)).contains(previewBytes) else { throw RillError.invalidLimits }
+        self.downloadBytes = downloadBytes; self.previewBytes = previewBytes
     }
 }
 
@@ -67,10 +68,10 @@ public enum RequestEngine {
         components.percentEncodedQuery = query
         components.fragment = nil
         guard let url = components.url else { throw RillError.invalidURL }
-        guard draft.timeout.isFinite, draft.timeout > 0 else { throw RillError.invalidTimeout }
+        guard draft.timeout.isFinite, (1...300).contains(draft.timeout) else { throw RillError.invalidTimeout }
         var request = URLRequest(url: url)
         request.httpMethod = draft.method.rawValue
-        request.timeoutInterval = min(max(draft.timeout, 1), 300)
+        request.timeoutInterval = draft.timeout
         request.setValue("application/json, */*;q=0.5", forHTTPHeaderField: "Accept")
         request.setValue("Rill/0.1", forHTTPHeaderField: "User-Agent")
         var headerNames = Set<String>()
@@ -150,6 +151,7 @@ public enum RequestEngine {
         let start = ProcessInfo.processInfo.systemUptime
         let (bytes, response) = try await session.bytes(for: request)
         guard let http = response as? HTTPURLResponse else { throw RillError.invalidURL }
+        let headersElapsed = ProcessInfo.processInfo.systemUptime - start
         let maximum = budget.downloadBytes
         if response.expectedContentLength > Int64(maximum) { throw RillError.responseTooLarge }
         var data = Data()
@@ -162,7 +164,9 @@ public enum RequestEngine {
         var checks: [CheckResult] = []
         if !draft.expectedStatus.isEmpty { checks.append(CheckResult(title: "Status equals \(draft.expectedStatus)", passed: Int(draft.expectedStatus) == http.statusCode)) }
         if !draft.bodyContains.isEmpty { checks.append(CheckResult(title: "Body contains \(draft.bodyContains)", passed: String(data: data, encoding: .utf8)?.contains(draft.bodyContains) == true)) }
-        return Exchange(requestID: draft.id, requestName: draft.name, method: draft.method, url: http.url?.absoluteString ?? request.url!.absoluteString, status: http.statusCode, duration: ProcessInfo.processInfo.systemUptime - start, headers: headers, body: data, checks: checks, preparedRequest: PreparedRequestSummary(request))
+        var summary = PreparedRequestSummary(request); summary.tlsPolicy = tlsProfile?.mode.rawValue ?? TLSMode.system.rawValue
+        let elapsed = ProcessInfo.processInfo.systemUptime - start
+        return Exchange(requestID: draft.id, requestName: draft.name, method: draft.method, url: http.url?.absoluteString ?? request.url!.absoluteString, status: http.statusCode, duration: elapsed, headers: headers, body: data, checks: checks, preparedRequest: summary, previewLimit: budget.previewBytes, downloadLimit: budget.downloadBytes, events: [ExecutionEvent(elapsed: 0, title: "Prepared request; transport started"), ExecutionEvent(elapsed: headersElapsed, title: "Response headers received"), ExecutionEvent(elapsed: elapsed, title: "Response body complete")])
     }
 }
 

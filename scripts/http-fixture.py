@@ -4,6 +4,7 @@ import time
 import json
 import base64
 import hashlib
+import gzip
 from urllib.parse import parse_qs
 from socketserver import TCPServer
 
@@ -70,6 +71,27 @@ class Handler(BaseHTTPRequestHandler):
     do_OPTIONS = do_echo
 
     def do_GET(self):
+        if self.path.startswith('/gzip/'):
+            count = min(int(self.path.rsplit('/', 1)[1]), 1024 * 1024)
+            body = gzip.compress(b'x' * count)
+            self.send_response(200)
+            self.send_header('Content-Encoding', 'gzip')
+            self.send_header('Content-Length', str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        if self.path == '/slow-chunks':
+            self.protocol_version = 'HTTP/1.1'
+            self.send_response(200)
+            self.send_header('Transfer-Encoding', 'chunked')
+            self.end_headers()
+            try:
+                self.wfile.write(b'1\r\nx\r\n'); self.wfile.flush()
+                time.sleep(5)
+                self.wfile.write(b'1\r\ny\r\n0\r\n\r\n')
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+            return
         if self.path.startswith('/echo'):
             return self.do_echo()
         if self.path.startswith(('/bytes/', '/chunked/', '/unknown/')):
