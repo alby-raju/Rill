@@ -30,6 +30,7 @@ public struct WorkspaceImportPlan: Sendable {
         if (incoming.tlsProfiles ?? []).contains(where: { $0.mode == .insecure }) { warnings.append("The import includes insecure TLS profiles. They remain visibly marked and desktop Send requires confirmation.") }
         if incoming.requests.contains(where: { $0.binaryFile != nil || ($0.multipartParts ?? []).contains(where: { $0.file != nil }) }) { warnings.append("File references are retained, not read or attached. Send verifies local file identity/size/time before reading.") }
         if incoming.requests.contains(where: { !($0.foreignScripts ?? []).isEmpty }) { warnings.append("Foreign script source remains disabled review material; it may contain secrets and stays plain text in native exports/backups.") }
+        if incoming.requests.contains(where: { $0.preHook != nil || $0.postHook != nil }) { warnings.append("Native hook sources remain plain text and are disabled on import. Review before explicitly enabling them.") }
         if !incoming.history.isEmpty { warnings.append("Incoming response history is not imported.") }
         preview = WorkspaceImportPreview(collections: incoming.collections.count, requests: incoming.requests.count, environments: incoming.environments.count, profiles: incoming.authProfiles?.count ?? 0, tlsProfiles: incoming.tlsProfiles?.count ?? 0, secretDescriptors: incoming.namedSecrets?.count ?? 0, requestNames: incoming.requests.prefix(30).map { $0.name.utf8.count > 512 ? String(decoding: $0.name.utf8.prefix(512), as: UTF8.self) + "…" : $0.name }, warnings: warnings)
     }

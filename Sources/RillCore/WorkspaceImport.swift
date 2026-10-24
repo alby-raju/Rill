@@ -52,6 +52,7 @@ public enum WorkspaceImport {
             request.id = UUID()
             request.collectionID = request.collectionID.flatMap { collections[$0] }
             request.credential = ""
+            request.preHook?.enabled = false; request.postHook?.enabled = false
             if let id = request.tlsProfileID { request.tlsProfileID = tlsIDs[id] ?? UUID() }
             if let id = request.authProfileID { request.authProfileID = profileIDs[id] ?? UUID() }
             request.url = rewrite(request.url); request.body = rewrite(request.body); request.username = rewrite(request.username)

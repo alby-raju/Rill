@@ -56,12 +56,12 @@ public enum ResponseComparator {
         return ResponseComparison(differences: differences, limited: limited)
     }
 }
-private struct JSONKey: Hashable {
+struct JSONKey: Hashable {
     let bytes: Data
     init(_ value: String) { bytes = Data(value.utf8) }
     var text: String { String(decoding: bytes, as: UTF8.self) }
 }
-private indirect enum JSONValue: Equatable {
+indirect enum JSONValue: Equatable {
     case object([JSONKey: JSONValue]), array([JSONValue]), string(Data), number(String), bool(Bool), null
     var summary: String {
         switch self {
@@ -74,7 +74,7 @@ private indirect enum JSONValue: Equatable {
         }
     }
 }
-private struct JSONValueParser {
+struct JSONValueParser {
     let bytes: [UInt8]
     var index = 0
     var nodes = 0
