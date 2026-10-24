@@ -20,6 +20,12 @@ class Handler(BaseHTTPRequestHandler):
             self.send_error(413)
             return
         payload = self.rfile.read(length)
+        if self.path.startswith('/redirect-'):
+            self.send_response(307)
+            self.send_header('Location', '/echo' if self.path == '/redirect-same' else 'http://127.0.0.1:9/echo')
+            self.send_header('Content-Length', '0')
+            self.end_headers()
+            return
         body = json.dumps({'method': self.command, 'path': self.path,
                            'headers': dict(self.headers),
                            'body': base64.b64encode(payload).decode()}).encode()

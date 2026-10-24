@@ -13,7 +13,9 @@ The package separates serializable models and request execution (`RillCore`) fro
 The archive documents a much larger product than this first native build. These features are not implemented or represented as working controls:
 
 - OpenAPI/Swagger, Postman, Insomnia, Bruno, HAR and cURL import/conversion.
-- Multipart/file uploads, cookie management, OAuth flows, custom TLS/mTLS and API-key auth helpers.
+- Cookie management, reusable auth profiles/named secrets, OAuth flows and custom TLS/mTLS.
+
+[M2](milestones/M2.md) adds structured forms, API-key auth, streaming file/multipart uploads and prepared request inspection. Interoperability and installed-app acceptance remain partial.
 - GraphQL IDE/introspection/subscriptions; ordinary GraphQL HTTP POST can be composed manually.
 - WebSocket, SSE, gRPC, MQTT, Kafka and AMQP clients.
 - Collection runner, extraction/chaining, scripting, matrix/load tests and CI reports.

@@ -69,4 +69,36 @@ import XCTest
         XCTAssertEqual(exchange.preparedRequest?.headers.first { $0.name.lowercased() == "x-key" }?.value, "[redacted]")
     }
 
+    func testBinaryStreamReplaysOnSameOriginRedirectAndStopsAtCrossOrigin() async throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let payload = Data(repeating: 42, count: 150_000)
+        try payload.write(to: file); defer { try? FileManager.default.removeItem(at: file) }
+        var request = try draft("/redirect-same"); request.method = .POST; request.bodyMode = .binary
+        request.binaryFile = try UploadFileReference.capture(file)
+        let exchange = try await RequestEngine.execute(request, environment: nil)
+        XCTAssertEqual(exchange.status, 200)
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: exchange.body) as? [String: Any])
+        XCTAssertEqual(Data(base64Encoded: try XCTUnwrap(object["body"] as? String)), payload)
+        XCTAssertTrue(exchange.url.hasSuffix("/echo"))
+        request.url = try draft("/redirect-cross").url
+        let redirect = try await RequestEngine.execute(request, environment: nil)
+        XCTAssertEqual(redirect.status, 307)
+    }
+    func testMultipartWireBoundaryAndFileBytes() async throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try Data([0, 255, 13, 10]).write(to: file); defer { try? FileManager.default.removeItem(at: file) }
+        var request = try draft("/echo"); request.method = .POST; request.bodyMode = .multipart
+        var part = MultipartPart(); part.name = "file"; part.kind = .file; part.file = try UploadFileReference.capture(file); part.filename = "fixture.bin"; part.contentType = "application/octet-stream"
+        request.multipartParts = [part]
+        let exchange = try await RequestEngine.execute(request, environment: nil)
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: exchange.body) as? [String: Any])
+        let data = try XCTUnwrap(Data(base64Encoded: try XCTUnwrap(object["body"] as? String)))
+        let headers = try XCTUnwrap(object["headers"] as? [String: String])
+        let type = try XCTUnwrap(headers.first { $0.key.lowercased() == "content-type" }?.value)
+        let boundary = try XCTUnwrap(type.components(separatedBy: "boundary=").last)
+        XCTAssertTrue(data.starts(with: Data(("--" + boundary + "\r\n").utf8)))
+        XCTAssertNotNil(data.range(of: Data([0, 255, 13, 10])))
+        XCTAssertEqual(exchange.preparedRequest?.bodyBytes, data.count)
+    }
+
 }

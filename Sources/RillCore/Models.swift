@@ -10,7 +10,7 @@ public struct Field: Codable, Identifiable, Equatable, Sendable {
 public enum HTTPMethod: String, Codable, CaseIterable, Sendable { case GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS }
 public enum AuthKind: String, Codable, CaseIterable, Sendable { case none = "None", bearer = "Bearer token", basic = "Basic", apiKey = "API key" }
 public enum APIKeyLocation: String, Codable, CaseIterable, Sendable { case header = "Header", query = "Query" }
-public enum RequestBodyMode: String, Codable, CaseIterable, Sendable { case none = "None", text = "Raw text", form = "Form fields" }
+public enum RequestBodyMode: String, Codable, CaseIterable, Sendable { case none = "None", text = "Raw text", form = "Form fields", multipart = "Multipart", binary = "Binary file" }
 public struct PreparedRequestSummary: Codable, Equatable, Sendable {
     public var method: String
     public var url: String
@@ -24,7 +24,7 @@ public struct PreparedRequestSummary: Codable, Equatable, Sendable {
         url = components?.url?.absoluteString ?? "Unavailable"
         let visible: Set<String> = ["accept", "content-type", "user-agent", "content-length"]
         headers = (request.allHTTPHeaderFields ?? [:]).map { Field(name: $0.key, value: visible.contains($0.key.lowercased()) ? $0.value : "[redacted]") }.sorted { $0.name < $1.name }
-        bodyBytes = request.httpBody?.count
+        bodyBytes = request.httpBody?.count ?? request.value(forHTTPHeaderField: "Content-Length").flatMap(Int.init)
     }
 }
 public struct RequestDraft: Codable, Identifiable, Equatable, Sendable {
@@ -39,6 +39,8 @@ public struct RequestDraft: Codable, Identifiable, Equatable, Sendable {
     public var contentType = "application/json"
     public var bodyMode: RequestBodyMode?
     public var formFields: [Field]?
+    public var multipartParts: [MultipartPart]?
+    public var binaryFile: UploadFileReference?
     public var apiKeyName: String?
     public var apiKeyLocation: APIKeyLocation?
     public var auth: AuthKind = .none

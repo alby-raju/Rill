@@ -22,6 +22,7 @@ The bundle is written to `dist/Rill.app`. It is ad-hoc signed for local developm
 
 - Native adaptive split-view workspace with collection CRUD, request ordering, global search and templates.
 - Persistent request tabs, pin/reopen, separate unsaved drafts, explicit Save/Discard/Cancel and two-second recovery checkpoints.
+- Bounded streaming binary/multipart uploads with file change detection and replayable private snapshots.
 - HTTP methods, query parameters, headers, text/JSON/XML/form-encoded bodies, JSON formatting, Basic, Bearer and header/query API-key auth; separate None/raw/structured-form body modes.
 - Inherited environments and bounded nested `{{name}}` expansion with explicit missing/cyclic-variable errors.
 - Native body editor with syntax colors, line numbers, find, zoom, wrap, undo and variable suggestions; lossless JSON formatting.
