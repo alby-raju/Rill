@@ -65,7 +65,7 @@ struct RunnerView: View {
                             Text("Environment \(run.environmentID.uuidString)").font(.headline); results(run.report)
                         }
                         ForEach(matrix.comparisons, id: \.requestID) { comparison in
-                            Text("\(comparison.requestID.uuidString.prefix(8)): states \(comparison.statesDiffer ? "differ" : "match"), checks \(comparison.checksDiffer ? "differ" : "match"), body fingerprints \(comparison.bodiesDiffer ? "differ (possibly dynamic values)" : "match"), not run: \(comparison.includesNotRun ? "yes" : "no")").font(.caption)
+                            Text("\(String(comparison.requestID.uuidString.prefix(8))): states \(comparison.statesDiffer ? "differ" : "match"), checks \(comparison.checksDiffer ? "differ" : "match"), body fingerprints \(comparison.bodiesDiffer ? "differ (possibly dynamic values)" : "match"), not run: \(comparison.includesNotRun ? "yes" : "no")").font(.caption)
                         }
                     }
                     if let load {
@@ -86,7 +86,7 @@ struct RunnerView: View {
         VStack(alignment: .leading, spacing: 5) {
             Text("\(report.passed ? "Passed" : "Unsuccessful") · \(report.outcomes.count) outcomes · \(report.duration, specifier: "%.3f") s · Cancelled: \(report.cancelled ? "yes" : "no") · Budget exhausted: \(report.exhausted ? "yes" : "no")").font(.headline)
             ForEach(report.outcomes) { outcome in
-                Text("\(outcome.requestID.uuidString.prefix(8)) · iteration \(outcome.iteration), attempt \(outcome.attempt) · \(outcome.state.rawValue) · HTTP \(outcome.status.map(String.init) ?? "—") · \(outcome.duration, specifier: "%.3f") s\(outcome.bodyOmitted ? " · body omitted" : "")").font(.system(.caption, design: .monospaced))
+                Text("\(String(outcome.requestID.uuidString.prefix(8))) · iteration \(outcome.iteration), attempt \(outcome.attempt) · \(outcome.state.rawValue) · HTTP \(outcome.status.map(String.init) ?? "—") · \(outcome.duration, specifier: "%.3f") s\(outcome.bodyOmitted ? " · body omitted" : "")").font(.system(.caption, design: .monospaced))
             }
         }
     }
