@@ -24,7 +24,9 @@ typealias ViewState<Value> = SwiftUI.State<Value>
                 Button("Import cURL / HTTPie / HAR…") { store.showCommandImport = true }
                 Button("Import Postman JSON…") { store.importForeign(.postman) }
                 Button("Import HTTPie Desktop JSON…") { store.importForeign(.httpieDesktop) }
+                Button("Import Insomnia JSON / YAML…") { store.importForeign(.insomnia) }
                 Button("Import Rill Workspace…") { store.importWorkspace() }
+                Button("Export Insomnia Collection…") { store.exportInterchange("Insomnia collection") }
                 Button("Export Postman Collection…") { store.exportInterchange("Postman collection") }
                 Button("Export Postman Environment…") { store.exportInterchange("Postman environment") }.disabled(store.environment == nil)
                 Button("Export HAR Request…") { store.exportInterchange("HAR") }.disabled(store.selected == nil)
@@ -36,6 +38,7 @@ typealias ViewState<Value> = SwiftUI.State<Value>
             }
             CommandGroup(replacing: .saveItem) { Button("Save Request") { store.saveSelected() }.keyboardShortcut("s") }
             CommandMenu("Request") {
+                Button("Review Imported Scripts…") { store.showForeignScripts = true }.disabled(store.selected?.foreignScripts?.isEmpty != false)
                 Button("New Request Tab") { store.newRequest() }.keyboardShortcut("t")
                 Button("Close Request Tab") { if let id = store.selection { store.closeTab(id) } }.keyboardShortcut("w")
                 Button("Reopen Closed Tab") { store.reopenTab() }.keyboardShortcut("t", modifiers: [.command, .shift])

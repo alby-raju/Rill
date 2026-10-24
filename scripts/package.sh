@@ -24,6 +24,7 @@ cat > "$RILL_APP/Contents/Info.plist" <<'PLIST'
 <key>NSAppTransportSecurity</key><dict><key>NSAllowsArbitraryLoads</key><true/></dict>
 </dict></plist>
 PLIST
+cp "$RILL_ROOT/THIRD_PARTY_NOTICES.txt" "$RILL_APP/Contents/Resources/THIRD_PARTY_NOTICES.txt"
 plutil -lint "$RILL_APP/Contents/Info.plist"
 codesign --force --sign - "$RILL_APP"
 codesign --verify --strict "$RILL_APP"

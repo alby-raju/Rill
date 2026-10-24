@@ -54,6 +54,7 @@ public struct RequestDraft: Codable, Identifiable, Equatable, Sendable {
     public var username = ""
     public var credential = ""
     public var timeout: Double = 30
+    public var foreignScripts: [ForeignScriptSource]?
     public var expectedStatus = ""
     public var bodyContains = ""
     public init(collectionID: UUID? = nil) { self.collectionID = collectionID }

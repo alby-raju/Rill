@@ -71,3 +71,5 @@ Postman v2.0/v2.1 JSON collections and environments can be imported from the Fil
 The File menu also exports Postman collections/environments and an unexecuted HAR request. Masked exports still include bodies, URL paths and unmarked variable values; review before sharing. HAR binary/multipart capture and native auth/TLS profile exports fail explicitly rather than silently changing behavior.
 
 HTTPie Desktop 1.0.0 workspace/collection/request/environment JSON also imports through a reviewed plan, including marked secrets and supported inherited auth. Unsupported path/template/body semantics fail explicitly; see M3 for limitations.
+
+Insomnia v4 JSON and v5 collection/environment YAML import/export are available in File. Imported foreign scripts remain disabled review text (Request → Review Imported Scripts); exporting to Insomnia omits them to prevent foreign auto-execution. YAML uses pinned Yams 6.2.2 with bounded event preflight; dependency notices ship in the app bundle. See [parser decision](docs/decisions/yaml-parser.md) and [M3 limits](docs/milestones/M3.md).
