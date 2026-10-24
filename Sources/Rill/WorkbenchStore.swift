@@ -524,6 +524,31 @@ import UniformTypeIdentifiers
             } catch { self.error = "Import failed without applying incoming changes. \(error.localizedDescription)"; if (error as? WorkspaceError) == .conflict { persistenceAvailable = false; persistenceHealth = .conflict } }
         }
     }
+    func exportInterchange(_ target: String) {
+        guard canEdit else { return }
+        let alert = NSAlert(); alert.messageText = "Export " + target + "?"
+        alert.informativeText = "URLs, bodies, file paths and unmarked variables may contain secrets. Postman exports saved requests and separate environments; native secret references need local configuration. HAR exports the current draft without sending it, with an explicitly unexecuted response placeholder. Masked HAR also redacts query values and nonessential headers. File references are exported as metadata only; unsupported profiles or bodies fail before writing."
+        alert.addButton(withTitle: "Cancel"); alert.addButton(withTitle: "Export Masked"); alert.addButton(withTitle: "Include Auth Values")
+        let choice = alert.runModal(); guard choice != .alertFirstButtonReturn else { return }
+        let include = choice == .alertThirdButtonReturn
+        let panel = NSSavePanel(); panel.nameFieldStringValue = "Rill-" + target + (target == "HAR" ? ".har" : ".json")
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        let snapshot = workspace, request = selected, environment = environment
+        let resolver = NamedSecretResolver(catalog: snapshot.namedSecrets ?? [])
+        Task {
+            do {
+                try await Task.detached {
+                    let data: Data
+                    switch target {
+                    case "Postman collection": data = try PostmanExporter.collection(snapshot, includeCredentials: include)
+                    case "Postman environment": guard let environment else { throw ForeignExportError.unsupported }; data = try PostmanExporter.environment(environment)
+                    default: guard let request else { throw ForeignExportError.unsupported }; data = try HARExporter.request(request, environment: environment, includeCredentials: include, profiles: snapshot.authProfiles ?? [], secrets: resolver)
+                    }
+                    try ForeignExportFile.write(data, to: url)
+                }.value
+            } catch { self.error = "Export did not complete. " + error.localizedDescription }
+        }
+    }
     func importPostman() {
         guard canEdit, persistenceAvailable else { return }
         let panel = NSOpenPanel(); panel.allowedContentTypes = [.json]

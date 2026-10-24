@@ -24,6 +24,9 @@ typealias ViewState<Value> = SwiftUI.State<Value>
                 Button("Import cURL / HTTPie / HAR…") { store.showCommandImport = true }
                 Button("Import Postman JSON…") { store.importPostman() }
                 Button("Import Rill Workspace…") { store.importWorkspace() }
+                Button("Export Postman Collection…") { store.exportInterchange("Postman collection") }
+                Button("Export Postman Environment…") { store.exportInterchange("Postman environment") }.disabled(store.environment == nil)
+                Button("Export HAR Request…") { store.exportInterchange("HAR") }.disabled(store.selected == nil)
                 Button("Export Rill Workspace…") { store.exportWorkspace() }
                 Button("Export Support Diagnostics…") { store.exportDiagnostics() }
                 Divider()
