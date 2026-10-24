@@ -57,12 +57,14 @@ public final class PreparedHTTPRequest: @unchecked Sendable {
 
 enum UploadBody {
     static let maximumBytes = 256 * 1024 * 1024
-    static func create(_ draft: RequestDraft, environment: Environment?, limit: Int = maximumBytes) throws -> (url: URL, count: Int, contentType: String) {
+    static func create(_ draft: RequestDraft, environment: Environment?, secrets: NamedSecretResolver? = nil, limit: Int = maximumBytes) throws -> (url: URL, count: Int, contentType: String) {
         guard (1...maximumBytes).contains(limit) else { throw UploadError.tooLarge }
         let variables = environment?.variables.filter { $0.enabled && !$0.name.isEmpty }.reduce(into: [String: String]()) { $0[$1.name] = $1.value } ?? [:]
         var expandedBytes = 0
         func expand(_ value: String) throws -> String {
-            let output = try VariableExpansion.resolve(value, values: variables)
+            let output = try VariableExpansion.resolve(value, values: variables, secretLookup: { name in
+                guard let secrets else { throw AuthenticationError.missingSecret }; return try secrets.resolve(name)
+            })
             expandedBytes += output.utf8.count
             guard expandedBytes <= ResourceLimits.workspaceBytes else { throw EditingError.expansionLimit }
             return output

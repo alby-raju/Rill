@@ -32,7 +32,7 @@ The bundle is written to `dist/Rill.app`. It is ad-hoc signed for local developm
 - Status and body-contains checks.
 - Session history bounded to 50 exchanges and 32 MiB of bodies.
 - Validated, conflict-aware background workspace persistence and Rill JSON import/export with regenerated identities.
-- Authentication credentials in macOS Keychain; credentials excluded from exported workspaces.
+- Authentication credentials in macOS Keychain; reusable auth profiles and named `{{secret:name}}` values with a read-only `RILL_SECRET_` process fallback. Credentials are excluded from exported workspaces.
 - System/light/dark appearance and keyboard shortcuts: Cmd+N, Cmd+Enter, Cmd+K, Cmd+Shift+E, Cmd+period.
 
 Requests are sent only when you choose Send. A fresh workspace has no preconfigured remote endpoint.
@@ -41,7 +41,7 @@ Requests are sent only when you choose Send. A fresh workspace has no preconfigu
 
 Workspace: `~/Library/Application Support/Rill/workspace.json`.
 
-Saved Auth-tab credentials use Keychain service `app.rill.credentials`; draft credentials use `app.rill.drafts`. Draft checkpoints are separate in `editor-session.json` beside the workspace. Headers, URLs, usernames, bodies and environment values are stored as entered, including any secrets you type there. Exports include those values. Response history is session-only. Avoid credentials in URLs and use the Auth tab for tokens/passwords.
+Saved Auth-tab credentials use Keychain service `app.rill.credentials`; draft credentials use `app.rill.drafts`, and named values use `app.rill.namedsecrets`. Draft checkpoints are separate in `editor-session.json` beside the workspace. Headers, URLs, usernames, bodies and environment values are stored as entered, including any secrets you type there. Exports include those values. Response history is session-only. Avoid credentials in URLs and use the Auth tab for tokens/passwords.
 
 ## Verification
 
