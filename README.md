@@ -69,3 +69,5 @@ This is the first working native foundation, not full parity with the old applic
 Postman v2.0/v2.1 JSON collections and environments can be imported from the File menu with a loss preview. Supported inherited auth is flattened, nested folders become collection breadcrumbs, and marked environment secrets move to Keychain. Scripts, OAuth helper imports and scoped folder/request variables are not supported; unsupported auth/body data fails before Apply. File references require local reselection. See [M3 details](docs/milestones/M3.md).
 
 The File menu also exports Postman collections/environments and an unexecuted HAR request. Masked exports still include bodies, URL paths and unmarked variable values; review before sharing. HAR binary/multipart capture and native auth/TLS profile exports fail explicitly rather than silently changing behavior.
+
+HTTPie Desktop 1.0.0 workspace/collection/request/environment JSON also imports through a reviewed plan, including marked secrets and supported inherited auth. Unsupported path/template/body semantics fail explicitly; see M3 for limitations.
