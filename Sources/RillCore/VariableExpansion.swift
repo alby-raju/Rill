@@ -18,7 +18,8 @@ public enum VariableExpansion {
                 try append(String(input[previous..<range.lowerBound]))
                 let key = String(input[keyRange]).trimmingCharacters(in: .whitespaces)
                 let value: String
-                if let cached = cache[key] { value = cached }
+                if key.hasPrefix("$") { value = try DynamicTemplates.generate(key) }
+                else if let cached = cache[key] { value = cached }
                 else {
                     guard visiting.insert(key).inserted else { throw EditingError.variableCycle(key) }
                     if key.hasPrefix("secret:") {
@@ -32,7 +33,7 @@ public enum VariableExpansion {
                     visiting.remove(key)
                     cachedBytes += value.utf8.count
                     guard value.utf8.count <= 1024 * 1024, cachedBytes <= ResourceLimits.workspaceBytes else { throw EditingError.expansionLimit }
-                    cache[key] = value
+                    if key.hasPrefix("secret:") { cache[key] = value }
                 }
                 try append(value); previous = range.upperBound
             }

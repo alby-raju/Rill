@@ -172,6 +172,7 @@ public enum RequestEngine {
         var checks: [CheckResult] = []
         if !draft.expectedStatus.isEmpty { checks.append(CheckResult(title: "Status equals \(draft.expectedStatus)", passed: Int(draft.expectedStatus) == http.statusCode)) }
         if !draft.bodyContains.isEmpty { checks.append(CheckResult(title: "Body contains \(draft.bodyContains)", passed: String(data: data, encoding: .utf8)?.contains(draft.bodyContains) == true)) }
+        checks += ResponseRules.evaluate(draft.assertions ?? [], response: Exchange(requestID: draft.id, requestName: draft.name, method: draft.method, url: http.url?.absoluteString ?? "", status: http.statusCode, duration: 0, headers: headers, body: data, checks: []))
         var summary = PreparedRequestSummary(request); summary.tlsPolicy = tlsProfile?.mode.rawValue ?? TLSMode.system.rawValue
         let elapsed = ProcessInfo.processInfo.systemUptime - start
         return Exchange(requestID: draft.id, requestName: draft.name, method: draft.method, url: http.url?.absoluteString ?? request.url!.absoluteString, status: http.statusCode, duration: elapsed, headers: headers, body: data, checks: checks, preparedRequest: summary, previewLimit: budget.previewBytes, downloadLimit: budget.downloadBytes, events: [ExecutionEvent(elapsed: 0, title: "Prepared request; transport started"), ExecutionEvent(elapsed: headersElapsed, title: "Response headers received"), ExecutionEvent(elapsed: elapsed, title: "Response body complete")])

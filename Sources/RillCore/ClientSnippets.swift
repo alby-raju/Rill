@@ -15,8 +15,11 @@ public struct FrozenClientRequest: Sendable {
     public let timeout: Double
     public static let bodyLimit = 1024 * 1024
 
-    public static func capture(_ draft: RequestDraft, environment: Environment?, includeCredentials: Bool = false,
+    public static func capture(_ input: RequestDraft, environment inputEnvironment: Environment?, includeCredentials: Bool = false,
                                profiles: [AuthenticationProfile] = [], secrets: NamedSecretResolver? = nil) throws -> Self {
+        try Task.checkCancellation()
+        let prepared = try WorkflowEngine.prepare(input, variables: WorkflowEngine.variables(in: inputEnvironment))
+        let draft = prepared.request, environment = WorkflowEngine.environment(prepared.variables)
         guard draft.tlsProfileID == nil else { throw CommandError.unsupported("client TLS profiles") }
         let files = (draft.bodyMode == .binary ? [draft.binaryFile].compactMap { $0 } : []) + (draft.bodyMode == .multipart ? (draft.multipartParts ?? []).filter { $0.enabled && $0.kind == .file }.compactMap(\.file) : [])
         var size: UInt64 = 0
@@ -44,7 +47,7 @@ public struct FrozenClientRequest: Sendable {
         var headers = request.allHTTPHeaderFields ?? [:]
         guard headers.count <= 1000, headers.reduce(0, { $0 + $1.key.utf8.count + $1.value.utf8.count }) <= 256 * 1024 else { throw CommandError.tooLarge }
         let effective = try AuthenticationProfiles.applying(to: draft, profiles: profiles)
-        let values = environment?.variables.filter { $0.enabled && !$0.name.isEmpty }.reduce(into: [String: String]()) { $0[$1.name] = $1.value } ?? [:]
+        let values = prepared.variables
         let customKey = effective.auth == .apiKey && effective.apiKeyLocation != .query
             ? try VariableExpansion.resolve(effective.apiKeyName ?? "", values: values, secretLookup: { name in
                 guard let secrets else { throw AuthenticationError.missingSecret }; return try secrets.resolve(name)

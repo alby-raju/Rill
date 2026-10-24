@@ -74,7 +74,7 @@ struct CommandExportView: View {
             }
             if !clientSnippet { Picker("Target", selection: $target) { ForEach(CommandTarget.allCases, id: \.self) { Text($0.rawValue).tag($0) } }.pickerStyle(.segmented) }
             Toggle("Include auth, cookie and API-key header values", isOn: $includeCredentials)
-            Text("URL queries, bodies, file paths and uncommon headers may contain secrets even with masking enabled. Generation resolves selected variables/secrets and may read selected files to freeze the request; it never sends traffic. Review before copying or sharing.").font(.caption).foregroundStyle(.secondary)
+            Text("URL queries, bodies, file paths and uncommon headers may contain secrets even with masking enabled. Generation runs enabled native pre-hooks and resolves selected variables/secrets and may read selected files to freeze the request; it never sends traffic. Review before copying or sharing.").font(.caption).foregroundStyle(.secondary)
             Button(generating ? "Generating…" : "Generate from current draft") {
                 guard let request = store.selected else { return }
                 let environment = store.environment, profiles = store.workspace.authProfiles ?? [], secrets = NamedSecretResolver(catalog: store.workspace.namedSecrets ?? [])

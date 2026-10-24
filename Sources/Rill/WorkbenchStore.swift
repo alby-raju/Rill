@@ -56,6 +56,7 @@ import UniformTypeIdentifiers
     @Published var showForeignScripts = false
     @Published var showCommandImport = false
     @Published var showCommandExport = false
+    @Published var showRunner = false
     @Published var showTLS = false
     @Published var showAuthentication = false
     @Published var showEnvironments = false
@@ -332,7 +333,8 @@ import UniformTypeIdentifiers
         task = Task {
             defer { if activeContext == context.id { running = false; task = nil; activeContext = nil } }
             do {
-                let exchange = try await RequestEngine.execute(draft, environment: environment, budget: try ResponseBudget(downloadBytes: settings.downloadBytes, previewBytes: settings.previewBytes), profiles: profiles, secrets: secrets, tlsProfiles: tlsProfiles)
+                let result = try await WorkflowEngine.execute(draft, variables: WorkflowEngine.variables(in: environment), budget: try ResponseBudget(downloadBytes: settings.downloadBytes, previewBytes: settings.previewBytes), profiles: profiles, secrets: secrets, tlsProfiles: tlsProfiles)
+                let exchange = result.exchange
                 try Task.checkCancellation()
                 guard activeContext == context.id else { return }
                 if context.matches(request: selected, environment: self.environment) { response = exchange }

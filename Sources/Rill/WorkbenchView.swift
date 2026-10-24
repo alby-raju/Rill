@@ -38,6 +38,7 @@ struct WorkbenchView: View {
         .tint(accent)
         .sheet(isPresented: $store.showForeignScripts) { ForeignScriptReviewView().environmentObject(store) }
         .sheet(isPresented: $store.showCommandImport) { CommandImportView().environmentObject(store) }
+        .sheet(isPresented: $store.showRunner) { RunnerView().environmentObject(store) }
         .sheet(isPresented: $store.showCommandExport) { CommandExportView().environmentObject(store) }
         .sheet(isPresented: $store.showTLS) { TLSManagerView().environmentObject(store) }
         .sheet(isPresented: $store.showAuthentication) { AuthenticationManager().environmentObject(store) }
@@ -196,7 +197,7 @@ struct RequestEditor: View {
     private var composition: some View {
                 VStack(alignment: .leading, spacing: 0) {
                     HStack(spacing: 22) {
-                        ForEach(["Parameters", "Headers", "Body", "Auth", "Checks"], id: \.self) { title in
+                        ForEach(["Parameters", "Headers", "Body", "Auth", "Checks", "Workflow"], id: \.self) { title in
                             Button { section = title } label: { VStack(spacing: 10) { Text(title).font(.system(size: 12, weight: section == title ? .semibold : .regular)).foregroundStyle(section == title ? .primary : .secondary); Rectangle().fill(section == title ? accent : .clear).frame(height: 2) }.fixedSize(horizontal: true, vertical: false) }.buttonStyle(.plain)
                         }
                         Spacer()
@@ -209,6 +210,7 @@ struct RequestEditor: View {
                         case "Body": BodyComposer(request: $request)
                         case "Auth":
                             AuthenticationComposer(request: $request)
+                        case "Workflow": WorkflowEditor(request: $request)
                         default:
                             Form {
                                 TextField("Expected HTTP status", text: $request.expectedStatus, prompt: Text("e.g. 200"))

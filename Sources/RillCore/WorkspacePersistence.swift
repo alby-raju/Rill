@@ -53,6 +53,8 @@ public enum WorkspaceFile {
             throw WorkspaceError.invalidStructure
         }
         for request in workspace.requests {
+            try ResponseRules.validate(request.assertions ?? [], request.extractions ?? [])
+            for hook in [request.preHook, request.postHook].compactMap({ $0 }) { try HookRuntime.validateStorage(hook) }
             let scripts = request.foreignScripts ?? []
             guard scripts.count <= 16, scripts.allSatisfy({ $0.source.utf8.count <= 256 * 1024 && $0.origin.utf8.count <= 4096 && $0.stage.utf8.count <= 128 }), scripts.reduce(0, { $0 + $1.source.utf8.count }) <= 1024 * 1024 else { throw WorkspaceError.invalidStructure }
             guard request.collectionID.map({ collections.contains($0) }) ?? true,

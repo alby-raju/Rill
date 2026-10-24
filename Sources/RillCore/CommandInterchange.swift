@@ -309,7 +309,9 @@ extension CommandImporter {
 }
 public enum CommandTarget: String, CaseIterable, Sendable { case curl = "cURL", httpie = "HTTPie" }
 public enum CommandGenerator {
-    public static func generate(_ draft: RequestDraft, environment: Environment?, target: CommandTarget, includeCredentials: Bool = false, profiles: [AuthenticationProfile] = [], secrets: NamedSecretResolver? = nil) throws -> String {
+    public static func generate(_ input: RequestDraft, environment inputEnvironment: Environment?, target: CommandTarget, includeCredentials: Bool = false, profiles: [AuthenticationProfile] = [], secrets: NamedSecretResolver? = nil) throws -> String {
+        let prepared = try WorkflowEngine.prepare(input, variables: WorkflowEngine.variables(in: inputEnvironment))
+        let draft = prepared.request, environment = WorkflowEngine.environment(prepared.variables)
         guard draft.tlsProfileID == nil else { throw CommandError.unsupported("TLS profiles require separately configured CLI trust/identity options") }
         if target == .httpie && draft.bodyMode == .binary { throw CommandError.unsupported("HTTPie binary file body snippets") }
         guard draft.bodyMode != .multipart else { throw CommandError.unsupported("multipart snippets are a subsequent slice; export the prepared request for inspection") }
@@ -319,7 +321,7 @@ public enum CommandGenerator {
         var words = target == .curl ? ["curl", "--disable", "--globoff", "--request", CommandWords.quote(request.httpMethod ?? "GET"), "--url", CommandWords.quote(request.url!.absoluteString)] : ["http", "--ignore-stdin", "--ignore-netrc", request.httpMethod ?? "GET", CommandWords.quote(request.url!.absoluteString)]
         let knownSecrets: Set<String> = ["authorization", "proxy-authorization", "cookie", "set-cookie", "x-api-key", "api-key", "x-auth-token"]
         let effective = try AuthenticationProfiles.applying(to: draft, profiles: profiles)
-        let variables = environment?.variables.filter { $0.enabled && !$0.name.isEmpty }.reduce(into: [String: String]()) { $0[$1.name] = $1.value } ?? [:]
+        let variables = prepared.variables
         let keyName = effective.auth == .apiKey ? try VariableExpansion.resolve(effective.apiKeyName ?? "", values: variables, secretLookup: { name in guard let secrets else { throw AuthenticationError.missingSecret }; return try secrets.resolve(name) }).trimmingCharacters(in: .whitespacesAndNewlines) : ""
         words += [target == .curl ? "--max-time" : "--timeout", String(request.timeoutInterval)]
         for (name, original) in (request.allHTTPHeaderFields ?? [:]).sorted(by: { $0.key.lowercased() < $1.key.lowercased() }) {
