@@ -28,6 +28,16 @@ public struct ResponseBudget: Sendable {
     }
 }
 
+enum HTTPClientConfiguration {
+    static func make() -> URLSessionConfiguration {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.httpShouldSetCookies = false
+        configuration.urlCache = nil
+        configuration.tlsMinimumSupportedProtocolVersion = .TLSv12
+        return configuration
+    }
+}
+
 public enum RequestEngine {
     public static func resolve(_ text: String, variables: [String: String]) throws -> String {
         try VariableExpansion.resolve(text, values: variables)
@@ -143,9 +153,7 @@ public enum RequestEngine {
         let frozen = try freeze(draft, environment: environment, profiles: profiles, secrets: secrets)
         defer { frozen.removeTemporaryBody() }
         let request = frozen.request
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.httpShouldSetCookies = false
-        configuration.urlCache = nil
+        let configuration = HTTPClientConfiguration.make()
         let session = URLSession(configuration: configuration, delegate: HTTPTransportDelegate(prepared: frozen, profile: tlsProfile, identity: identity), delegateQueue: nil)
         defer { session.invalidateAndCancel() }
         let start = ProcessInfo.processInfo.systemUptime
