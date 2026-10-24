@@ -10,11 +10,15 @@ RILL_TLS_DIRECTORY="$(mktemp -d -t rill-tls)"
 RILL_TLS_LOG="$(mktemp -t rill-tls-log)"
 python3 scripts/tls-fixture.py "$RILL_TLS_DIRECTORY" > "$RILL_TLS_LOG" 2>&1 &
 RILL_TLS_PID=$!
+RILL_LIVE_LOG="$(mktemp -t rill-live-log)"
+python3 scripts/live-fixture.py > "$RILL_LIVE_LOG" 2>&1 &
+RILL_LIVE_PID=$!
 cleanup() {
   RILL_EXIT_STATUS=$?
   trap - EXIT
   kill "$RILL_FIXTURE_PID" 2>/dev/null || true
   kill "$RILL_TLS_PID" 2>/dev/null || true
+  kill "$RILL_LIVE_PID" 2>/dev/null || true
   python3 - "$RILL_TLS_DIRECTORY" <<'PY_CLEANUP'
 import shutil
 import sys
@@ -23,11 +27,30 @@ PY_CLEANUP
   if [ "$RILL_EXIT_STATUS" -ne 0 ]; then
     cat "$RILL_FIXTURE_LOG"
     cat "$RILL_TLS_LOG"
+    cat "$RILL_LIVE_LOG"
   fi
   exit "$RILL_EXIT_STATUS"
 }
 trap cleanup EXIT
+export RILL_TEST_LIVE_URL=http://127.0.0.1:18755
 export RILL_TEST_BASE_URL=http://127.0.0.1:18749
+# Verify the live fixture owns its endpoint before tests can use it.
+python3 - "$RILL_LIVE_PID" <<'PY_LIVE'
+import http.client, os, sys, time
+pid = int(sys.argv[1])
+for attempt in range(100):
+    os.kill(pid, 0)
+    try:
+        connection = http.client.HTTPConnection('127.0.0.1', 18755, timeout=0.5)
+        connection.request('GET', '/health')
+        response = connection.getresponse()
+        body = response.read(); connection.close()
+        if response.status == 200 and b'RillLive' in body:
+            time.sleep(0.1); os.kill(pid, 0); break
+    except (OSError, http.client.HTTPException): pass
+    time.sleep(0.1)
+else: raise SystemExit('Live fixture failed to start.')
+PY_LIVE
 # Wait for readiness and check ownership so an occupied port cannot hide a
 # failed fixture startup.
 if ! python3 - "$RILL_FIXTURE_PID" <<'PY'

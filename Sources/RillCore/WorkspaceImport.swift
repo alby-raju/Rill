@@ -58,6 +58,7 @@ public enum WorkspaceImport {
             request.collectionID = request.collectionID.flatMap { collections[$0] }
             request.credential = ""
             if let id = request.apiLink?.sourceID { request.apiLink?.sourceID = sourceIDs[id]!; request.apiLink?.baseline = Data() }
+            request.graphql?.introspectOnEndpointChange = false
             request.preHook?.enabled = false; request.postHook?.enabled = false
             if let id = request.tlsProfileID { request.tlsProfileID = tlsIDs[id] ?? UUID() }
             if let id = request.authProfileID { request.authProfileID = profileIDs[id] ?? UUID() }

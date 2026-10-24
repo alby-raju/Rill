@@ -2,7 +2,7 @@
 
 A new native macOS API workbench, written from scratch in Swift and SwiftUI. Rill takes its name from a small stream: a quiet workspace for following requests and responses.
 
-Requires macOS 14+ and Swift 6+. No Java, JavaFX, third-party packages, account or hosted workspace.
+Requires macOS 14+ and Swift 6+. No Java, JavaFX, account or hosted workspace. Independently selected YAML/archive dependencies are pinned; see THIRD_PARTY_NOTICES.txt.
 
 ## Run
 
@@ -36,9 +36,13 @@ The bundle is written to `dist/Rill.app`. It is ad-hoc signed for local developm
 - Named TLS trust profiles, custom anchors and Keychain client identities; explicit per-profile insecure development mode.
 - Explicit OAuth2 client-credentials and browser PKCE acquisition into named Keychain tokens.
 - Authentication credentials in macOS Keychain; reusable auth profiles and named `{{secret:name}}` values with a read-only `RILL_SECRET_` process fallback. Credentials are excluded from exported workspaces.
+- Reviewed HAR/Postman/HTTPie Desktop/Insomnia/Bruno imports and portable exports, plus nine frozen-request client generators.
+- Shared collection/matrix/load runners, assertions/extraction, finite JSON hooks and redacted JSON/Markdown/JUnit/Allure reports.
+- Bounded OpenAPI/Swagger generation/refresh, explicit JSON Schema subset, linked contracts, editable loopback mocks and explicit security probes.
+- GraphQL query/variables, explicit or opt-in introspection, offline schemas and prefix completion; native WebSocket, SSE and graphql-transport-ws subscription sessions. See [supported boundaries](docs/milestones/M6.md).
 - System/light/dark appearance and keyboard shortcuts: Cmd+N, Cmd+Enter, Cmd+K, Cmd+Shift+E, Cmd+period.
 
-Network requests start only when you choose Send or explicitly acquire an OAuth token. A fresh workspace has no preconfigured remote endpoint.
+Network requests start through explicit actions such as Send, runners, definition loads, introspection, live connections, probes or OAuth acquisition. Endpoint-change introspection requires a saved opt-in. A fresh workspace has no preconfigured remote endpoint.
 
 ## Data
 
