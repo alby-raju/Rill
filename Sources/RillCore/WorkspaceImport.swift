@@ -20,8 +20,10 @@ public enum WorkspaceImport {
             request.credential = ""
             result.requests.append(request)
         }
+        let environmentIDs = Dictionary(uniqueKeysWithValues: incoming.environments.map { ($0.id, UUID()) })
         for var environment in incoming.environments {
-            environment.id = UUID()
+            environment.id = environmentIDs[environment.id]!
+            environment.parentID = environment.parentID.flatMap { environmentIDs[$0] }
             result.environments.append(environment)
         }
         try WorkspaceFile.validate(result)

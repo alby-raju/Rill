@@ -24,8 +24,18 @@ typealias ViewState<Value> = SwiftUI.State<Value>
                 Button("Import Rill Workspace…") { store.importWorkspace() }
                 Button("Export Rill Workspace…") { store.exportWorkspace() }
                 Button("Export Support Diagnostics…") { store.exportDiagnostics() }
+                Divider()
+                Button("Create Backup…") { store.createBackup() }
+                Button("Restore Backup…") { store.restoreBackup() }
             }
+            CommandGroup(replacing: .saveItem) { Button("Save Request") { store.saveSelected() }.keyboardShortcut("s") }
             CommandMenu("Request") {
+                Button("New Request Tab") { store.newRequest() }.keyboardShortcut("t")
+                Button("Close Request Tab") { if let id = store.selection { store.closeTab(id) } }.keyboardShortcut("w")
+                Button("Reopen Closed Tab") { store.reopenTab() }.keyboardShortcut("t", modifiers: [.command, .shift])
+                Button("Move Request Earlier") { store.reorderSelected(-1) }.keyboardShortcut(.upArrow, modifiers: .option)
+                Button("Move Request Later") { store.reorderSelected(1) }.keyboardShortcut(.downArrow, modifiers: .option)
+                Divider()
                 Button("Send Request") { store.send() }.keyboardShortcut(.return, modifiers: .command).disabled(store.running || store.loading)
                 Button("Cancel Request") { store.cancel() }.keyboardShortcut(".")
                 Button("Find Request") { store.showPalette = true }.keyboardShortcut("k")
@@ -46,11 +56,13 @@ typealias ViewState<Value> = SwiftUI.State<Value>
     weak var store: WorkbenchStore?
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard let store else { return .terminateNow }
+        guard !store.importing else { store.error = "Wait for the workspace operation to finish before quitting."; return .terminateCancel }
         store.closing = true
         store.cancel()
         Task {
             let saved = await store.flushPendingChanges()
             if saved { sender.reply(toApplicationShouldTerminate: true); return }
+            if store.quitCancelled { store.closing = false; sender.reply(toApplicationShouldTerminate: false); return }
             let alert = NSAlert()
             alert.messageText = "Some changes have not been saved"
             alert.informativeText = "Cancel quitting to export your edits or retry saving. Quitting without saving loses in-memory changes."

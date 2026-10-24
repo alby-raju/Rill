@@ -50,6 +50,32 @@ public actor WorkspaceSession {
             }
         }
     }
+    public func currentRevision() -> WorkspaceRevision? { revision }
+
+    public func restore(_ contents: BackupContents, retainingPreviousAt previous: URL, editor: EditorSessionState?) throws -> Workspace {
+        try contents.validate()
+        guard previous.standardizedFileURL.resolvingSymlinksInPath() != repository.url.standardizedFileURL.resolvingSymlinksInPath() else { throw BackupError.invalid }
+        guard let revision else { throw WorkspaceError.unavailable }
+        try repository.withSnapshot { snapshot in
+            guard snapshot.revision == revision else { throw WorkspaceError.conflict }
+            try WorkspaceFile.createNew(WorkspaceBackup.encode(workspace: snapshot.workspace, editor: editor), at: previous)
+        }
+        var restored = contents.workspace
+        restored.history = []
+        self.revision = try repository.commit(restored, expecting: revision) { committed in
+            self.revision = committed
+            var loaded: [UUID: String] = [:]
+            for index in restored.requests.indices {
+                let id = restored.requests[index].id
+                restored.requests[index].credential = try credentialStore.read(id)
+                loaded[id] = restored.requests[index].credential
+            }
+            // Retain other local keys so the pre-restore workspace remains usable.
+            credentials = loaded
+        }
+        return restored
+    }
+
 }
 
 public protocol CredentialStore: Sendable {
@@ -58,10 +84,11 @@ public protocol CredentialStore: Sendable {
 }
 
 public struct KeychainCredentialStore: CredentialStore {
-    public init() {}
+    private let service: String
+    public init(service: String = "app.rill.credentials") { self.service = service }
     private func query(_ id: UUID) -> [String: Any] {
         [kSecClass as String: kSecClassGenericPassword,
-         kSecAttrService as String: "app.rill.credentials",
+         kSecAttrService as String: service,
          kSecAttrAccount as String: id.uuidString]
     }
     public func read(_ id: UUID) throws -> String {

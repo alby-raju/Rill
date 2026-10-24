@@ -7,6 +7,7 @@ struct ResponseView: View {
     var running: Bool
     @ViewState<String> private var section = "Body"
     @ViewState<Bool> private var pretty = true
+    @AppStorage("editorFontSize") private var fontSize = 12.0
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 18) {
@@ -32,7 +33,7 @@ struct ResponseView: View {
                         Text("Preview limited to 512 KiB. Export or copy the raw body for the complete response.")
                             .font(.caption).foregroundStyle(.secondary).padding(.horizontal, 20)
                     }
-                    ScrollView([.vertical, .horizontal]) { Text(exchange.previewText(pretty: pretty)).font(.system(size: 12, design: .monospaced)).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .topLeading).padding(20) }.frame(maxWidth: .infinity, maxHeight: .infinity)
+                    ScrollView([.vertical, .horizontal]) { Text(exchange.previewText(pretty: pretty)).font(.system(size: fontSize, design: .monospaced)).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .topLeading).padding(20) }.frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if section == "Headers" {
                     List(exchange.headers) { field in HStack(alignment: .top) { Text(field.name).fontWeight(.medium).frame(width: 190, alignment: .leading); Text(field.value).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading); Button { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(field.value, forType: .string) } label: { Image(systemName: "doc.on.doc") }.buttonStyle(.plain).help("Copy header value") }.font(.system(size: 11, design: .monospaced)) }
                 } else if exchange.checks.isEmpty {
@@ -72,9 +73,13 @@ struct EnvironmentEditor: View {
                 if let index = store.workspace.environments.firstIndex(where: { $0.id == selected }) {
                     VStack(alignment: .leading) {
                         TextField("Environment name", text: $store.workspace.environments[index].name).font(.title3).textFieldStyle(.roundedBorder).padding(16)
+                        Picker("Inherits from", selection: $store.workspace.environments[index].parentID) {
+                            Text("None").tag(nil as UUID?)
+                            ForEach(store.workspace.environments.filter { EnvironmentResolver.canSetParent($0.id, for: store.workspace.environments[index].id, in: store.workspace.environments) }) { parent in Text(parent.name).tag(Optional(parent.id)) }
+                        }.padding(.horizontal, 16)
                         FieldEditor(fields: $store.workspace.environments[index].variables, noun: "variable")
                         Text("Use {{name}} in URLs, headers, body or auth. Environment values are stored in plain text; keep tokens in the request’s Auth tab.").font(.caption).foregroundStyle(.secondary).padding(.horizontal, 16)
-                        Button("Delete environment", role: .destructive) { if store.workspace.selectedEnvironmentID == selected { store.workspace.selectedEnvironmentID = nil }; store.workspace.environments.remove(at: index); selected = nil; store.persist() }.padding(16)
+                        Button("Delete environment", role: .destructive) { if let selected { WorkspaceOperations.deleteEnvironment(selected, in: &store.workspace) }; selected = nil; store.persist() }.padding(16)
                     }
                 } else { ContentUnavailableView("Choose an environment", systemImage: "square.stack.3d.up", description: Text("Create Local, Staging or Production variable sets.")) }
             }
@@ -87,23 +92,20 @@ struct HistoryView: View {
     @EnvironmentObject var store: WorkbenchStore
     @SwiftUI.Environment(\.dismiss) var dismiss
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack { Text("Session history").font(.title2.weight(.semibold)); Spacer(); Button("Clear") { store.workspace.history.removeAll() }.disabled(store.workspace.history.isEmpty); Button("Done") { dismiss() }.keyboardShortcut(.defaultAction) }
-            Text("Response payloads are kept in memory for this session. Up to 50 exchanges, with a shared 32 MiB limit.").font(.caption).foregroundStyle(.secondary)
-            if store.workspace.history.isEmpty { ContentUnavailableView("A fresh start", systemImage: "clock", description: Text("Your requests will appear here as you send them.")) }
-            else {
-                List(store.workspace.history) { exchange in
-                    Button {
-                        if store.workspace.requests.contains(where: { $0.id == exchange.requestID }) { store.selection = exchange.requestID }
-                        // Defer until request navigation has cleared its previous response.
-                        Task { @MainActor in await Task.yield(); store.response = exchange }
-                        dismiss()
-                    } label: {
-                        HStack { Text("\(exchange.status)").foregroundStyle(exchange.status < 400 ? Color.green : Color.orange).frame(width: 40); VStack(alignment: .leading) { Text(exchange.requestName).fontWeight(.medium); Text("\(exchange.method.rawValue) \(exchange.url)").font(.caption).foregroundStyle(.secondary).lineLimit(1) }; Spacer(); Text(exchange.date, style: .time).font(.caption).foregroundStyle(.secondary) }
-                    }.buttonStyle(.plain).padding(.vertical, 5)
-                }
+        VStack(spacing: 16) {
+            HStack { Text("Session history").font(.title2.weight(.semibold)); Spacer(); Button("Clear") { store.workspace.history.removeAll(); store.inspectedHistoryID = nil }; Button("Done") { dismiss() }.keyboardShortcut(.defaultAction) }
+            HSplitView {
+                List(selection: $store.inspectedHistoryID) {
+                    ForEach(store.workspace.history) { exchange in
+                        VStack(alignment: .leading) {
+                            Text("\(exchange.status) · \(exchange.requestName)")
+                            Text(exchange.date, style: .time).font(.caption).foregroundStyle(.secondary)
+                        }.tag(exchange.id).padding(.vertical, 5)
+                    }
+                }.frame(minWidth: 200, idealWidth: 250)
+                ResponseView(exchange: store.workspace.history.first { $0.id == store.inspectedHistoryID }, running: false).frame(minWidth: 500)
             }
-        }.padding(24).frame(width: 800, height: 500)
+        }.padding(24).frame(width: 1000, height: 600)
     }
 }
 struct RequestSearch: View {
@@ -113,11 +115,13 @@ struct RequestSearch: View {
     @FocusState private var focused: Bool
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack { Image(systemName: "magnifyingglass"); TextField("Find a request by name or URL", text: $query).textFieldStyle(.plain).focused($focused); Button("Done") { dismiss() } }
+            HStack { Image(systemName: "magnifyingglass"); TextField("Find requests, collections, environments or history", text: $query).textFieldStyle(.plain).focused($focused); Button("Done") { dismiss() } }
             Divider()
-            List(store.workspace.requests.filter { query.isEmpty || $0.name.localizedCaseInsensitiveContains(query) || $0.url.localizedCaseInsensitiveContains(query) }) { request in
-                Button { store.selection = request.id; store.response = nil; dismiss() } label: { HStack { Text(request.method.rawValue).foregroundStyle(methodColor(request.method)).font(.system(size: 10, weight: .bold, design: .monospaced)).frame(width: 50); VStack(alignment: .leading) { Text(request.name); Text(request.url.isEmpty ? "No URL yet" : request.url).font(.caption).foregroundStyle(.secondary).lineLimit(1) }; Spacer(); Image(systemName: "return").foregroundStyle(.tertiary) } }.buttonStyle(.plain).padding(.vertical, 6)
+            List(store.searchResults(query)) { result in
+                Button { dismiss(); Task { @MainActor in await Task.yield(); store.activateSearch(result) } } label: {
+                    HStack { Text(result.kind.rawValue.capitalized).font(.caption).foregroundStyle(.secondary).frame(width: 90); VStack(alignment: .leading) { Text(result.title); Text(result.detail).font(.caption).foregroundStyle(.secondary).lineLimit(1) }; Spacer() }
+                }.buttonStyle(.plain).padding(.vertical, 6)
             }
-        }.padding(24).frame(width: 640, height: 380).onAppear { focused = true }
+        }.padding(24).frame(width: 720, height: 400).onAppear { focused = true }
     }
 }

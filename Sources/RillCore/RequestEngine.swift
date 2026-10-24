@@ -27,19 +27,18 @@ public struct ResponseBudget: Sendable {
 
 public enum RequestEngine {
     public static func resolve(_ text: String, variables: [String: String]) throws -> String {
-        let pattern = try NSRegularExpression(pattern: #"\{\{\s*([^{}]+?)\s*\}\}"#)
-        var output = text
-        for match in pattern.matches(in: text, range: NSRange(text.startIndex..., in: text)).reversed() {
-            guard let keyRange = Range(match.range(at: 1), in: text), let fullRange = Range(match.range, in: output) else { continue }
-            let name = String(text[keyRange]).trimmingCharacters(in: .whitespaces)
-            guard let value = variables[name] else { throw RillError.missingVariable(name) }
-            output.replaceSubrange(fullRange, with: value)
-        }
-        return output
+        try VariableExpansion.resolve(text, values: variables)
     }
+
     public static func prepare(_ draft: RequestDraft, environment: Environment?) throws -> URLRequest {
         let variables = environment?.variables.filter { $0.enabled && !$0.name.isEmpty }.reduce(into: [String: String]()) { $0[$1.name] = $1.value } ?? [:]
-        func expand(_ value: String) throws -> String { try resolve(value, variables: variables) }
+        var expandedBytes = 0
+        func expand(_ value: String) throws -> String {
+            let result = try resolve(value, variables: variables)
+            expandedBytes += result.utf8.count
+            guard expandedBytes <= ResourceLimits.workspaceBytes else { throw EditingError.expansionLimit }
+            return result
+        }
         let address = try expand(draft.url).trimmingCharacters(in: .whitespacesAndNewlines)
         guard var components = URLComponents(string: address), ["http", "https"].contains(components.scheme?.lowercased() ?? ""), components.host?.isEmpty == false, components.user == nil, components.password == nil else { throw RillError.invalidURL }
         let query = try draft.parameters.filter { $0.enabled && !$0.name.isEmpty }.map { URLQueryItem(name: try expand($0.name), value: try expand($0.value)) }

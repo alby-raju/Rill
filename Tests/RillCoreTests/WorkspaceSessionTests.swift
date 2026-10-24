@@ -1,7 +1,7 @@
 import XCTest
 @testable import RillCore
 
-private final class TestCredentials: CredentialStore, @unchecked Sendable {
+final class TestCredentials: CredentialStore, @unchecked Sendable {
     private let lock = NSLock()
     private var values: [UUID: String] = [:]
     private var failRead = false
