@@ -496,19 +496,30 @@ import UniformTypeIdentifiers
         Task { do { try await Task.detached { try WorkspaceFile.save(exported, to: url) }.value } catch { self.error = error.localizedDescription } }
     }
     func importWorkspace() {
-        guard canEdit else { return }
+        guard canEdit, persistenceAvailable else { return }
         let panel = NSOpenPanel(); panel.allowedContentTypes = [.json]
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        importing = true; cancel()
+        importing = true; cancel(); saveTask?.cancel(); saveGeneration = UUID()
         Task {
             defer { importing = false }
             do {
-                let incoming = try await Task.detached { try WorkspaceFile.load(from: url) }.value
+                guard await saveWorkspaceNow() else { return }
                 let current = workspace
-                let merged = try await Task.detached { try WorkspaceImport.merging(incoming, into: current) }.value
-                guard workspace == current else { self.error = "Workspace changed during import. Try again."; return }
-                workspace = merged
-            } catch { self.error = "Import failed without applying changes. \(error.localizedDescription)" }
+                let plan = try await Task.detached { try WorkspaceImportPlan(incoming: WorkspaceFile.load(from: url), current: current) }.value
+                let preview = plan.preview
+                let alert = NSAlert(); alert.messageText = "Import Rill workspace?"
+                alert.informativeText = "Add \(preview.collections) collection(s), \(preview.requests) request(s), \(preview.environments) environment(s), \(preview.profiles) auth profile(s), \(preview.tlsProfiles) TLS profile(s) and \(preview.secretDescriptors) secret descriptor(s).\n\n" + preview.warnings.joined(separator: "\n\n")
+                if !preview.requestNames.isEmpty {
+                    let text = NSTextView(frame: NSRect(x: 0, y: 0, width: 430, height: 120)); text.isEditable = false
+                    text.string = preview.requestNames.joined(separator: "\n") + (preview.requests > preview.requestNames.count ? "\n…" : "")
+                    let scroll = NSScrollView(frame: text.frame); scroll.documentView = text; scroll.hasVerticalScroller = true; alert.accessoryView = scroll
+                }
+                alert.addButton(withTitle: "Cancel"); alert.addButton(withTitle: "Apply Import")
+                guard alert.runModal() == .alertSecondButtonReturn else { return }
+                let merged = try await persistence.applyImport(plan, current: workspace)
+                applyingWorkspace = true; workspace = merged; applyingWorkspace = false
+                hasUnsavedChanges = false; persistenceHealth = .saved
+            } catch { self.error = "Import failed without applying incoming changes. \(error.localizedDescription)"; if (error as? WorkspaceError) == .conflict { persistenceAvailable = false; persistenceHealth = .conflict } }
         }
     }
     func createBackup() {
