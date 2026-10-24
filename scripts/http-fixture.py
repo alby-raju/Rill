@@ -3,6 +3,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import time
 import json
 import base64
+import hashlib
+from urllib.parse import parse_qs
 from socketserver import TCPServer
 
 class LoopbackServer(ThreadingHTTPServer):
@@ -20,6 +22,32 @@ class Handler(BaseHTTPRequestHandler):
             self.send_error(413)
             return
         payload = self.rfile.read(length)
+        if self.path.startswith('/oauth/'):
+            fields = parse_qs(payload.decode(), keep_blank_values=True)
+            valid_client = self.headers.get('Authorization') == 'Basic ' + base64.b64encode(b'fixture-client:fixture-secret').decode()
+            valid_client = valid_client or fields.get('client_secret') == ['fixture-secret']
+            valid_code = fields.get('code') == ['fixture-code'] and fields.get('client_id') == ['fixture-client']
+            verifier = fields.get('code_verifier', [''])[0]
+            challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).decode().rstrip('=')
+            valid_code = valid_code and challenge == 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM'
+            valid = (fields.get('grant_type') == ['client_credentials'] and valid_client) or (fields.get('grant_type') == ['authorization_code'] and valid_code)
+            status = 200 if valid else 400
+            body = json.dumps({'access_token': 'fixture-access-token', 'token_type': 'Bearer', 'expires_in': 3600} if valid else {'error': 'invalid_client', 'error_description': 'SEEDED_SECRET'}).encode()
+            if self.path == '/oauth/redirect':
+                status = 302
+            if self.path == '/oauth/oversized':
+                body = b'x' * 65537
+            self.send_response(status)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Length', str(len(body)))
+            if status == 302:
+                self.send_header('Location', '/oauth/token')
+            self.end_headers()
+            try:
+                self.wfile.write(body)
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+            return
         if self.path.startswith('/redirect-'):
             self.send_response(307)
             self.send_header('Location', '/echo' if self.path == '/redirect-same' else 'http://127.0.0.1:9/echo')

@@ -37,7 +37,7 @@ struct AuthenticationManager: View {
     @ViewState<UUID?> private var replacing: UUID?
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack { Text("Authentication and secrets").font(.title2); Spacer(); Button("Done") { secretValue = ""; dismiss() }.keyboardShortcut(.defaultAction) }
+            HStack { Text("Authentication and secrets").font(.title2); Spacer(); Button("Done") { store.cancelOAuth(); secretValue = ""; dismiss() }.keyboardShortcut(.defaultAction) }
             HSplitView {
                 VStack(alignment: .leading) {
                     Text("PROFILES").font(.caption).foregroundStyle(.secondary)
@@ -69,8 +69,10 @@ struct AuthenticationManager: View {
                     }
                     Text("Use {{secret:name}} directly or inside an environment value. Native entries take precedence. Process fallback uses RILL_SECRET_NAME (uppercase, dot/hyphen → underscore), is read-only and is never saved. Restart to pick up process changes.").font(.caption).foregroundStyle(.secondary)
                 }.frame(minWidth: 280)
-            }
-        }.padding(24).frame(width: 1000, height: 560).disabled(store.importing)
+            }.disabled(store.oauthRunning)
+            if store.oauthRunning { HStack { ProgressView().controlSize(.small); Text(store.oauthStatus); Spacer(); Button("Cancel authorization") { store.cancelOAuth() } } }
+            else if !store.oauthStatus.isEmpty { Text(store.oauthStatus).font(.caption).foregroundStyle(.secondary) }
+        }.padding(24).frame(width: 1100, height: 700).disabled(store.importing).onDisappear { store.cancelOAuth(); secretValue = "" }
     }
     private func profileForm(_ index: Int) -> some View {
         let original = store.workspace.authProfiles![index]
@@ -86,6 +88,16 @@ struct AuthenticationManager: View {
                 TextField("Key name", text: profile.apiKeyName)
                 Picker("Send in", selection: profile.apiKeyLocation) { ForEach(APIKeyLocation.allCases, id: \.self) { Text($0.rawValue).tag($0) } }
             }
+            Toggle("OAuth2 token acquisition", isOn: Binding(get: { profile.wrappedValue.oauth != nil }, set: { enabled in profile.wrappedValue.oauth = enabled ? OAuthConfiguration() : nil; profile.wrappedValue.tokenExpiresAt = nil }))
+            if profile.wrappedValue.oauth != nil {
+                OAuthConfigurationEditor(configuration: Binding(get: { profile.wrappedValue.oauth ?? OAuthConfiguration() }, set: { profile.wrappedValue.oauth = $0 }))
+                Text("The profile secret name above receives the access token. Client secrets use a different named entry. Tokens are acquired only by these buttons; refresh tokens are not retained.").font(.caption).foregroundStyle(.secondary)
+                HStack {
+                    Button("Client credentials") { store.acquireOAuth(profileID: original.id, browser: false) }
+                    Button("Browser + PKCE") { store.acquireOAuth(profileID: original.id, browser: true) }
+                }
+                if let expiry = profile.wrappedValue.tokenExpiresAt { Text("Token expires: " + expiry.formatted()).font(.caption) }
+            }
             Text("Profiles store references and metadata. Secret values stay in Keychain or the process provider.").font(.caption).foregroundStyle(.secondary)
             Button("Delete profile", role: .destructive) {
                 let alert = NSAlert(); alert.messageText = "Delete this profile?"; alert.informativeText = "Requests retain their selection and fail until another profile or request-specific auth is selected."
@@ -93,5 +105,20 @@ struct AuthenticationManager: View {
                 if alert.runModal() == .alertSecondButtonReturn { store.workspace.authProfiles?.removeAll { $0.id == original.id }; selection = nil }
             }
         }.padding(12)
+    }
+}
+
+private struct OAuthConfigurationEditor: View {
+    @Binding var configuration: OAuthConfiguration
+    var body: some View {
+        Group {
+            TextField("Authorization endpoint", text: $configuration.authorizationEndpoint)
+            TextField("Token endpoint", text: $configuration.tokenEndpoint)
+            TextField("Client ID", text: $configuration.clientID)
+            TextField("Scope", text: $configuration.scope)
+            Picker("Client authentication", selection: $configuration.clientAuthentication) { ForEach(OAuthClientAuthentication.allCases, id: \.self) { Text($0.rawValue).tag($0) } }
+            if configuration.clientAuthentication != .none { TextField("Client secret name", text: $configuration.clientSecretName) }
+            Text("Register http://127.0.0.1:{dynamic-port}/oauth/callback for the public native client. HTTPS endpoints are required except literal loopback testing.").font(.caption).foregroundStyle(.secondary)
+        }
     }
 }

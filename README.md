@@ -32,6 +32,7 @@ The bundle is written to `dist/Rill.app`. It is ad-hoc signed for local developm
 - Status and body-contains checks.
 - Session history bounded to 50 exchanges and 32 MiB of bodies.
 - Validated, conflict-aware background workspace persistence and Rill JSON import/export with regenerated identities.
+- Explicit OAuth2 client-credentials and browser PKCE acquisition into named Keychain tokens.
 - Authentication credentials in macOS Keychain; reusable auth profiles and named `{{secret:name}}` values with a read-only `RILL_SECRET_` process fallback. Credentials are excluded from exported workspaces.
 - System/light/dark appearance and keyboard shortcuts: Cmd+N, Cmd+Enter, Cmd+K, Cmd+Shift+E, Cmd+period.
 

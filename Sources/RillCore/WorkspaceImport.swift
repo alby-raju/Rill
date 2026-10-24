@@ -31,6 +31,8 @@ public enum WorkspaceImport {
             profile.id = profileIDs[profile.id]!
             profile.secretName = secretNames[profile.secretName] ?? profile.secretName
             profile.username = rewrite(profile.username); profile.apiKeyName = rewrite(profile.apiKeyName)
+            if let name = profile.oauth?.clientSecretName { profile.oauth?.clientSecretName = secretNames[name] ?? name }
+            profile.tokenExpiresAt = nil
             if result.authProfiles == nil { result.authProfiles = [] }
             result.authProfiles?.append(profile)
         }
