@@ -6,7 +6,16 @@ cd "$RILL_ROOT"
 RILL_FIXTURE_LOG="$(mktemp -t rill-fixture)"
 python3 scripts/http-fixture.py > "$RILL_FIXTURE_LOG" 2>&1 &
 RILL_FIXTURE_PID=$!
-trap 'kill "$RILL_FIXTURE_PID" 2>/dev/null || true' EXIT
+cleanup() {
+  RILL_EXIT_STATUS=$?
+  trap - EXIT
+  kill "$RILL_FIXTURE_PID" 2>/dev/null || true
+  if [ "$RILL_EXIT_STATUS" -ne 0 ]; then
+    cat "$RILL_FIXTURE_LOG"
+  fi
+  exit "$RILL_EXIT_STATUS"
+}
+trap cleanup EXIT
 export RILL_TEST_BASE_URL=http://127.0.0.1:18749
 # Wait for readiness and check ownership so an occupied port cannot hide a
 # failed fixture startup.

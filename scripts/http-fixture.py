@@ -13,6 +13,34 @@ class LoopbackServer(ThreadingHTTPServer):
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
+        if self.path.startswith(('/bytes/', '/chunked/', '/unknown/')):
+            mode, count = self.path.strip('/').split('/')
+            count = min(int(count), 1024 * 1024)
+            if mode == 'chunked':
+                self.protocol_version = 'HTTP/1.1'
+            self.send_response(200)
+            if mode == 'bytes':
+                self.send_header('Content-Length', str(count))
+            elif mode == 'chunked':
+                self.protocol_version = 'HTTP/1.1'
+                self.send_header('Transfer-Encoding', 'chunked')
+            else:
+                self.send_header('Connection', 'close')
+                self.close_connection = True
+            self.end_headers()
+            try:
+                while count:
+                    chunk = b'x' * min(count, 512)
+                    count -= len(chunk)
+                    if mode == 'chunked':
+                        self.wfile.write(f'{len(chunk):x}\r\n'.encode() + chunk + b'\r\n')
+                    else:
+                        self.wfile.write(chunk)
+                if mode == 'chunked':
+                    self.wfile.write(b'0\r\n\r\n')
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+            return
         if self.path == '/slow':
             time.sleep(5)
         if self.path == '/large':

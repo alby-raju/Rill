@@ -38,13 +38,13 @@ public struct Environment: Codable, Identifiable, Equatable, Sendable {
     public var variables: [Field] = []
     public init(name: String) { self.name = name }
 }
-public struct CheckResult: Codable, Identifiable, Sendable {
+public struct CheckResult: Codable, Identifiable, Equatable, Sendable {
     public var id = UUID()
     public var title: String
     public var passed: Bool
     public init(title: String, passed: Bool) { self.title = title; self.passed = passed }
 }
-public struct Exchange: Codable, Identifiable, Sendable {
+public struct Exchange: Codable, Identifiable, Equatable, Sendable {
     public var id = UUID()
     public var date = Date()
     public var requestID: UUID
@@ -57,15 +57,22 @@ public struct Exchange: Codable, Identifiable, Sendable {
     public var body: Data
     public var checks: [CheckResult]
     public var text: String { String(data: body, encoding: .utf8) ?? "Binary response (\(body.count) bytes). Export to inspect." }
+    public var previewIsTruncated: Bool { body.count > ResourceLimits.previewBytes }
+    public func previewText(pretty: Bool) -> String {
+        guard !previewIsTruncated else { return String(decoding: body.prefix(ResourceLimits.previewBytes), as: UTF8.self) }
+        return pretty ? prettyText : text
+    }
     public var prettyText: String {
+        guard body.count <= ResourceLimits.previewBytes else { return previewText(pretty: false) }
         guard let object = try? JSONSerialization.jsonObject(with: body, options: [.fragmentsAllowed]),
               let data = try? JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys, .fragmentsAllowed]),
               let text = String(data: data, encoding: .utf8) else { return text }
         return text
     }
 }
-public struct Workspace: Codable, Sendable {
+public struct Workspace: Codable, Equatable, Sendable {
     public var version = 1
+    public var storageRevision: UUID?
     public var collections: [RequestCollection] = []
     public var requests: [RequestDraft] = []
     public var environments: [Environment] = []

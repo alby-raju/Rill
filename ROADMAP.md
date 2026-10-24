@@ -20,7 +20,7 @@ Rill has a SwiftUI workspace, basic HTTP request composition/execution, flat env
 
 This is a narrow foundation, not a percentage-complete implementation of Relay. Some apparent similarities are incomplete: a raw form-encoded body is not a structured form editor; selecting a GraphQL content payload is not an IDE; saving JSON is not a recoverable workspace; generic headers do not replace reusable API-key/OAuth/TLS tools.
 
-Statuses are `planned`, `partial`, `verified`, or `deviation`. No baseline row is `verified`. A verified row needs linked code, automated behavior evidence and manual evidence where needed. A deviation needs owner approval and a documented replacement/omission with its user impact. A deadline or a release label cannot turn planned work into verified work.
+Statuses are `planned`, `partial`, `verified`, or `deviation`. The initial audit marked no rows verified; current progress and evidence are tracked in the capability register and [M0 implementation record](docs/milestones/M0.md). A verified row needs linked code, automated behavior evidence and manual evidence where needed. A deviation needs owner approval and a documented replacement/omission with its user impact. A deadline or a release label cannot turn planned work into verified work.
 
 ## Delivery sequence
 
@@ -46,7 +46,7 @@ Owner roles: platform/core maintainer and repository maintainer.
 1. Establish one shared preparation/execution/outcome contract; give all long operations cancellation and ownership rules. Separate transport limits, preview limits and retention limits.
 2. Validate loaded workspace references, migrations and concurrent writes; preserve unreadable originals and expose saving/recovery failures. Define the secret-bearing fields and default redaction policy.
 3. Extend tests beyond known Content-Length to unknown/chunked/oversized payloads, stale selection races, invalid auth/header fields and error recovery. Add content-free diagnostics.
-4. Preserve PR-only/no-bypass history protection; make the stable Swift CI job a required check as a separate repository-setting task. Add a supported toolchain/architecture test matrix after verifying runner availability.
+4. Preserve PR/history protection and the owner-approved administrator-bypass/one-review configuration; make the stable Swift CI job a required check as a separate repository-setting task. Add a supported toolchain/architecture test matrix after verifying runner availability.
 
 Exit evidence: core invariants and resource policy, deterministic regression tests, CI success and diagnostic redaction fixture. Do not start a transport implementation that bypasses these shared primitives.
 

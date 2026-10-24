@@ -23,12 +23,15 @@ struct WorkbenchView: View {
                     Circle().fill(accent).frame(width: 6, height: 6)
                     Text("LOCAL WORKSPACE").font(.system(size: 10, weight: .semibold, design: .monospaced))
                     Spacer()
-                    Text(!store.persistenceAvailable ? "Workspace recovery needed · saving paused" : store.running ? "Request in progress" : "Changes saved automatically")
+                    Text(store.saveStatus)
+                    if store.persistenceHealth == .failed && store.persistenceAvailable { Button("Retry saving") { store.persist() } }
                     Text("·").foregroundStyle(.tertiary)
                     Text("⌘ K  Find request")
                 }.font(.caption).foregroundStyle(.secondary).padding(.horizontal, 20).padding(.vertical, 9)
             }.background(Color(nsColor: .textBackgroundColor))
         }
+        .disabled(store.loading || store.importing || store.closing)
+        .overlay { if store.loading { ProgressView("Opening workspace…").padding(24).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12)) } }
         .tint(accent)
         .sheet(isPresented: $store.showEnvironments) { EnvironmentEditor().environmentObject(store) }
         .sheet(isPresented: $store.showHistory) { HistoryView().environmentObject(store) }

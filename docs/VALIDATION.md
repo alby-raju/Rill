@@ -1,6 +1,6 @@
 # Validation
 
-The debug application builds successfully. Ten XCTest cases passed on the local Apple Silicon Mac using the installed Xcode toolchain:
+The debug application builds successfully. The original ten XCTest cases passed on the local Apple Silicon Mac using the installed Xcode toolchain. The [M0 reliability slice](milestones/M0.md) extends these with storage, redaction and streaming-budget regressions:
 
 - Seven core cases: URL/query preparation, variables and Unicode, unresolved variables, disabled fields and CRLF header rejection, allowed schemes/embedded credentials, auth/body/timeout, atomic workspace round trip and duplicate identity rejection.
 - Three loopback integration cases: real HTTP response and assertions, oversized Content-Length rejection, and cancellation of an in-flight request.
@@ -11,7 +11,7 @@ The same full-suite command used by GitHub Actions starts the fixture, waits for
 bash scripts/test.sh
 ```
 
-CI uses the `macos-15` runner with Xcode 16.4. The workflow has read-only repository permissions and needs no repository secrets.
+CI uses macOS 15 Apple Silicon and Intel with Xcode 16.4, plus Apple Silicon/Xcode 26.3. The workflow has read-only repository permissions and needs no repository secrets.
 
 To run the fixture manually instead, start it in one terminal:
 

@@ -27,7 +27,7 @@ The bundle is written to `dist/Rill.app`. It is ad-hoc signed for local developm
 - Response body, formatted JSON, selectable text, copy/export, headers, status, latency and size.
 - Status and body-contains checks.
 - Session history bounded to 50 exchanges and 32 MiB of bodies.
-- Atomic local workspace persistence and Rill JSON import/export with regenerated identities.
+- Validated, conflict-aware background workspace persistence and Rill JSON import/export with regenerated identities.
 - Authentication credentials in macOS Keychain; credentials excluded from exported workspaces.
 - System/light/dark appearance and keyboard shortcuts: Cmd+N, Cmd+Enter, Cmd+K, Cmd+Shift+E, Cmd+period.
 
@@ -45,11 +45,13 @@ Auth-tab credentials use Keychain service `app.rill.credentials`. Headers, URLs,
 bash scripts/test.sh
 ```
 
-GitHub Actions builds the release executable and runs the full test suite on macOS for pushes to `main`, pull requests, and manual runs. Python is used only for the loopback HTTP fixture; no Python packaging or PyPI workflow is needed.
+GitHub Actions builds the release executable and runs the full test suite on Apple Silicon/Intel macOS configurations for pushes to `main`, pull requests, and manual runs. Python is used only for the loopback HTTP fixture; no Python packaging or PyPI workflow is needed.
 
-Ten cases cover request preparation, persistence, real loopback HTTP responses, cancellation and response limits. See [validation](docs/VALIDATION.md) for the fixture setup and the Xcode toolchain command.
+The suite covers request preparation, validated/conflict-aware persistence, transactional imports, diagnostic redaction, real loopback HTTP responses, cancellation and response limits. See [validation](docs/VALIDATION.md) for the fixture setup and the Xcode toolchain command.
 
 ## Roadmap
+
+The first [M0 reliability slice](docs/milestones/M0.md) adds bounded storage, stale-writer protection, visible save states and allowlisted diagnostics.
 
 See the [phased roadmap](ROADMAP.md), [122-capability register](docs/roadmap/CAPABILITIES.md) and [acceptance journeys](docs/roadmap/ACCEPTANCE.md) for the path to Relay-level workflow breadth. The audit records missing functionality and supported-subset boundaries without incorporating the original code.
 

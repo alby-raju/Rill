@@ -25,10 +25,14 @@ struct ResponseView: View {
                 HStack {
                     Picker("Response section", selection: $section) { Text("Body").tag("Body"); Text("Headers (\(exchange.headers.count))").tag("Headers"); Text("Checks (\(exchange.checks.count))").tag("Checks") }.pickerStyle(.segmented).frame(width: 310)
                     Spacer()
-                    if section == "Body" { Toggle("Pretty JSON", isOn: $pretty).toggleStyle(.checkbox); Button { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(pretty ? exchange.prettyText : exchange.text, forType: .string) } label: { Image(systemName: "doc.on.doc") }.help("Copy response body"); Button { export(exchange) } label: { Image(systemName: "square.and.arrow.up") }.help("Export response") }
+                    if section == "Body" { Toggle("Pretty JSON", isOn: $pretty).toggleStyle(.checkbox); Button { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(exchange.previewIsTruncated ? exchange.text : pretty ? exchange.prettyText : exchange.text, forType: .string) } label: { Image(systemName: "doc.on.doc") }.help("Copy response body"); Button { export(exchange) } label: { Image(systemName: "square.and.arrow.up") }.help("Export response") }
                 }.font(.caption).padding(.horizontal, 20).padding(.vertical, 10)
                 if section == "Body" {
-                    ScrollView([.vertical, .horizontal]) { Text(pretty ? exchange.prettyText : exchange.text).font(.system(size: 12, design: .monospaced)).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .topLeading).padding(20) }.frame(maxWidth: .infinity, maxHeight: .infinity)
+                    if exchange.previewIsTruncated {
+                        Text("Preview limited to 512 KiB. Export or copy the raw body for the complete response.")
+                            .font(.caption).foregroundStyle(.secondary).padding(.horizontal, 20)
+                    }
+                    ScrollView([.vertical, .horizontal]) { Text(exchange.previewText(pretty: pretty)).font(.system(size: 12, design: .monospaced)).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .topLeading).padding(20) }.frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if section == "Headers" {
                     List(exchange.headers) { field in HStack(alignment: .top) { Text(field.name).fontWeight(.medium).frame(width: 190, alignment: .leading); Text(field.value).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading); Button { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(field.value, forType: .string) } label: { Image(systemName: "doc.on.doc") }.buttonStyle(.plain).help("Copy header value") }.font(.system(size: 11, design: .monospaced)) }
                 } else if exchange.checks.isEmpty {
