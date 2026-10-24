@@ -100,7 +100,7 @@ public enum ClientSnippetGenerator {
             headers = \(headers)
             body = \(pythonBody)
             with \(client) as client:
-                client.trust_env = False
+                \(target == .requests ? "client.trust_env = False" : "# trust_env is configured in the constructor")
                 with \(call) as response:
                     payload = bytearray()
                     for chunk in \(chunks):

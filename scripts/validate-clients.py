@@ -84,6 +84,8 @@ def command_for(target, source, folder):
     run(["dotnet", "build", "--nologo", "-o", "out"], folder)
     return ["dotnet", str(folder / "out/Fixture.dll")]
 
+failures = []
+failed_targets = set()
 try:
     for case in sorted(args.fixtures.iterdir()):
         if not case.is_dir(): continue
@@ -91,6 +93,7 @@ try:
         parts = urllib.parse.urlsplit(expected["url"])
         assert parts.scheme == "http" and parts.hostname == "127.0.0.1" and parts.port == 18750
         for target in targets:
+            if target in failed_targets: continue
             source = (case / (target + ".txt")).resolve()
             with tempfile.TemporaryDirectory(prefix="rill-client-") as temp:
                 folder = pathlib.Path(temp)
@@ -105,8 +108,16 @@ try:
                         assert headers.get(key.lower()) == value, (target, "header", key)
                     assert result.stdout == (b"" if method == "HEAD" or expected.get("overflow", False) else b"synthetic response"), (target, "response")
                     assert received.empty(), (target, "unexpected extra request")
-                except subprocess.CalledProcessError as error:
-                    raise RuntimeError(f"{case.name}/{target}: {error.stderr.decode(errors='replace')[:4000]}") from error
+                except Exception as error:
+                    detail = error.stderr.decode(errors="replace")[:4000] if isinstance(error, subprocess.CalledProcessError) else str(error)
+                    failures.append(f"{case.name}/{target}: {detail}")
+                    failed_targets.add(target)
+                    while not received.empty(): received.get_nowait()
+                    print(f"FAIL {case.name}/{target}: {detail}", flush=True)
+                    continue
                 print(f"PASS {case.name}/{target}", flush=True)
 finally:
     server.shutdown(); server.server_close()
+
+if failures:
+    raise SystemExit("Generated client validation failed:\n" + "\n".join(failures))
