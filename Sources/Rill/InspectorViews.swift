@@ -103,7 +103,7 @@ struct EnvironmentEditor: View {
                         TextField("Environment name", text: $store.workspace.environments[index].name).font(.title3).textFieldStyle(.roundedBorder).padding(16)
                         Picker("Inherits from", selection: $store.workspace.environments[index].parentID) {
                             Text("None").tag(nil as UUID?)
-                            ForEach(store.workspace.environments.filter { EnvironmentResolver.canSetParent($0.id, for: store.workspace.environments[index].id, in: store.workspace.environments) }) { parent in Text(parent.name).tag(Optional(parent.id)) }
+                            ForEach(EnvironmentResolver.validParents(for: store.workspace.environments[index].id, in: store.workspace.environments)) { parent in Text(parent.name).tag(Optional(parent.id)) }
                         }.padding(.horizontal, 16)
                         FieldEditor(fields: $store.workspace.environments[index].variables, noun: "variable")
                         Text("Use {{name}} in URLs, headers, body or auth. Environment values are stored in plain text; keep tokens in the request’s Auth tab.").font(.caption).foregroundStyle(.secondary).padding(.horizontal, 16)

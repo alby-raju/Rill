@@ -38,8 +38,8 @@ public enum ResponseComparator {
             if before == after || limited { return }
             switch (before, after) {
             case (.object(let lhs), .object(let rhs)):
-                for key in Set(lhs.keys).union(rhs.keys).sorted() {
-                    let child = path + "/" + key.replacingOccurrences(of: "~", with: "~0").replacingOccurrences(of: "/", with: "~1")
+                for key in Set(lhs.keys).union(rhs.keys).sorted(by: { $0.bytes.lexicographicallyPrecedes($1.bytes) }) {
+                    let child = path + "/" + key.text.replacingOccurrences(of: "~", with: "~0").replacingOccurrences(of: "/", with: "~1")
                     if let a = lhs[key], let b = rhs[key] { try descend(a, b, path: child) } else { try record(child, lhs[key], rhs[key]) }
                     if limited { return }
                 }
@@ -56,13 +56,18 @@ public enum ResponseComparator {
         return ResponseComparison(differences: differences, limited: limited)
     }
 }
+private struct JSONKey: Hashable {
+    let bytes: Data
+    init(_ value: String) { bytes = Data(value.utf8) }
+    var text: String { String(decoding: bytes, as: UTF8.self) }
+}
 private indirect enum JSONValue: Equatable {
-    case object([String: JSONValue]), array([JSONValue]), string(String), number(String), bool(Bool), null
+    case object([JSONKey: JSONValue]), array([JSONValue]), string(Data), number(String), bool(Bool), null
     var summary: String {
         switch self {
         case .object(let value): "Object (\(value.count) keys)"
         case .array(let value): "Array (\(value.count) values)"
-        case .string(let value): String(reflecting: String(value.prefix(500))) + (value.count > 500 ? "…" : "")
+        case .string(let value): String(reflecting: String(decoding: value.prefix(512), as: UTF8.self)) + (value.count > 512 ? "…" : "")
         case .number(let value): String(value.prefix(500))
         case .bool(let value): value ? "true" : "false"
         case .null: "null"
@@ -91,10 +96,10 @@ private struct JSONValueParser {
         whitespace(); guard index < bytes.count else { throw ComparisonError.unsupported }
         switch bytes[index] {
         case 123:
-            index += 1; var object: [String: JSONValue] = [:]
+            index += 1; var object: [JSONKey: JSONValue] = [:]
             if take(125) { return .object(object) }
             repeat {
-                whitespace(); let key = try string()
+                whitespace(); let key = JSONKey(try string())
                 guard object[key] == nil, take(58) else { throw ComparisonError.unsupported }
                 object[key] = try value(depth: depth + 1)
                 if take(125) { return .object(object) }
@@ -108,7 +113,7 @@ private struct JSONValueParser {
                 if take(93) { return .array(array) }
             } while take(44)
             throw ComparisonError.unsupported
-        case 34: return .string(try string())
+        case 34: return .string(Data(try string().utf8))
         case 116: try literal("true"); return .bool(true)
         case 102: try literal("false"); return .bool(false)
         case 110: try literal("null"); return .null

@@ -57,8 +57,8 @@ public enum WorkspaceFile {
                   fieldsValid(request.headers), fieldsValid(request.parameters), fieldsValid(request.formFields ?? []), unique((request.multipartParts ?? []).map(\.id)),
                   request.timeout.isFinite, (1...300).contains(request.timeout) else { throw WorkspaceError.invalidStructure }
         }
+        try EnvironmentResolver.validateHierarchy(workspace.environments)
         for environment in workspace.environments {
-            _ = try EnvironmentResolver.resolve(environment.id, in: workspace.environments)
             guard fieldsValid(environment.variables) else { throw WorkspaceError.invalidStructure }
         }
         // History may intentionally outlive a deleted request.

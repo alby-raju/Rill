@@ -79,11 +79,39 @@ public enum EnvironmentResolver {
         effective.variables = fields.values.sorted { $0.name < $1.name }
         return effective
     }
+    private static func hierarchyDepths(_ environments: [Environment]) throws -> [UUID: Int] {
+        let indexed = Dictionary(environments.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        guard indexed.count == environments.count else { throw EditingError.invalidParent }
+        var depths: [UUID: Int] = [:]
+        for environment in environments where depths[environment.id] == nil {
+            var chain: [UUID] = [], seen = Set<UUID>(), next: UUID? = environment.id, base = 0
+            while let id = next {
+                if let cached = depths[id] { base = cached; break }
+                guard chain.count < 64, seen.insert(id).inserted, let current = indexed[id] else { throw EditingError.invalidParent }
+                chain.append(id); next = current.parentID
+            }
+            guard chain.count + base <= 64 else { throw EditingError.invalidParent }
+            for id in chain.reversed() { base += 1; depths[id] = base }
+        }
+        return depths
+    }
+    public static func validateHierarchy(_ environments: [Environment]) throws { _ = try hierarchyDepths(environments) }
+    public static func validParents(for id: UUID, in environments: [Environment]) -> [Environment] {
+        guard let depths = try? hierarchyDepths(environments), depths[id] != nil else { return [] }
+        var children: [UUID: [UUID]] = [:]
+        for environment in environments { if let parent = environment.parentID { children[parent, default: []].append(environment.id) } }
+        var excluded = Set<UUID>(), stack = [(id, 0)], height = 0
+        while let (current, level) = stack.popLast() {
+            excluded.insert(current); height = max(height, level)
+            stack += (children[current] ?? []).map { ($0, level + 1) }
+        }
+        return environments.filter { !excluded.contains($0.id) && (depths[$0.id] ?? 64) + 1 + height <= 64 }
+    }
     public static func canSetParent(_ parent: UUID?, for id: UUID, in environments: [Environment]) -> Bool {
         var copy = environments
         guard let index = copy.firstIndex(where: { $0.id == id }) else { return false }
         copy[index].parentID = parent
-        return (try? resolve(id, in: copy)) != nil
+        return (try? validateHierarchy(copy)) != nil
     }
 }
 
