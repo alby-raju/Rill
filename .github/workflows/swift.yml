@@ -48,16 +48,57 @@ jobs:
       - name: Package and verify app bundle
         run: zsh scripts/package.sh
       - name: Run unit and loopback integration tests
+        env:
+          RILL_SNIPPET_FIXTURES: ${{ runner.temp }}/rill-client-fixtures
         run: bash scripts/test.sh
+      - name: Upload synthetic generated programs
+        if: matrix.runner == 'macos-15' && matrix.xcode == '16.4'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: generated-client-fixtures
+          path: ${{ runner.temp }}/rill-client-fixtures
+          retention-days: 2
+
+  clients:
+    name: Compile and execute generated clients
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: generated-client-fixtures
+          path: fixtures
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: '10.0.x'
+      - name: Install isolated test SDKs
+        run: |
+          python3 -m venv "$RUNNER_TEMP/client-python"
+          "$RUNNER_TEMP/client-python/bin/pip" install requests==2.34.2 httpx==0.28.1
+          npm install --prefix "$RUNNER_TEMP/client-node" --ignore-scripts --no-save axios@1.20.0
+          mvn -q -f scripts/client-validation-pom.xml dependency:build-classpath -Dmdep.outputFile="$RUNNER_TEMP/client-classpath"
+      - name: Compile and execute synthetic requests on loopback
+        run: |
+          export RILL_CLIENT_PYTHON="$RUNNER_TEMP/client-python/bin/python"
+          export RILL_CLIENT_NODE_MODULES="$RUNNER_TEMP/client-node/node_modules"
+          export RILL_CLIENT_JAVA_HOME="$JAVA_HOME_21_X64"
+          export RILL_CLIENT_OKHTTP_CLASSPATH="$(cat "$RUNNER_TEMP/client-classpath")"
+          export RILL_CLIENT_CARGO_TARGET="$RUNNER_TEMP/client-cargo"
+          python3 scripts/validate-clients.py fixtures --targets requests,httpx,fetch,axios,java,okhttp,go,rust,csharp
 
   build-and-test:
     name: Build and test on macOS
     if: always()
-    needs: verify
+    needs: [verify, clients]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: Require every macOS configuration to pass
         env:
           MATRIX_RESULT: ${{ needs.verify.result }}
-        run: test "$MATRIX_RESULT" = success
+          CLIENT_RESULT: ${{ needs.clients.result }}
+        run: test "$MATRIX_RESULT" = success && test "$CLIENT_RESULT" = success
