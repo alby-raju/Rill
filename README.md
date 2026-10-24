@@ -29,6 +29,7 @@ The bundle is written to `dist/Rill.app`. It is ad-hoc signed for local developm
 - Secret-scrubbed `.rillbackup` workspace/draft backups and restore with a retained pre-restore copy.
 - Ephemeral URLSession execution, 1–300 second timeout, cancellation, system TLS verification by default and a 16 MiB response limit.
 - Safe JSON/XML/HTML-source/text/binary/raster previews, raw export, response metadata, prepared-request inspector and transport timeline.
+- Reviewed cURL/HTTPie command import and masked frozen-request command generation; unsupported options fail explicitly.
 - Status and body-contains checks.
 - Configurable response/preview/history budgets; opt-in durable redacted snapshots (bodies omitted by default), per-exchange inspection and exact semantic JSON comparison.
 - Validated, conflict-aware background workspace persistence and Rill JSON import/export with a reviewed import plan and regenerated identities.

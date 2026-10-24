@@ -21,6 +21,7 @@ typealias ViewState<Value> = SwiftUI.State<Value>
                 Button("New Request") { store.newRequest() }.keyboardShortcut("n")
                 Button("New Collection") { store.newCollection() }.keyboardShortcut("n", modifiers: [.command, .shift])
                 Divider()
+                Button("Import cURL / HTTPie…") { store.showCommandImport = true }
                 Button("Import Rill Workspace…") { store.importWorkspace() }
                 Button("Export Rill Workspace…") { store.exportWorkspace() }
                 Button("Export Support Diagnostics…") { store.exportDiagnostics() }
@@ -36,6 +37,7 @@ typealias ViewState<Value> = SwiftUI.State<Value>
                 Button("Move Request Earlier") { store.reorderSelected(-1) }.keyboardShortcut(.upArrow, modifiers: .option)
                 Button("Move Request Later") { store.reorderSelected(1) }.keyboardShortcut(.downArrow, modifiers: .option)
                 Divider()
+                Button("Generate Command…") { store.showCommandExport = true }.disabled(store.selection == nil)
                 Button("Send Request") { store.send() }.keyboardShortcut(.return, modifiers: .command).disabled(store.running || store.loading)
                 Button("Cancel Request") { store.cancel() }.keyboardShortcut(".")
                 Button("Find Request") { store.showPalette = true }.keyboardShortcut("k")

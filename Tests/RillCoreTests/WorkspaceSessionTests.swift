@@ -25,6 +25,7 @@ final class TestCredentials: CredentialStore, @unchecked Sendable {
         }
     }
     var count: Int { lock.withLock { writeCount } }
+    var nonemptyCount: Int { lock.withLock { values.count } }
 }
 
 @MainActor final class WorkspaceSessionTests: XCTestCase {

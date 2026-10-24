@@ -36,6 +36,8 @@ struct WorkbenchView: View {
         .disabled(store.loading || store.importing || store.closing)
         .overlay { if store.loading { ProgressView("Opening workspace…").padding(24).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12)) } }
         .tint(accent)
+        .sheet(isPresented: $store.showCommandImport) { CommandImportView().environmentObject(store) }
+        .sheet(isPresented: $store.showCommandExport) { CommandExportView().environmentObject(store) }
         .sheet(isPresented: $store.showTLS) { TLSManagerView().environmentObject(store) }
         .sheet(isPresented: $store.showAuthentication) { AuthenticationManager().environmentObject(store) }
         .sheet(isPresented: $store.showEnvironments) { EnvironmentEditor().environmentObject(store) }

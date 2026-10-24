@@ -9,6 +9,7 @@ public enum WorkspaceError: LocalizedError, Equatable {
     case tooDeep
     case conflict
     case unavailable
+    case companionRollback
 
     public var errorDescription: String? {
         switch self {
@@ -17,6 +18,7 @@ public enum WorkspaceError: LocalizedError, Equatable {
         case .tooLarge: "The workspace exceeds the 32 MiB file limit."
         case .tooDeep: "The workspace exceeds the supported JSON nesting depth."
         case .conflict: "The workspace changed in another process. Saving has paused to protect both versions. Export your current edits before reopening the app."
+        case .companionRollback: "The workspace was preserved, but a new unreferenced credential may remain in Keychain because cleanup failed."
         case .unavailable: "The workspace could not be accessed. Check its permissions and available storage, then retry."
         }
     }
@@ -196,6 +198,15 @@ public struct WorkspaceRepository: Sendable {
     /// It receives the committed revision even if a companion-store write fails.
     public func commit(_ workspace: Workspace, expecting revision: WorkspaceRevision,
                        onCommit: (WorkspaceRevision) throws -> Void = { _ in }) throws -> WorkspaceRevision {
+        try commitPrepared(workspace, expecting: revision, beforeWrite: {}, onWriteFailure: {}, onCommit: onCommit)
+    }
+    public func commitWithCompanion(_ workspace: Workspace, expecting revision: WorkspaceRevision,
+                                    beforeWrite: () throws -> Void, onWriteFailure: () throws -> Void) throws -> WorkspaceRevision {
+        try commitPrepared(workspace, expecting: revision, beforeWrite: beforeWrite, onWriteFailure: onWriteFailure, onCommit: { _ in })
+    }
+    private func commitPrepared(_ workspace: Workspace, expecting revision: WorkspaceRevision,
+                                beforeWrite: () throws -> Void, onWriteFailure: () throws -> Void,
+                                onCommit: (WorkspaceRevision) throws -> Void) throws -> WorkspaceRevision {
         var persisted = workspace
         // Even credential-only or otherwise identical saves advance the token.
         persisted.storageRevision = UUID()
@@ -208,7 +219,13 @@ public struct WorkspaceRepository: Sendable {
             guard actual == revision else { throw WorkspaceError.conflict }
             if let existing { _ = try WorkspaceFile.decode(existing) }
             try Task.checkCancellation()
-            try WorkspaceFile.atomicWrite(data, to: url)
+            try beforeWrite()
+            do { try WorkspaceFile.atomicWrite(data, to: url) }
+            catch {
+                let original = error
+                do { try onWriteFailure() } catch { throw WorkspaceError.companionRollback }
+                throw original
+            }
             let next = WorkspaceRevision(data: data)
             try onCommit(next)
             return next

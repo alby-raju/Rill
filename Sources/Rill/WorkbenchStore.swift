@@ -53,6 +53,8 @@ import UniformTypeIdentifiers
     @Published var oauthStatus = ""
     private var oauthTask: Task<Void, Never>?
     private var oauthGeneration: UUID?
+    @Published var showCommandImport = false
+    @Published var showCommandExport = false
     @Published var showTLS = false
     @Published var showAuthentication = false
     @Published var showEnvironments = false
@@ -520,6 +522,24 @@ import UniformTypeIdentifiers
                 applyingWorkspace = true; workspace = merged; applyingWorkspace = false
                 hasUnsavedChanges = false; persistenceHealth = .saved
             } catch { self.error = "Import failed without applying incoming changes. \(error.localizedDescription)"; if (error as? WorkspaceError) == .conflict { persistenceAvailable = false; persistenceHealth = .conflict } }
+        }
+    }
+    func importCommand(_ result: CommandImport) async -> Bool {
+        guard canEdit, persistenceAvailable else { return false }
+        importing = true; cancel(); saveTask?.cancel(); saveGeneration = UUID()
+        defer { importing = false }
+        guard await saveWorkspaceNow() else { return false }
+        do {
+            var request = result.request
+            request.collectionID = focusedCollectionID ?? workspace.collections.first?.id
+            let imported = try await persistence.importRequest(request, current: workspace)
+            applyingWorkspace = true; workspace = imported.workspace; applyingWorkspace = false
+            hasUnsavedChanges = false; persistenceHealth = .saved; selection = imported.requestID
+            return true
+        } catch {
+            self.error = "Command import did not complete. \(error.localizedDescription)"
+            if (error as? WorkspaceError) == .conflict { persistenceAvailable = false; persistenceHealth = .conflict }
+            return false
         }
     }
     func createBackup() {
