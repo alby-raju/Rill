@@ -48,7 +48,7 @@ public struct FrozenClientRequest: Sendable {
         let customKey = effective.auth == .apiKey && effective.apiKeyLocation != .query
             ? try VariableExpansion.resolve(effective.apiKeyName ?? "", values: values, secretLookup: { name in
                 guard let secrets else { throw AuthenticationError.missingSecret }; return try secrets.resolve(name)
-            }).lowercased() : ""
+            }).trimmingCharacters(in: .whitespacesAndNewlines).lowercased() : ""
         let sensitive: Set<String> = ["authorization", "proxy-authorization", "cookie", "set-cookie", "x-api-key", "api-key", "x-auth-token", customKey]
         for (key, value) in headers {
             let lower = key.lowercased()

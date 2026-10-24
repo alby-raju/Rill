@@ -41,9 +41,14 @@ import XCTest
     }
     func testCustomAPIKeyMaskingAndTargetRepresentability() throws {
         var draft = RequestDraft(); draft.url = "https://example.test"; draft.auth = .apiKey
-        draft.apiKeyLocation = .header; draft.apiKeyName = "X-Custom-Credential"; draft.credential = "never-export"
+        draft.apiKeyLocation = .header; draft.apiKeyName = "  X-Custom-Credential  "; draft.credential = "never-export"
         let frozen = try FrozenClientRequest.capture(draft, environment: nil)
         XCTAssertEqual(frozen.headers.first { $0.key.lowercased() == "x-custom-credential" }?.value, "[REDACTED]")
+        for target in CommandTarget.allCases {
+            let command = try CommandGenerator.generate(draft, environment: nil, target: target)
+            XCTAssertFalse(command.contains("never-export"))
+            XCTAssertTrue(command.contains("[REDACTED]"))
+        }
         draft.auth = .none; draft.headers = [Field(name: "__proto__", value: "literal")]
         let reserved = try FrozenClientRequest.capture(draft, environment: nil)
         XCTAssertThrowsError(try ClientSnippetGenerator.generate(reserved, target: .axios))
@@ -65,7 +70,7 @@ import XCTest
             draft.headers = [Field(name: "X-Literal", value: "quotes \" and ' and $HOME"), Field(name: "X-Empty", value: "")]
             if kind == "redirect" || kind == "overflow" { draft.url = "http://127.0.0.1:18750/" + kind }
             if kind == "large" { draft.bodyMode = .text; draft.body = String(repeating: "🦦", count: 24_000); draft.contentType = "text/plain" }
-            else if kind == "raw" { draft.bodyMode = .text; draft.body = "Unicode 🐟\n$HOME \"quoted\""; draft.contentType = "application/json" }
+            else if kind == "raw" { draft.bodyMode = .text; draft.body = #"{"message":"Unicode 🐟\n$HOME \"quoted\""}"#; draft.contentType = "application/json" }
             else if kind == "binary" { draft.bodyMode = .binary; draft.binaryFile = try UploadFileReference.capture(file) }
             else if kind == "multipart" {
                 draft.bodyMode = .multipart

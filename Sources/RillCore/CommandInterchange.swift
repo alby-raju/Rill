@@ -320,7 +320,7 @@ public enum CommandGenerator {
         let knownSecrets: Set<String> = ["authorization", "proxy-authorization", "cookie", "set-cookie", "x-api-key", "api-key", "x-auth-token"]
         let effective = try AuthenticationProfiles.applying(to: draft, profiles: profiles)
         let variables = environment?.variables.filter { $0.enabled && !$0.name.isEmpty }.reduce(into: [String: String]()) { $0[$1.name] = $1.value } ?? [:]
-        let keyName = effective.auth == .apiKey ? try VariableExpansion.resolve(effective.apiKeyName ?? "", values: variables, secretLookup: { name in guard let secrets else { throw AuthenticationError.missingSecret }; return try secrets.resolve(name) }) : ""
+        let keyName = effective.auth == .apiKey ? try VariableExpansion.resolve(effective.apiKeyName ?? "", values: variables, secretLookup: { name in guard let secrets else { throw AuthenticationError.missingSecret }; return try secrets.resolve(name) }).trimmingCharacters(in: .whitespacesAndNewlines) : ""
         words += [target == .curl ? "--max-time" : "--timeout", String(request.timeoutInterval)]
         for (name, original) in (request.allHTTPHeaderFields ?? [:]).sorted(by: { $0.key.lowercased() < $1.key.lowercased() }) {
             if name.lowercased() == "content-length" && draft.bodyMode == .binary { continue }
