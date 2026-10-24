@@ -1,6 +1,8 @@
 """Loopback fixture for transport integration tests. No external service needed."""
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import time
+import json
+import base64
 from socketserver import TCPServer
 
 class LoopbackServer(ThreadingHTTPServer):
@@ -12,7 +14,30 @@ class LoopbackServer(ThreadingHTTPServer):
 
 
 class Handler(BaseHTTPRequestHandler):
+    def do_echo(self):
+        length = int(self.headers.get('Content-Length', '0'))
+        if length > 1024 * 1024:
+            self.send_error(413)
+            return
+        payload = self.rfile.read(length)
+        body = json.dumps({'method': self.command, 'path': self.path,
+                           'headers': dict(self.headers),
+                           'body': base64.b64encode(payload).decode()}).encode()
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Content-Length', str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    do_POST = do_echo
+    do_PUT = do_echo
+    do_PATCH = do_echo
+    do_DELETE = do_echo
+    do_OPTIONS = do_echo
+
     def do_GET(self):
+        if self.path.startswith('/echo'):
+            return self.do_echo()
         if self.path.startswith(('/bytes/', '/chunked/', '/unknown/')):
             mode, count = self.path.strip('/').split('/')
             count = min(int(count), 1024 * 1024)

@@ -1,9 +1,11 @@
 import Foundation
 
 public enum RillError: LocalizedError {
-    case invalidURL, missingVariable(String), invalidHeader(String), responseTooLarge, invalidWorkspace, invalidLimits, invalidTimeout, duplicateHeader
+    case unsupportedBodyMethod, invalidAPIKey, invalidURL, missingVariable(String), invalidHeader(String), responseTooLarge, invalidWorkspace, invalidLimits, invalidTimeout, duplicateHeader
     public var errorDescription: String? {
         switch self {
+        case .unsupportedBodyMethod: "GET and HEAD bodies are not supported by this transport. Choose None or another method."
+        case .invalidAPIKey: "Enter a nonempty API-key name."
         case .invalidLimits: "Response download limits must be between 1 byte and 256 MiB."
         case .invalidTimeout: "Request timeout must be a finite positive number."
         case .duplicateHeader: "Repeated request headers are not yet supported. Combine them explicitly only when permitted by the API."
@@ -41,8 +43,26 @@ public enum RequestEngine {
         }
         let address = try expand(draft.url).trimmingCharacters(in: .whitespacesAndNewlines)
         guard var components = URLComponents(string: address), ["http", "https"].contains(components.scheme?.lowercased() ?? ""), components.host?.isEmpty == false, components.user == nil, components.password == nil else { throw RillError.invalidURL }
-        let query = try draft.parameters.filter { $0.enabled && !$0.name.isEmpty }.map { URLQueryItem(name: try expand($0.name), value: try expand($0.value)) }
-        if !query.isEmpty { components.queryItems = (components.queryItems ?? []) + query }
+        // Preserve the caller's existing percent-encoded query byte-for-byte.
+        // New fields encode literal plus, spaces, Unicode and delimiters independently.
+        var query = components.percentEncodedQuery
+        func appendQuery(_ name: String, _ value: String) {
+            let pair = HTTPEncoding.component(name) + "=" + HTTPEncoding.component(value)
+            query = query.map { $0.isEmpty ? pair : $0 + "&" + pair } ?? pair
+        }
+        let keyName = draft.auth == .apiKey ? try expand(draft.apiKeyName ?? "").trimmingCharacters(in: .whitespacesAndNewlines) : ""
+        if draft.auth == .apiKey && keyName.isEmpty { throw RillError.invalidAPIKey }
+        let keyInQuery = draft.auth == .apiKey && draft.apiKeyLocation == .query
+        if keyInQuery {
+            query = HTTPEncoding.removingQuery(keyName, from: query)
+        }
+        for field in draft.parameters where field.enabled && !field.name.isEmpty {
+            let name = try expand(field.name), value = try expand(field.value)
+            if !keyInQuery || name != keyName { appendQuery(name, value) }
+        }
+        if keyInQuery { appendQuery(keyName, try expand(draft.credential)) }
+        components.percentEncodedQuery = query
+        components.fragment = nil
         guard let url = components.url else { throw RillError.invalidURL }
         guard draft.timeout.isFinite, draft.timeout > 0 else { throw RillError.invalidTimeout }
         var request = URLRequest(url: url)
@@ -58,11 +78,26 @@ public enum RequestEngine {
             guard !name.isEmpty, name.unicodeScalars.allSatisfy({ tokens.contains($0) }), !hasInvalidHeaderValue(value) else { throw RillError.invalidHeader(name) }
             request.setValue(value, forHTTPHeaderField: name)
         }
-        if !draft.body.isEmpty {
-            request.httpBody = try expand(draft.body).data(using: .utf8)
-            if request.value(forHTTPHeaderField: "Content-Type") == nil { let type = try expand(draft.contentType)
-                guard !hasInvalidHeaderValue(type) else { throw RillError.invalidHeader("Content-Type") }
-                request.setValue(type, forHTTPHeaderField: "Content-Type") }
+        let body: Data?
+        switch draft.bodyMode {
+        case .none?: body = nil
+        case .form?:
+            let fields = try (draft.formFields ?? []).filter { $0.enabled && !$0.name.isEmpty }.map {
+                HTTPEncoding.formComponent(try expand($0.name)) + "=" + HTTPEncoding.formComponent(try expand($0.value))
+            }
+            body = Data(fields.joined(separator: "&").utf8)
+        case .text?: body = Data(try expand(draft.body).utf8)
+        case nil: body = draft.body.isEmpty ? nil : Data(try expand(draft.body).utf8)
+        }
+        if let body {
+            guard draft.method != .GET && draft.method != .HEAD else { throw RillError.unsupportedBodyMethod }
+            request.httpBody = body
+            let type = draft.bodyMode == .form ? "application/x-www-form-urlencoded" : try expand(draft.contentType)
+            guard !hasInvalidHeaderValue(type) else { throw RillError.invalidHeader("Content-Type") }
+            if draft.bodyMode == .form {
+                // A structured encoder owns its wire content type.
+                request.setValue(type, forHTTPHeaderField: "Content-Type")
+            } else if request.value(forHTTPHeaderField: "Content-Type") == nil { request.setValue(type, forHTTPHeaderField: "Content-Type") }
         }
         switch draft.auth {
         case .none: break
@@ -70,6 +105,11 @@ public enum RequestEngine {
             let token = try expand(draft.credential)
             guard !hasInvalidHeaderValue(token) else { throw RillError.invalidHeader("Authorization") }
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        case .apiKey:
+            if !keyInQuery {
+                guard HTTPEncoding.isHeaderName(keyName), !hasInvalidHeaderValue(try expand(draft.credential)) else { throw RillError.invalidHeader(keyName) }
+                request.setValue(try expand(draft.credential), forHTTPHeaderField: keyName)
+            }
         case .basic:
             let token = try "\(expand(draft.username)):\(expand(draft.credential))".data(using: .utf8)!.base64EncodedString()
             request.setValue("Basic \(token)", forHTTPHeaderField: "Authorization")
@@ -102,6 +142,6 @@ public enum RequestEngine {
         var checks: [CheckResult] = []
         if !draft.expectedStatus.isEmpty { checks.append(CheckResult(title: "Status equals \(draft.expectedStatus)", passed: Int(draft.expectedStatus) == http.statusCode)) }
         if !draft.bodyContains.isEmpty { checks.append(CheckResult(title: "Body contains \(draft.bodyContains)", passed: String(data: data, encoding: .utf8)?.contains(draft.bodyContains) == true)) }
-        return Exchange(requestID: draft.id, requestName: draft.name, method: draft.method, url: request.url!.absoluteString, status: http.statusCode, duration: ProcessInfo.processInfo.systemUptime - start, headers: headers, body: data, checks: checks)
+        return Exchange(requestID: draft.id, requestName: draft.name, method: draft.method, url: http.url?.absoluteString ?? request.url!.absoluteString, status: http.statusCode, duration: ProcessInfo.processInfo.systemUptime - start, headers: headers, body: data, checks: checks, preparedRequest: PreparedRequestSummary(request))
     }
 }
