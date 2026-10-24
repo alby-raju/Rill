@@ -126,7 +126,7 @@ public enum OAuthClient {
     }
     public static func acquire(_ request: URLRequest) async throws -> OAuthToken {
         try Task.checkCancellation()
-        let configuration = URLSessionConfiguration.ephemeral; configuration.httpShouldSetCookies = false; configuration.urlCache = nil
+        let configuration = HTTPClientConfiguration.make()
         let session = URLSession(configuration: configuration, delegate: OAuthNoRedirect(), delegateQueue: nil)
         defer { session.invalidateAndCancel() }
         let (bytes, response) = try await session.bytes(for: request)

@@ -38,7 +38,7 @@ The bundle is written to `dist/Rill.app`. It is ad-hoc signed for local developm
 - Authentication credentials in macOS Keychain; reusable auth profiles and named `{{secret:name}}` values with a read-only `RILL_SECRET_` process fallback. Credentials are excluded from exported workspaces.
 - System/light/dark appearance and keyboard shortcuts: Cmd+N, Cmd+Enter, Cmd+K, Cmd+Shift+E, Cmd+period.
 
-Requests are sent only when you choose Send. A fresh workspace has no preconfigured remote endpoint.
+Network requests start only when you choose Send or explicitly acquire an OAuth token. A fresh workspace has no preconfigured remote endpoint.
 
 ## Data
 
