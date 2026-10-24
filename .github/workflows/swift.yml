@@ -15,12 +15,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-and-test:
-    name: Build and test on macOS
-    runs-on: macos-15
+  verify:
+    name: Swift / ${{ matrix.runner }} / Xcode ${{ matrix.xcode }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            xcode: '16.4'
+          - runner: macos-15-intel
+            xcode: '16.4'
+          - runner: macos-15
+            xcode: '26.3'
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 15
     env:
-      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+      DEVELOPER_DIR: /Applications/Xcode_${{ matrix.xcode }}.app/Contents/Developer
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -37,3 +47,15 @@ jobs:
         run: swift build --configuration release
       - name: Run unit and loopback integration tests
         run: bash scripts/test.sh
+
+  build-and-test:
+    name: Build and test on macOS
+    if: always()
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every macOS configuration to pass
+        env:
+          MATRIX_RESULT: ${{ needs.verify.result }}
+        run: test "$MATRIX_RESULT" = success

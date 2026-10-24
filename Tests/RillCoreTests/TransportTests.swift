@@ -33,4 +33,23 @@ import XCTest
         catch let error as URLError { XCTAssertEqual(error.code, .cancelled) }
         XCTAssertLessThan(Date().timeIntervalSince(started), 3)
     }
+    func testExactDownloadBudgetSucceedsForKnownUnknownAndChunkedLengths() async throws {
+        let budget = try ResponseBudget(downloadBytes: 4096)
+        for mode in ["bytes", "unknown", "chunked"] {
+            let request = try draft("/\(mode)/4096")
+            let exchange = try await RequestEngine.execute(request, environment: nil, budget: budget)
+            XCTAssertEqual(exchange.body.count, 4096, mode)
+        }
+    }
+    func testKnownUnknownAndChunkedOverflowNeverReturnsPartialSuccess() async throws {
+        let budget = try ResponseBudget(downloadBytes: 4096)
+        for mode in ["bytes", "unknown", "chunked"] {
+            let request = try draft("/\(mode)/4097")
+            do {
+                _ = try await RequestEngine.execute(request, environment: nil, budget: budget)
+                XCTFail("Oversized \(mode) response was accepted")
+            } catch RillError.responseTooLarge { }
+        }
+    }
+
 }

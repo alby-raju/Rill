@@ -1,17 +1,30 @@
 import Foundation
 
 public enum RillError: LocalizedError {
-    case invalidURL, missingVariable(String), invalidHeader(String), responseTooLarge, invalidWorkspace
+    case invalidURL, missingVariable(String), invalidHeader(String), responseTooLarge, invalidWorkspace, invalidLimits, invalidTimeout, duplicateHeader
     public var errorDescription: String? {
         switch self {
+        case .invalidLimits: "Response download limits must be between 1 byte and 256 MiB."
+        case .invalidTimeout: "Request timeout must be a finite positive number."
+        case .duplicateHeader: "Repeated request headers are not yet supported. Combine them explicitly only when permitted by the API."
         case .invalidURL: "Enter a valid http:// or https:// URL."
         case .missingVariable(let name): "No value found for {{\(name)}} in the selected environment."
         case .invalidHeader(let name): "Invalid header: \(name). Header names must be HTTP tokens and values cannot contain line breaks."
-        case .responseTooLarge: "Response exceeded the 16 MiB limit."
+        case .responseTooLarge: "Response exceeded the configured download limit."
         case .invalidWorkspace: "This file is not a supported Rill workspace."
         }
     }
 }
+public struct ResponseBudget: Sendable {
+    public let downloadBytes: Int
+    public static let standard = ResponseBudget(uncheckedBytes: ResourceLimits.responseBytes)
+    private init(uncheckedBytes: Int) { downloadBytes = uncheckedBytes }
+    public init(downloadBytes: Int) throws {
+        guard (1...(256 * 1024 * 1024)).contains(downloadBytes) else { throw RillError.invalidLimits }
+        self.downloadBytes = downloadBytes
+    }
+}
+
 public enum RequestEngine {
     public static func resolve(_ text: String, variables: [String: String]) throws -> String {
         let pattern = try NSRegularExpression(pattern: #"\{\{\s*([^{}]+?)\s*\}\}"#)
@@ -32,26 +45,31 @@ public enum RequestEngine {
         let query = try draft.parameters.filter { $0.enabled && !$0.name.isEmpty }.map { URLQueryItem(name: try expand($0.name), value: try expand($0.value)) }
         if !query.isEmpty { components.queryItems = (components.queryItems ?? []) + query }
         guard let url = components.url else { throw RillError.invalidURL }
+        guard draft.timeout.isFinite, draft.timeout > 0 else { throw RillError.invalidTimeout }
         var request = URLRequest(url: url)
         request.httpMethod = draft.method.rawValue
         request.timeoutInterval = min(max(draft.timeout, 1), 300)
         request.setValue("application/json, */*;q=0.5", forHTTPHeaderField: "Accept")
         request.setValue("Rill/0.1", forHTTPHeaderField: "User-Agent")
+        var headerNames = Set<String>()
         for field in draft.headers where field.enabled && !field.name.isEmpty {
             let name = try expand(field.name), value = try expand(field.value)
+            guard headerNames.insert(name.lowercased()).inserted else { throw RillError.duplicateHeader }
             let tokens = CharacterSet(charactersIn: "!#$%&'*+-.^_`|~0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-            guard !name.isEmpty, name.unicodeScalars.allSatisfy({ tokens.contains($0) }), !value.unicodeScalars.contains(where: { $0.value == 13 || $0.value == 10 }) else { throw RillError.invalidHeader(name) }
+            guard !name.isEmpty, name.unicodeScalars.allSatisfy({ tokens.contains($0) }), !hasInvalidHeaderValue(value) else { throw RillError.invalidHeader(name) }
             request.setValue(value, forHTTPHeaderField: name)
         }
         if !draft.body.isEmpty {
             request.httpBody = try expand(draft.body).data(using: .utf8)
-            if request.value(forHTTPHeaderField: "Content-Type") == nil { request.setValue(draft.contentType, forHTTPHeaderField: "Content-Type") }
+            if request.value(forHTTPHeaderField: "Content-Type") == nil { let type = try expand(draft.contentType)
+                guard !hasInvalidHeaderValue(type) else { throw RillError.invalidHeader("Content-Type") }
+                request.setValue(type, forHTTPHeaderField: "Content-Type") }
         }
         switch draft.auth {
         case .none: break
         case .bearer:
             let token = try expand(draft.credential)
-            guard !token.unicodeScalars.contains(where: { $0.value == 13 || $0.value == 10 }) else { throw RillError.invalidHeader("Authorization") }
+            guard !hasInvalidHeaderValue(token) else { throw RillError.invalidHeader("Authorization") }
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         case .basic:
             let token = try "\(expand(draft.username)):\(expand(draft.credential))".data(using: .utf8)!.base64EncodedString()
@@ -59,17 +77,21 @@ public enum RequestEngine {
         }
         return request
     }
-    public static func execute(_ draft: RequestDraft, environment: Environment?) async throws -> Exchange {
+    private static func hasInvalidHeaderValue(_ value: String) -> Bool {
+        value.unicodeScalars.contains { ($0.value < 32 && $0.value != 9) || $0.value == 127 }
+    }
+    public static func execute(_ draft: RequestDraft, environment: Environment?, budget: ResponseBudget = .standard) async throws -> Exchange {
+        try Task.checkCancellation()
         let request = try prepare(draft, environment: environment)
         let configuration = URLSessionConfiguration.ephemeral
         configuration.httpShouldSetCookies = false
         configuration.urlCache = nil
         let session = URLSession(configuration: configuration)
         defer { session.invalidateAndCancel() }
-        let start = Date()
+        let start = ProcessInfo.processInfo.systemUptime
         let (bytes, response) = try await session.bytes(for: request)
         guard let http = response as? HTTPURLResponse else { throw RillError.invalidURL }
-        let maximum = 16 * 1024 * 1024
+        let maximum = budget.downloadBytes
         if response.expectedContentLength > Int64(maximum) { throw RillError.responseTooLarge }
         var data = Data()
         for try await byte in bytes {
@@ -81,19 +103,6 @@ public enum RequestEngine {
         var checks: [CheckResult] = []
         if !draft.expectedStatus.isEmpty { checks.append(CheckResult(title: "Status equals \(draft.expectedStatus)", passed: Int(draft.expectedStatus) == http.statusCode)) }
         if !draft.bodyContains.isEmpty { checks.append(CheckResult(title: "Body contains \(draft.bodyContains)", passed: String(data: data, encoding: .utf8)?.contains(draft.bodyContains) == true)) }
-        return Exchange(requestID: draft.id, requestName: draft.name, method: draft.method, url: request.url!.absoluteString, status: http.statusCode, duration: Date().timeIntervalSince(start), headers: headers, body: data, checks: checks)
-    }
-}
-public enum WorkspaceFile {
-    public static func load(from url: URL) throws -> Workspace {
-        let workspace = try JSONDecoder().decode(Workspace.self, from: Data(contentsOf: url))
-        guard workspace.version == 1, Set(workspace.requests.map(\.id)).count == workspace.requests.count, Set(workspace.collections.map(\.id)).count == workspace.collections.count, Set(workspace.environments.map(\.id)).count == workspace.environments.count else { throw RillError.invalidWorkspace }
-        return workspace
-    }
-    public static func save(_ workspace: Workspace, to url: URL) throws {
-        let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try encoder.encode(workspace).write(to: url, options: [.atomic, .completeFileProtectionUnlessOpen])
-        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+        return Exchange(requestID: draft.id, requestName: draft.name, method: draft.method, url: request.url!.absoluteString, status: http.statusCode, duration: ProcessInfo.processInfo.systemUptime - start, headers: headers, body: data, checks: checks)
     }
 }

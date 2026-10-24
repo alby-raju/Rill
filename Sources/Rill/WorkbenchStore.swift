@@ -1,11 +1,22 @@
 import SwiftUI
 import RillCore
-import Security
 import UniformTypeIdentifiers
 
 @MainActor final class WorkbenchStore: ObservableObject {
-    @Published var workspace = Workspace.starter
-    @Published var selection: UUID? { didSet { if oldValue != selection { response = nil } } }
+    @Published var workspace = Workspace.starter {
+        didSet {
+            guard !loading, workspace.needsSave(comparedTo: oldValue) else { return }
+            let previousRequest = oldValue.requests.first { $0.id == selection }
+            let previousEnvironment = oldValue.environments.first { $0.id == oldValue.selectedEnvironmentID }
+            if previousRequest != selected || previousEnvironment != environment {
+                response = nil
+                cancel()
+            }
+            hasUnsavedChanges = true
+            persist()
+        }
+    }
+    @Published var selection: UUID? { didSet { if oldValue != selection { response = nil; cancel() } } }
     @Published var response: Exchange?
     @Published var error: String?
     @Published var running = false
@@ -15,15 +26,42 @@ import UniformTypeIdentifiers
     @Published var showPalette = false
     @Published var persistenceAvailable = true
     private var task: Task<Void, Never>?
-    private let file: URL
+    @Published var persistenceHealth: PersistenceHealth = .loading
+    @Published var loading = true
+    @Published var importing = false
+    @Published var closing = false
+    @Published private(set) var hasUnsavedChanges = false
+    private var lastFailure: DiagnosticFailure?
+    private var saveTask: Task<Void, Never>?
+    private var saveGeneration = UUID()
+    private var activeContext: UUID?
+    private let persistence: WorkspaceSession
     init() {
-        file = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Rill/workspace.json")
-        if FileManager.default.fileExists(atPath: file.path) {
-            do { workspace = try WorkspaceFile.load(from: file) }
-            catch { persistenceAvailable = false; self.error = "Could not open the workspace. The existing file has been preserved. \(error.localizedDescription)" }
+        let file = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Rill/workspace.json")
+        persistence = WorkspaceSession(url: file)
+        Task {
+            defer { loading = false }
+            do {
+                workspace = try await persistence.open()
+                selection = workspace.requests.first?.id
+                persistenceHealth = .saved
+            } catch {
+                persistenceAvailable = false
+                persistenceHealth = .failed
+                lastFailure = DiagnosticFailure.classify(error)
+                self.error = "Could not open the workspace. Saving is paused and the existing file is preserved. \(error.localizedDescription)"
+            }
         }
-        for index in workspace.requests.indices { workspace.requests[index].credential = Vault.read(workspace.requests[index].id) }
-        selection = workspace.requests.first?.id
+    }
+    var saveStatus: String {
+        switch persistenceHealth {
+        case .loading: "Opening workspace…"
+        case .saved: "All changes saved"
+        case .pending: "Unsaved changes"
+        case .saving: "Saving…"
+        case .failed: "Save failed · edits retained in memory"
+        case .conflict: "Workspace conflict · saving paused"
+        }
     }
     var selected: RequestDraft? { workspace.requests.first { $0.id == selection } }
     var environment: RillCore.Environment? { workspace.environments.first { $0.id == workspace.selectedEnvironmentID } }
@@ -33,23 +71,37 @@ import UniformTypeIdentifiers
         persist()
     }
     func persist() {
-        guard persistenceAvailable else { return }
-        do {
-            var disk = workspace
-            disk.history = [] // Response payloads stay in this session only.
-            for index in disk.requests.indices {
-                let request = disk.requests[index]
-                try Vault.write(request.credential, id: request.id)
-                disk.requests[index].credential = ""
+        guard !loading, persistenceAvailable, hasUnsavedChanges else { return }
+        saveTask?.cancel()
+        let generation = UUID()
+        saveGeneration = generation
+        let snapshot = workspace
+        persistenceHealth = .pending
+        saveTask = Task {
+            do {
+                try await Task.sleep(for: .milliseconds(250))
+                persistenceHealth = .saving
+                try await persistence.save(snapshot)
+                if saveGeneration == generation { persistenceHealth = .saved; hasUnsavedChanges = false }
+            } catch is CancellationError { }
+            catch {
+                guard saveGeneration == generation else { return }
+                lastFailure = DiagnosticFailure.classify(error)
+                if (error as? WorkspaceError) == .conflict {
+                    persistenceAvailable = false
+                    persistenceHealth = .conflict
+                } else { persistenceHealth = .failed }
+                self.error = "Could not save. Your edits are retained in memory. \(error.localizedDescription)"
             }
-            try WorkspaceFile.save(disk, to: file)
-        } catch { self.error = "Could not save: \(error.localizedDescription)" }
+        }
     }
     func newRequest(in collection: UUID? = nil) {
+        guard !loading, !importing, !closing else { return }
         let request = RequestDraft(collectionID: collection ?? workspace.collections.first?.id)
         workspace.requests.append(request); selection = request.id; response = nil; persist()
     }
     func newCollection() {
+        guard !loading, !importing, !closing else { return }
         let collection = RequestCollection(name: "New collection")
         workspace.collections.append(collection); newRequest(in: collection.id)
     }
@@ -59,69 +111,99 @@ import UniformTypeIdentifiers
     }
     func delete(_ request: RequestDraft) {
         workspace.requests.removeAll { $0.id == request.id }
-        try? Vault.write("", id: request.id)
         if selection == request.id { selection = workspace.requests.first?.id; response = nil }
         persist()
     }
     func send() {
-        guard !running, let draft = selected else { return }
+        guard !loading, !importing, !closing, !running, let draft = selected else { return }
         let environment = environment
+        let context = ExecutionContext(request: draft, environment: environment)
+        activeContext = context.id
         running = true; response = nil
         task = Task {
-            defer { running = false; task = nil }
+            defer { if activeContext == context.id { running = false; task = nil; activeContext = nil } }
             do {
                 let exchange = try await RequestEngine.execute(draft, environment: environment)
                 try Task.checkCancellation()
-                if selection == draft.id { response = exchange }
+                guard activeContext == context.id else { return }
+                if context.matches(request: selected, environment: self.environment) { response = exchange }
                 workspace.history.insert(exchange, at: 0)
                 // Bound both payload memory and exchange count.
-                while workspace.history.count > 50 || workspace.history.reduce(0, { $0 + $1.body.count }) > 32 * 1024 * 1024 { workspace.history.removeLast() }
+                while workspace.history.count > ResourceLimits.historyCount || workspace.history.reduce(0, { $0 + $1.body.count }) > ResourceLimits.historyBytes { workspace.history.removeLast() }
             } catch is CancellationError { }
             catch let failure as URLError where failure.code == .cancelled { }
-            catch { self.error = error.localizedDescription }
+            catch {
+                guard activeContext == context.id else { return }
+                lastFailure = DiagnosticFailure.classify(error)
+                if context.matches(request: selected, environment: self.environment) { self.error = error.localizedDescription }
+            }
         }
     }
-    func cancel() { task?.cancel() }
+    func cancel() {
+        let wasRunning = running
+        task?.cancel(); task = nil; activeContext = nil; running = false
+        if wasRunning { lastFailure = .cancelled }
+    }
+    func flushPendingChanges() async -> Bool {
+        if loading || !hasUnsavedChanges { return true }
+        guard persistenceAvailable else { return false }
+        saveTask?.cancel()
+        saveGeneration = UUID()
+        persistenceHealth = .saving
+        do {
+            try await persistence.save(workspace)
+            persistenceHealth = .saved
+            hasUnsavedChanges = false
+            return true
+        } catch {
+            lastFailure = DiagnosticFailure.classify(error)
+            persistenceHealth = (error as? WorkspaceError) == .conflict ? .conflict : .failed
+            return false
+        }
+    }
+    func exportDiagnostics() {
+        let panel = NSSavePanel(); panel.nameFieldStringValue = "Rill-diagnostics.json"; panel.allowedContentTypes = [.json]
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        let diagnostics = SupportDiagnostics(workspace: workspace, persistence: persistenceHealth, lastFailure: lastFailure)
+        Task {
+            do { try await Task.detached { try diagnostics.write(to: url) }.value }
+            catch { self.error = "Could not export diagnostics." }
+        }
+    }
     func exportWorkspace() {
+        guard !loading, !importing, !closing else { return }
         let panel = NSSavePanel(); panel.nameFieldStringValue = "Rill-workspace.json"; panel.allowedContentTypes = [.json]
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        do {
-            var exported = workspace; exported.history = []
-            for index in exported.requests.indices { exported.requests[index].credential = "" }
-            try WorkspaceFile.save(exported, to: url)
-        } catch { self.error = error.localizedDescription }
+        var exported = workspace; exported.history = []
+        for index in exported.requests.indices { exported.requests[index].credential = "" }
+        let snapshot = exported
+        Task {
+            do { try await Task.detached { try WorkspaceFile.save(snapshot, to: url) }.value }
+            catch { lastFailure = DiagnosticFailure.classify(error); self.error = error.localizedDescription }
+        }
     }
     func importWorkspace() {
+        guard !loading, !importing, !closing else { return }
         let panel = NSOpenPanel(); panel.allowedContentTypes = [.json]; panel.allowsMultipleSelection = false
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        do {
-            let incoming = try WorkspaceFile.load(from: url)
-            // Remap identities so repeated imports never alias existing items.
-            var collectionMap: [UUID: UUID] = [:]
-            for var collection in incoming.collections { let old = collection.id; collection.id = UUID(); collectionMap[old] = collection.id; workspace.collections.append(collection) }
-            for var request in incoming.requests { request.id = UUID(); request.collectionID = request.collectionID.flatMap { collectionMap[$0] }; request.credential = ""; workspace.requests.append(request) }
-            for var environment in incoming.environments { environment.id = UUID(); workspace.environments.append(environment) }
-            persist()
-        } catch { self.error = "Import failed: \(error.localizedDescription)" }
-    }
-}
-private enum Vault {
-    static func query(_ id: UUID) -> [String: Any] { [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: "app.rill.credentials", kSecAttrAccount as String: id.uuidString] }
-    static func read(_ id: UUID) -> String {
-        var parameters = query(id); parameters[kSecReturnData as String] = true; parameters[kSecMatchLimit as String] = kSecMatchLimitOne
-        var item: CFTypeRef?
-        guard SecItemCopyMatching(parameters as CFDictionary, &item) == errSecSuccess, let data = item as? Data else { return "" }
-        return String(data: data, encoding: .utf8) ?? ""
-    }
-    static func write(_ value: String, id: UUID) throws {
-        let parameters = query(id)
-        if value.isEmpty { SecItemDelete(parameters as CFDictionary); return }
-        let data = Data(value.utf8)
-        var status = SecItemUpdate(parameters as CFDictionary, [kSecValueData as String: data] as CFDictionary)
-        if status == errSecItemNotFound {
-            var entry = parameters; entry[kSecValueData as String] = data; entry[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-            status = SecItemAdd(entry as CFDictionary, nil)
+        importing = true
+        cancel()
+        Task {
+            defer { importing = false }
+            do {
+                let incoming = try await Task.detached { try WorkspaceFile.load(from: url) }.value
+                let current = workspace
+                let merged = try await Task.detached { try WorkspaceImport.merging(incoming, into: current) }.value
+                guard workspace == current else {
+                    self.error = "The workspace changed during import. Nothing was imported; try again."
+                    return
+                }
+                workspace = merged
+            } catch {
+                lastFailure = DiagnosticFailure.classify(error)
+                self.error = "Import failed. The workspace has not been changed. \(error.localizedDescription)"
+            }
         }
-        guard status == errSecSuccess else { throw NSError(domain: NSOSStatusErrorDomain, code: Int(status), userInfo: [NSLocalizedDescriptionKey: "Keychain could not save a credential (\(status))."]) }
     }
+
 }

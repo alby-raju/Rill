@@ -34,7 +34,7 @@ def render(rows):
     lines = [
         '# Capability register', '',
         'Audit date: 2026-10-24. Reference: supplied Relay 1.0.0 archive. Baseline Rill: `abd4371`.', '',
-        f'{len(rows)} tracked capabilities. **Partial** means a subset exists in Rill, not that parity is established. **Planned** means no dedicated implementation has been verified. No baseline row is marked parity-complete.', '',
+        f'{len(rows)} tracked capabilities. **Partial** means a subset exists in Rill, not that parity is established. **Planned** means no dedicated implementation has been verified. **Verified** rows link Rill evidence; a verified row is not a claim of complete product parity.', '',
         'Each row is a required scope item, not a promise of full protocol/specification conformance. A row becomes **verified** only with linked Rill implementation, tests and any necessary manual evidence. Approved intentional differences use **deviation** with rationale and owner approval; they never disappear from the register.', '',
         'The authoritative editable checklist is [capabilities.csv](capabilities.csv). This readable register is generated from it. Evidence keys resolve to source paths and hashes in [reference-inventory.json](reference-inventory.json); the original archive is deliberately not committed.', '',
         'See [roadmap](../../ROADMAP.md) for sequencing and dependencies.', '',

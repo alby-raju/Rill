@@ -54,7 +54,8 @@ final class RequestEngineTests: XCTestCase {
         let restored = try WorkspaceFile.load(from: file)
         XCTAssertEqual(restored.requests, workspace.requests)
         workspace.requests.append(workspace.requests[0])
-        try WorkspaceFile.save(workspace, to: file)
+        XCTAssertThrowsError(try WorkspaceFile.save(workspace, to: file))
+        try JSONEncoder().encode(workspace).write(to: file)
         XCTAssertThrowsError(try WorkspaceFile.load(from: file))
     }
 }
