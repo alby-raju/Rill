@@ -20,9 +20,12 @@ The bundle is written to `dist/Rill.app`. It is ad-hoc signed for local developm
 
 ## Implemented
 
-- Native split-view workspace with collection navigation, searchable requests, editable names, duplication, deletion and collection assignment.
+- Native adaptive split-view workspace with collection CRUD, request ordering, global search and templates.
+- Persistent request tabs, pin/reopen, separate unsaved drafts, explicit Save/Discard/Cancel and two-second recovery checkpoints.
 - HTTP methods, query parameters, headers, text/JSON/XML/form-encoded bodies, JSON formatting, Basic and Bearer auth.
-- Environment variables using `{{name}}`, explicit errors for unresolved values, and enable/disable controls.
+- Inherited environments and bounded nested `{{name}}` expansion with explicit missing/cyclic-variable errors.
+- Native body editor with syntax colors, line numbers, find, zoom, wrap, undo and variable suggestions; lossless JSON formatting.
+- Secret-scrubbed `.rillbackup` workspace/draft backups and restore with a retained pre-restore copy.
 - Ephemeral URLSession execution, 1–300 second timeout, cancellation, default system TLS verification and a 16 MiB response limit.
 - Response body, formatted JSON, selectable text, copy/export, headers, status, latency and size.
 - Status and body-contains checks.
@@ -37,7 +40,7 @@ Requests are sent only when you choose Send. A fresh workspace has no preconfigu
 
 Workspace: `~/Library/Application Support/Rill/workspace.json`.
 
-Auth-tab credentials use Keychain service `app.rill.credentials`. Headers, URLs, usernames, bodies and environment values are stored as entered, including any secrets you type there. Exports include those values. Response history is session-only. Avoid credentials in URLs and use the Auth tab for tokens/passwords.
+Saved Auth-tab credentials use Keychain service `app.rill.credentials`; draft credentials use `app.rill.drafts`. Draft checkpoints are separate in `editor-session.json` beside the workspace. Headers, URLs, usernames, bodies and environment values are stored as entered, including any secrets you type there. Exports include those values. Response history is session-only. Avoid credentials in URLs and use the Auth tab for tokens/passwords.
 
 ## Verification
 
@@ -51,7 +54,7 @@ The suite covers request preparation, validated/conflict-aware persistence, tran
 
 ## Roadmap
 
-The first [M0 reliability slice](docs/milestones/M0.md) adds bounded storage, stale-writer protection, visible save states and allowlisted diagnostics.
+[M0 reliability](docs/milestones/M0.md) and [M1 workspace/recovery](docs/milestones/M1.md) document implementation, tests and outstanding manual acceptance.
 
 See the [phased roadmap](ROADMAP.md), [122-capability register](docs/roadmap/CAPABILITIES.md) and [acceptance journeys](docs/roadmap/ACCEPTANCE.md) for the path to Relay-level workflow breadth. The audit records missing functionality and supported-subset boundaries without incorporating the original code.
 

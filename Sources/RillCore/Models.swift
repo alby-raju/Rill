@@ -34,6 +34,7 @@ public struct RequestCollection: Codable, Identifiable, Equatable, Sendable {
 }
 public struct Environment: Codable, Identifiable, Equatable, Sendable {
     public var id = UUID()
+    public var parentID: UUID?
     public var name: String
     public var variables: [Field] = []
     public init(name: String) { self.name = name }

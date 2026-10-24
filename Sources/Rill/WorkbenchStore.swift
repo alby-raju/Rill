@@ -5,78 +5,132 @@ import UniformTypeIdentifiers
 @MainActor final class WorkbenchStore: ObservableObject {
     @Published var workspace = Workspace.starter {
         didSet {
-            guard !loading, workspace.needsSave(comparedTo: oldValue) else { return }
-            let previousRequest = oldValue.requests.first { $0.id == selection }
-            let previousEnvironment = oldValue.environments.first { $0.id == oldValue.selectedEnvironmentID }
-            if previousRequest != selected || previousEnvironment != environment {
-                response = nil
-                cancel()
-            }
-            hasUnsavedChanges = true
-            persist()
+            guard !loading, !applyingWorkspace, workspace.needsSave(comparedTo: oldValue) else { return }
+            let previous = editor.request(selection, in: oldValue)
+            let oldEnvironment = try? resolvedEnvironment(in: oldValue)
+            if previous != selected || oldEnvironment != environment { response = nil; cancel() }
+            hasUnsavedChanges = true; persist()
         }
     }
-    @Published var selection: UUID? { didSet { if oldValue != selection { response = nil; cancel() } } }
+    @Published var editor = EditorSessionState() {
+        didSet { if !loading { checkpointNeeded = true; checkpointGeneration = UUID() } }
+    }
+    @Published var selection: UUID? {
+        didSet {
+            guard oldValue != selection else { return }
+            response = nil; cancel()
+            if !loading {
+                if let selection { attempt { try editor.open(selection) } }
+                else { editor.activeID = nil }
+            }
+        }
+    }
     @Published var response: Exchange?
     @Published var error: String?
     @Published var running = false
     @Published var search = ""
+    @Published var focusedCollectionID: UUID?
+    @Published var inspectedHistoryID: UUID?
     @Published var showEnvironments = false
     @Published var showHistory = false
     @Published var showPalette = false
     @Published var persistenceAvailable = true
-    private var task: Task<Void, Never>?
     @Published var persistenceHealth: PersistenceHealth = .loading
     @Published var loading = true
     @Published var importing = false
     @Published var closing = false
     @Published private(set) var hasUnsavedChanges = false
-    private var lastFailure: DiagnosticFailure?
+    @Published private(set) var checkpointFailed = false
+    private(set) var quitCancelled = false
+    private var task: Task<Void, Never>?
     private var saveTask: Task<Void, Never>?
     private var saveGeneration = UUID()
     private var activeContext: UUID?
+    private var lastFailure: DiagnosticFailure?
+    private var applyingWorkspace = false
+    private var checkpointNeeded = false
+    private var checkpointGeneration = UUID()
+    private var checkpointAvailable = true
     private let persistence: WorkspaceSession
+    private let editorPersistence: EditorSessionPersistence
+    private let directory: URL
+
     init() {
-        let file = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Rill/workspace.json")
-        persistence = WorkspaceSession(url: file)
+        directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Rill")
+        persistence = WorkspaceSession(url: directory.appendingPathComponent("workspace.json"))
+        editorPersistence = EditorSessionPersistence(url: directory.appendingPathComponent("editor-session.json"))
         Task {
             defer { loading = false }
             do {
                 workspace = try await persistence.open()
-                selection = workspace.requests.first?.id
                 persistenceHealth = .saved
+                do {
+                    editor = try await editorPersistence.open(in: workspace)
+                    if editor.drafts.contains(where: { editor.isDirty($0.id, in: workspace) }) {
+                        let alert = NSAlert()
+                        alert.messageText = "Recover unsaved requests?"
+                        alert.informativeText = "Draft checkpoints are separate from saved requests. Review recovered edits before saving, especially if another instance changed the workspace."
+                        alert.addButton(withTitle: "Recover Drafts")
+                        alert.addButton(withTitle: "Discard Recovered Drafts")
+                        if alert.runModal() == .alertSecondButtonReturn {
+                            editor.drafts.removeAll()
+                            try await editorPersistence.checkpoint(editor, workspace: workspace)
+                        }
+                    }
+                    selection = editor.activeID
+                } catch {
+                    checkpointAvailable = false; checkpointFailed = true
+                    editor = EditorSessionState()
+                    if let id = workspace.requests.first?.id { try editor.open(id); selection = id }
+                    self.error = "The saved workspace opened, but draft recovery is unavailable. The original checkpoint is preserved. \(error.localizedDescription)"
+                }
             } catch {
-                persistenceAvailable = false
-                persistenceHealth = .failed
+                persistenceAvailable = false; persistenceHealth = .failed
                 lastFailure = DiagnosticFailure.classify(error)
-                self.error = "Could not open the workspace. Saving is paused and the existing file is preserved. \(error.localizedDescription)"
+                self.error = "Could not open the workspace. Saving is paused and the original file is preserved. \(error.localizedDescription)"
+            }
+        }
+        Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(2))
+                guard let self else { return }
+                if !self.importing && !self.closing { _ = await self.checkpoint() }
             }
         }
     }
+    var selected: RequestDraft? { editor.request(selection, in: workspace) }
+    var environment: RillCore.Environment? { try? resolvedEnvironment(in: workspace) }
+    var dirtyCount: Int { editor.drafts.filter { editor.isDirty($0.id, in: workspace) }.count }
+    var canEdit: Bool { !loading && !importing && !closing }
     var saveStatus: String {
+        if checkpointFailed { return "Draft checkpoint failed · edits retained in memory" }
+        if dirtyCount > 0 { return "\(dirtyCount) unsaved draft\(dirtyCount == 1 ? "" : "s") · recovery checkpoints every 2s" }
         switch persistenceHealth {
-        case .loading: "Opening workspace…"
-        case .saved: "All changes saved"
-        case .pending: "Unsaved changes"
-        case .saving: "Saving…"
-        case .failed: "Save failed · edits retained in memory"
-        case .conflict: "Workspace conflict · saving paused"
+        case .loading: return "Opening workspace…"
+        case .saved: return "All changes saved"
+        case .pending: return "Unsaved workspace changes"
+        case .saving: return "Saving…"
+        case .failed: return "Save failed · edits retained in memory"
+        case .conflict: return "Workspace conflict · saving paused"
         }
     }
-    var selected: RequestDraft? { workspace.requests.first { $0.id == selection } }
-    var environment: RillCore.Environment? { workspace.environments.first { $0.id == workspace.selectedEnvironmentID } }
+    private func resolvedEnvironment(in workspace: Workspace) throws -> RillCore.Environment? {
+        guard let id = workspace.selectedEnvironmentID else { return nil }
+        return try EnvironmentResolver.resolve(id, in: workspace.environments)
+    }
+    func attempt(_ operation: () throws -> Void) {
+        do { try operation() } catch { self.error = error.localizedDescription }
+    }
     func update(_ request: RequestDraft) {
-        guard let index = workspace.requests.firstIndex(where: { $0.id == request.id }) else { return }
-        workspace.requests[index] = request
-        persist()
+        guard canEdit else { return }
+        cancel(); response = nil
+        attempt { try editor.update(request, savedIn: workspace) }
     }
     func persist() {
         guard !loading, persistenceAvailable, hasUnsavedChanges else { return }
         saveTask?.cancel()
-        let generation = UUID()
-        saveGeneration = generation
-        let snapshot = workspace
-        persistenceHealth = .pending
+        let generation = UUID(); saveGeneration = generation
+        let snapshot = workspace; persistenceHealth = .pending
         saveTask = Task {
             do {
                 try await Task.sleep(for: .milliseconds(250))
@@ -86,39 +140,150 @@ import UniformTypeIdentifiers
             } catch is CancellationError { }
             catch {
                 guard saveGeneration == generation else { return }
-                lastFailure = DiagnosticFailure.classify(error)
-                if (error as? WorkspaceError) == .conflict {
-                    persistenceAvailable = false
-                    persistenceHealth = .conflict
-                } else { persistenceHealth = .failed }
-                self.error = "Could not save. Your edits are retained in memory. \(error.localizedDescription)"
+                persistenceFailure(error)
             }
         }
     }
-    func newRequest(in collection: UUID? = nil) {
-        guard !loading, !importing, !closing else { return }
-        let request = RequestDraft(collectionID: collection ?? workspace.collections.first?.id)
-        workspace.requests.append(request); selection = request.id; response = nil; persist()
+    private func persistenceFailure(_ failure: Error) {
+        lastFailure = DiagnosticFailure.classify(failure)
+        if (failure as? WorkspaceError) == .conflict { persistenceAvailable = false; persistenceHealth = .conflict }
+        else { persistenceHealth = .failed }
+        error = "Could not save. In-memory edits are retained. \(failure.localizedDescription)"
+    }
+    private func saveWorkspaceNow() async -> Bool {
+        if loading || !hasUnsavedChanges { return true }
+        guard persistenceAvailable else { return false }
+        saveTask?.cancel(); saveGeneration = UUID(); persistenceHealth = .saving
+        do {
+            try await persistence.save(workspace)
+            persistenceHealth = .saved; hasUnsavedChanges = false
+            return true
+        } catch { persistenceFailure(error); return false }
+    }
+    @discardableResult func checkpoint() async -> Bool {
+        guard !loading, checkpointNeeded else { return true }
+        guard checkpointAvailable else { return false }
+        let generation = checkpointGeneration
+        var snapshot = editor
+        snapshot.baseRevision = await persistence.currentRevision()
+        let workspace = workspace
+        do {
+            try await editorPersistence.checkpoint(snapshot, workspace: workspace)
+            if generation == checkpointGeneration { checkpointNeeded = false }
+            checkpointFailed = false
+            return true
+        } catch {
+            if !checkpointFailed { self.error = "Could not checkpoint drafts. In-memory edits are retained. \(error.localizedDescription)" }
+            checkpointFailed = true
+            if (error as? WorkspaceError) == .conflict { checkpointAvailable = false }
+            return false
+        }
+    }
+    func newRequest(in collection: UUID? = nil, template: RequestTemplate? = nil) {
+        guard canEdit else { return }
+        let id = collection ?? focusedCollectionID ?? workspace.collections.first?.id
+        let request = template?.make(in: id) ?? RequestDraft(collectionID: id)
+        workspace.requests.append(request); selection = request.id
     }
     func newCollection() {
-        guard !loading, !importing, !closing else { return }
-        let collection = RequestCollection(name: "New collection")
-        workspace.collections.append(collection); newRequest(in: collection.id)
+        guard canEdit else { return }
+        workspace.collections.append(RequestCollection(name: "New collection"))
+    }
+    func renameCollection(_ collection: RequestCollection) {
+        let alert = NSAlert(); alert.messageText = "Rename collection"
+        let field = NSTextField(string: collection.name); field.frame = NSRect(x: 0, y: 0, width: 280, height: 24)
+        alert.accessoryView = field; alert.addButton(withTitle: "Rename"); alert.addButton(withTitle: "Cancel")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        attempt { try WorkspaceOperations.renameCollection(collection.id, to: field.stringValue, in: &workspace) }
+    }
+    func deleteCollection(_ collection: RequestCollection) {
+        let associated = Set((workspace.requests + editor.drafts).filter { $0.collectionID == collection.id }.map(\.id))
+        let count = associated.count
+        let alert = NSAlert(); alert.messageText = "Delete \(collection.name)?"
+        alert.informativeText = "This removes \(count) request(s), their open tabs and any associated unsaved drafts."
+        alert.addButton(withTitle: "Cancel"); alert.addButton(withTitle: "Delete Collection")
+        guard alert.runModal() == .alertSecondButtonReturn else { return }
+        attempt {
+            let removed = try WorkspaceOperations.deleteCollection(collection.id, in: &workspace)
+            editor.remove(removed.union(associated)); selection = editor.activeID
+        }
     }
     func duplicate(_ request: RequestDraft) {
-        var copy = request; copy.id = UUID(); copy.name += " copy"
-        workspace.requests.append(copy); selection = copy.id; persist()
+        guard canEdit else { return }
+        attempt {
+            // Duplicate the visible draft rather than silently losing its settings.
+            var copy = request; copy.id = UUID(); copy.name += " copy"
+            workspace.requests.append(copy); selection = copy.id
+        }
     }
     func delete(_ request: RequestDraft) {
-        workspace.requests.removeAll { $0.id == request.id }
-        if selection == request.id { selection = workspace.requests.first?.id; response = nil }
-        persist()
+        let alert = NSAlert(); alert.messageText = "Delete \(request.name)?"
+        alert.informativeText = "The saved request and its unsaved draft will be removed."
+        alert.addButton(withTitle: "Cancel"); alert.addButton(withTitle: "Delete Request")
+        guard alert.runModal() == .alertSecondButtonReturn else { return }
+        workspace.requests.removeAll { $0.id == request.id }; editor.remove([request.id]); selection = editor.activeID
+    }
+    func reorder(_ id: UUID, target: UUID, after: Bool) { attempt { try WorkspaceOperations.move(id, before: target, after: after, in: &workspace) } }
+    func reorderSelected(_ offset: Int) { if let selection { attempt { try WorkspaceOperations.move(selection, offset: offset, in: &workspace) } } }
+    func togglePin(_ id: UUID) { if editor.pinnedTabs.contains(id) { editor.pinnedTabs.remove(id) } else { editor.pinnedTabs.insert(id) } }
+    func closeTab(_ id: UUID, force: Bool = false) {
+        guard force || !editor.pinnedTabs.contains(id) else { return }
+        if editor.isDirty(id, in: workspace) {
+            let alert = NSAlert(); alert.messageText = "Save changes before closing?"
+            alert.addButton(withTitle: "Cancel"); alert.addButton(withTitle: "Discard"); alert.addButton(withTitle: "Save")
+            switch alert.runModal() {
+            case .alertSecondButtonReturn: editor.discard(id)
+            case .alertThirdButtonReturn:
+                Task { if await saveDrafts([id]) { closeTab(id, force: force) } }; return
+            default: return
+            }
+        }
+        attempt { try editor.close(id, in: workspace, force: force); selection = editor.activeID }
+    }
+    func reopenTab() { attempt { try editor.reopen(in: workspace); selection = editor.activeID } }
+    func saveSelected() { if let selection, canEdit { Task { _ = await saveDrafts([selection]) } } }
+    private func saveDrafts(_ ids: Set<UUID>) async -> Bool {
+        guard persistenceAvailable else { return false }
+        let drafts = editor.drafts.filter { ids.contains($0.id) }
+        if drafts.isEmpty { return true }
+        importing = true; cancel(); saveTask?.cancel(); saveGeneration = UUID()
+        defer { importing = false }
+        var updated = workspace
+        for draft in drafts {
+            if let index = updated.requests.firstIndex(where: { $0.id == draft.id }) { updated.requests[index] = draft }
+            else { updated.requests.append(draft) }
+        }
+        do {
+            try await persistence.save(updated)
+            applyingWorkspace = true; workspace = updated; applyingWorkspace = false
+            persistenceHealth = .saved; hasUnsavedChanges = false
+            for id in ids { editor.discard(id) }
+            _ = await checkpoint()
+            return true
+        } catch { persistenceFailure(error); return false }
+    }
+    func flushPendingChanges() async -> Bool {
+        quitCancelled = false
+        if loading { return true }
+        if dirtyCount > 0 {
+            let alert = NSAlert(); alert.messageText = "Save unsaved request drafts?"
+            alert.informativeText = "Recovery checkpoints do not replace explicitly saving requests."
+            alert.addButton(withTitle: "Cancel Quit"); alert.addButton(withTitle: "Discard Drafts"); alert.addButton(withTitle: "Save All")
+            switch alert.runModal() {
+            case .alertSecondButtonReturn: editor.drafts.removeAll()
+            case .alertThirdButtonReturn: if !(await saveDrafts(Set(editor.drafts.map(\.id)))) { return false }
+            default: quitCancelled = true; return false
+            }
+        }
+        guard await saveWorkspaceNow() else { return false }
+        return await checkpoint()
     }
     func send() {
-        guard !loading, !importing, !closing, !running, let draft = selected else { return }
-        let environment = environment
-        let context = ExecutionContext(request: draft, environment: environment)
-        activeContext = context.id
+        guard canEdit, !running, let draft = selected else { return }
+        let environment: RillCore.Environment?
+        do { environment = try resolvedEnvironment(in: workspace) }
+        catch { self.error = error.localizedDescription; return }
+        let context = ExecutionContext(request: draft, environment: environment); activeContext = context.id
         running = true; response = nil
         task = Task {
             defer { if activeContext == context.id { running = false; task = nil; activeContext = nil } }
@@ -128,7 +293,6 @@ import UniformTypeIdentifiers
                 guard activeContext == context.id else { return }
                 if context.matches(request: selected, environment: self.environment) { response = exchange }
                 workspace.history.insert(exchange, at: 0)
-                // Bound both payload memory and exchange count.
                 while workspace.history.count > ResourceLimits.historyCount || workspace.history.reduce(0, { $0 + $1.body.count }) > ResourceLimits.historyBytes { workspace.history.removeLast() }
             } catch is CancellationError { }
             catch let failure as URLError where failure.code == .cancelled { }
@@ -144,66 +308,95 @@ import UniformTypeIdentifiers
         task?.cancel(); task = nil; activeContext = nil; running = false
         if wasRunning { lastFailure = .cancelled }
     }
-    func flushPendingChanges() async -> Bool {
-        if loading || !hasUnsavedChanges { return true }
-        guard persistenceAvailable else { return false }
-        saveTask?.cancel()
-        saveGeneration = UUID()
-        persistenceHealth = .saving
-        do {
-            try await persistence.save(workspace)
-            persistenceHealth = .saved
-            hasUnsavedChanges = false
-            return true
-        } catch {
-            lastFailure = DiagnosticFailure.classify(error)
-            persistenceHealth = (error as? WorkspaceError) == .conflict ? .conflict : .failed
-            return false
+    func searchResults(_ query: String) -> [WorkspaceSearchResult] {
+        var effective = workspace
+        for draft in editor.drafts {
+            if let index = effective.requests.firstIndex(where: { $0.id == draft.id }) { effective.requests[index] = draft }
+            else { effective.requests.append(draft) }
+        }
+        return WorkspaceSearch.results(query, in: effective)
+    }
+    func activateSearch(_ result: WorkspaceSearchResult) {
+        switch result.kind {
+        case .request: selection = result.targetID
+        case .collection:
+            search = ""; focusedCollectionID = result.targetID; selection = workspace.requests.first { $0.collectionID == result.targetID }?.id
+        case .environment: workspace.selectedEnvironmentID = result.targetID; showEnvironments = true
+        case .history:
+            inspectedHistoryID = result.targetID; showHistory = true
         }
     }
     func exportDiagnostics() {
         let panel = NSSavePanel(); panel.nameFieldStringValue = "Rill-diagnostics.json"; panel.allowedContentTypes = [.json]
         guard panel.runModal() == .OK, let url = panel.url else { return }
         let diagnostics = SupportDiagnostics(workspace: workspace, persistence: persistenceHealth, lastFailure: lastFailure)
-        Task {
-            do { try await Task.detached { try diagnostics.write(to: url) }.value }
-            catch { self.error = "Could not export diagnostics." }
-        }
+        Task { do { try await Task.detached { try diagnostics.write(to: url) }.value } catch { self.error = "Could not export diagnostics." } }
     }
     func exportWorkspace() {
-        guard !loading, !importing, !closing else { return }
+        guard canEdit else { return }
         let panel = NSSavePanel(); panel.nameFieldStringValue = "Rill-workspace.json"; panel.allowedContentTypes = [.json]
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        var exported = workspace; exported.history = []
-        for index in exported.requests.indices { exported.requests[index].credential = "" }
-        let snapshot = exported
-        Task {
-            do { try await Task.detached { try WorkspaceFile.save(snapshot, to: url) }.value }
-            catch { lastFailure = DiagnosticFailure.classify(error); self.error = error.localizedDescription }
-        }
+        var snapshot = workspace; snapshot.history = []
+        for index in snapshot.requests.indices { snapshot.requests[index].credential = "" }
+        let exported = snapshot
+        Task { do { try await Task.detached { try WorkspaceFile.save(exported, to: url) }.value } catch { self.error = error.localizedDescription } }
     }
     func importWorkspace() {
-        guard !loading, !importing, !closing else { return }
-        let panel = NSOpenPanel(); panel.allowedContentTypes = [.json]; panel.allowsMultipleSelection = false
+        guard canEdit else { return }
+        let panel = NSOpenPanel(); panel.allowedContentTypes = [.json]
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        importing = true
-        cancel()
+        importing = true; cancel()
         Task {
             defer { importing = false }
             do {
                 let incoming = try await Task.detached { try WorkspaceFile.load(from: url) }.value
                 let current = workspace
                 let merged = try await Task.detached { try WorkspaceImport.merging(incoming, into: current) }.value
-                guard workspace == current else {
-                    self.error = "The workspace changed during import. Nothing was imported; try again."
-                    return
-                }
+                guard workspace == current else { self.error = "Workspace changed during import. Try again."; return }
                 workspace = merged
+            } catch { self.error = "Import failed without applying changes. \(error.localizedDescription)" }
+        }
+    }
+    func createBackup() {
+        guard canEdit else { return }
+        let alert = NSAlert(); alert.messageText = "Create workspace backup"
+        alert.informativeText = "Auth passwords and tokens are omitted. URLs, headers, bodies and environment values remain as entered and may contain sensitive data."
+        alert.addButton(withTitle: "Cancel"); alert.addButton(withTitle: "Workspace Only"); alert.addButton(withTitle: "Include Drafts")
+        let choice = alert.runModal(); guard choice != .alertFirstButtonReturn else { return }
+        let panel = NSSavePanel(); panel.nameFieldStringValue = "Rill-workspace.rillbackup"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        let snapshot = workspace, session = choice == .alertThirdButtonReturn ? editor : nil
+        Task { do { try await Task.detached { try WorkspaceBackup.write(workspace: snapshot, editor: session, to: url) }.value } catch { self.error = error.localizedDescription } }
+    }
+    func restoreBackup() {
+        guard canEdit else { return }
+        let panel = NSOpenPanel()
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        importing = true; cancel(); saveTask?.cancel(); saveGeneration = UUID()
+        Task {
+            defer { importing = false }
+            var restoreAttempted = false
+            do {
+                let contents = try await Task.detached { try WorkspaceBackup.load(from: url) }.value
+                let alert = NSAlert(); alert.messageText = "Replace this workspace?"
+                alert.informativeText = "Restore \(contents.workspace.collections.count) collection(s), \(contents.workspace.requests.count) request(s) and \(contents.editor?.drafts.count ?? 0) draft(s). Current editors will be replaced. A pre-restore backup will be retained locally. Auth secrets are not in this backup; matching local Keychain entries are retained."
+                alert.addButton(withTitle: "Cancel"); alert.addButton(withTitle: "Restore Backup")
+                guard alert.runModal() == .alertSecondButtonReturn else { persist(); return }
+                guard await saveWorkspaceNow() else { return }
+                let previous = directory.appendingPathComponent("backups/before-restore-\(UUID().uuidString).rillbackup")
+                restoreAttempted = true
+                let restored = try await persistence.restore(contents, retainingPreviousAt: previous, editor: editor)
+                applyingWorkspace = true; workspace = restored; applyingWorkspace = false
+                persistenceHealth = .saved; hasUnsavedChanges = false
+                var fresh = contents.editor ?? EditorSessionState()
+                try fresh.reconcile(with: restored)
+                editor = fresh; selection = fresh.activeID
+                do { editor = try await editorPersistence.restore(fresh, workspace: restored); checkpointNeeded = false }
+                catch { persistenceAvailable = false; checkpointAvailable = false; checkpointFailed = true; self.error = "Workspace restored, but session recovery could not be updated. The prior checkpoint and pre-restore backup are preserved." }
             } catch {
-                lastFailure = DiagnosticFailure.classify(error)
-                self.error = "Import failed. The workspace has not been changed. \(error.localizedDescription)"
+                if restoreAttempted { persistenceAvailable = false; checkpointAvailable = false; persistenceHealth = .failed }
+                self.error = "Restore did not complete. Original or pre-restore data is retained. Reopen Rill before retrying if saving is paused. \(error.localizedDescription)"
             }
         }
     }
-
 }

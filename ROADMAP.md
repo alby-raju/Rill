@@ -16,11 +16,11 @@ The inventory demonstrates that every scoped file has a roadmap owner. It does n
 
 ## Current position
 
-Rill has a SwiftUI workspace, basic HTTP request composition/execution, flat environments, Basic/Bearer credentials in Keychain, status/body checks, Rill JSON import/export and session-only history. Its 10 existing tests and the GitHub macOS build/test workflow pass. The UI, installed app, Keychain prompts and advanced protocol interoperability have not been manually signed off.
+Rill has a SwiftUI workspace, basic HTTP request composition/execution, inherited environments, Basic/Bearer credentials in Keychain, status/body checks, Rill JSON import/export and session-only history. Its 56 automated tests and the GitHub macOS build/test workflow pass. The UI, installed app, Keychain prompts and advanced protocol interoperability have not been manually signed off.
 
 This is a narrow foundation, not a percentage-complete implementation of Relay. Some apparent similarities are incomplete: a raw form-encoded body is not a structured form editor; selecting a GraphQL content payload is not an IDE; saving JSON is not a recoverable workspace; generic headers do not replace reusable API-key/OAuth/TLS tools.
 
-Statuses are `planned`, `partial`, `verified`, or `deviation`. The initial audit marked no rows verified; current progress and evidence are tracked in the capability register and [M0 implementation record](docs/milestones/M0.md). A verified row needs linked code, automated behavior evidence and manual evidence where needed. A deviation needs owner approval and a documented replacement/omission with its user impact. A deadline or a release label cannot turn planned work into verified work.
+Statuses are `planned`, `partial`, `verified`, or `deviation`. The initial audit marked no rows verified; current progress and evidence are tracked in the capability register and the [M0](docs/milestones/M0.md) and [M1](docs/milestones/M1.md) implementation records. A verified row needs linked code, automated behavior evidence and manual evidence where needed. A deviation needs owner approval and a documented replacement/omission with its user impact. A deadline or a release label cannot turn planned work into verified work.
 
 ## Delivery sequence
 

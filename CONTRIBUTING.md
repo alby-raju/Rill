@@ -12,7 +12,7 @@ Rill is an independent native Swift/macOS implementation. Use the roadmap capabi
 
 ## Changes and evidence
 
-Work on a feature branch and open a PR. Preserve the repository owner's administrator-bypass and one-review configuration. `Build and test on macOS` is the required aggregate CI check; it must succeed across all matrix jobs for ordinary merges. Administrator bypass is an owner-controlled exception, not an implementation workflow to use automatically.
+Work on a feature branch and open a PR. Preserve the repository owner's administrator-bypass and one-review configuration. `Build and test on macOS` is the required aggregate CI check; it must succeed across all matrix jobs for ordinary merges. Administrator bypass is owner-controlled. On 2026-10-24 the owner explicitly authorized the implement → PR → successful CI → administrator merge → continue workflow for this roadmap; preserve the one-review and bypass settings.
 
 Run:
 

@@ -49,6 +49,7 @@ public enum WorkspaceFile {
                   request.timeout.isFinite, request.timeout > 0 else { throw WorkspaceError.invalidStructure }
         }
         for environment in workspace.environments {
+            _ = try EnvironmentResolver.resolve(environment.id, in: workspace.environments)
             guard fieldsValid(environment.variables) else { throw WorkspaceError.invalidStructure }
         }
         // History may intentionally outlive a deleted request.
@@ -59,7 +60,7 @@ public enum WorkspaceFile {
         }
     }
 
-    public static func decode(_ data: Data) throws -> Workspace {
+    static func checkJSONBounds(_ data: Data) throws {
         guard data.count <= ResourceLimits.workspaceBytes else { throw WorkspaceError.tooLarge }
         // Bound nesting before asking the JSON decoder to allocate its tree.
         var depth = 0, inString = false, escaped = false
@@ -74,6 +75,10 @@ public enum WorkspaceFile {
                 if depth > ResourceLimits.jsonDepth { throw WorkspaceError.tooDeep }
             } else if byte == 125 || byte == 93 { depth -= 1 }
         }
+    }
+
+    public static func decode(_ data: Data) throws -> Workspace {
+        try checkJSONBounds(data)
         // Version 1 is the initial supported schema. Future migrations must be
         // explicit; unknown schemas are never normalized and overwritten.
         let workspace: Workspace
@@ -112,6 +117,17 @@ public enum WorkspaceFile {
         try atomicWrite(data, to: url)
     }
 
+    static func createNew(_ data: Data, at url: URL) throws {
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let descriptor = Darwin.open(url.path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0o600)
+        guard descriptor >= 0 else { throw WorkspaceError.unavailable }
+        let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+        var complete = false
+        defer { try? handle.close(); if !complete { try? FileManager.default.removeItem(at: url) } }
+        try handle.write(contentsOf: data); try handle.synchronize(); try handle.close()
+        complete = true
+    }
+
     static func atomicWrite(_ data: Data, to url: URL) throws {
         let directory = url.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -129,7 +145,7 @@ public enum WorkspaceFile {
 
 /// A content revision prevents stale application instances from replacing a
 /// newer file. The lock covers read/compare/rename across cooperating processes.
-public struct WorkspaceRevision: Equatable, Sendable {
+public struct WorkspaceRevision: Codable, Equatable, Sendable {
     let digest: String?
     public static let absent = WorkspaceRevision(digest: nil)
     init(data: Data) { digest = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined() }
@@ -182,11 +198,16 @@ public struct WorkspaceRepository: Sendable {
     }
 
     private func locked<T>(_ operation: () throws -> T) throws -> T {
+        try WorkspaceFileLock.withLock(at: url, operation)
+    }
+}
+
+internal enum WorkspaceFileLock {
+    static func withLock<T>(at url: URL, _ operation: () throws -> T) throws -> T {
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         let descriptor = Darwin.open(url.appendingPathExtension("lock").path, O_RDWR | O_CREAT | O_NOFOLLOW, 0o600)
         guard descriptor >= 0 else { throw WorkspaceError.unavailable }
         defer { Darwin.close(descriptor) }
-        // A nonblocking advisory lock fails visibly rather than freezing an actor.
         guard flock(descriptor, LOCK_EX | LOCK_NB) == 0 else { throw WorkspaceError.unavailable }
         defer { flock(descriptor, LOCK_UN) }
         return try operation()

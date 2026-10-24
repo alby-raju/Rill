@@ -18,7 +18,9 @@ The archive documents a much larger product than this first native build. These 
 - WebSocket, SSE, gRPC, MQTT, Kafka and AMQP clients.
 - Collection runner, extraction/chaining, scripting, matrix/load tests and CI reports.
 - Schema/contract validation, mocks, scanners, workspace Git and sharing.
-- Persistent request tabs, request ordering, environment inheritance, collection rename/delete and an independent CLI.
+- An independent CLI.
+
+[M1](milestones/M1.md) implements persistent tabs, separate drafts, ordering, inherited environments and native backups. Manual interaction/Keychain acceptance remains pending.
 - Distribution icon, Developer ID signing, notarization, accessibility audit and UI verification on supported macOS releases.
 
 The new HTTP foundation should be exercised against local fixtures before adding protocol transports. Protocol clients should use independently chosen maintained libraries rather than wrapping or embedding the old application. The name is a working product identity; trademark and distribution availability have not been checked.
