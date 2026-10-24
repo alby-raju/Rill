@@ -208,7 +208,7 @@ struct RequestEditor: View {
                                     Spacer()
                                     Button("Format JSON") { formatBody() }.disabled(request.contentType != "application/json")
                                 }
-                                CodeEditor(text: $request.body, contentType: request.contentType, completions: InputSuggestions.variables(in: store.environment))
+                                CodeEditor(text: $request.body, contentType: request.contentType, completions: InputSuggestions.variables(in: store.environment)).id(request.id)
                             }.padding(16)
                         case "Auth":
                             Form {
