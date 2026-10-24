@@ -31,7 +31,7 @@ The bundle is written to `dist/Rill.app`. It is ad-hoc signed for local developm
 - Safe JSON/XML/HTML-source/text/binary/raster previews, raw export, response metadata, prepared-request inspector and transport timeline.
 - Status and body-contains checks.
 - Configurable response/preview/history budgets; opt-in durable redacted snapshots (bodies omitted by default), per-exchange inspection and exact semantic JSON comparison.
-- Validated, conflict-aware background workspace persistence and Rill JSON import/export with regenerated identities.
+- Validated, conflict-aware background workspace persistence and Rill JSON import/export with a reviewed import plan and regenerated identities.
 - Named TLS trust profiles, custom anchors and Keychain client identities; explicit per-profile insecure development mode.
 - Explicit OAuth2 client-credentials and browser PKCE acquisition into named Keychain tokens.
 - Authentication credentials in macOS Keychain; reusable auth profiles and named `{{secret:name}}` values with a read-only `RILL_SECRET_` process fallback. Credentials are excluded from exported workspaces.

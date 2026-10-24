@@ -50,6 +50,23 @@ public actor WorkspaceSession {
             }
         }
     }
+    /// Native import adds fresh identities with no credentials. Commit metadata
+    /// without unnecessary companion-store writes, then publish the accepted value.
+    public func applyImport(_ plan: WorkspaceImportPlan, current: Workspace) throws -> Workspace {
+        try Task.checkCancellation()
+        guard let revision else { throw WorkspaceError.unavailable }
+        let updated = try plan.applying(to: current)
+        for request in updated.requests {
+            if plan.addedRequestIDs.contains(request.id) {
+                guard request.credential.isEmpty else { throw WorkspaceError.invalidStructure }
+            } else { guard credentials[request.id] == request.credential else { throw WorkspaceError.conflict } }
+        }
+        var disk = updated; disk.history = []
+        for index in disk.requests.indices { disk.requests[index].credential = "" }
+        self.revision = try repository.commit(disk, expecting: revision)
+        for id in plan.addedRequestIDs { credentials[id] = "" }
+        return updated
+    }
     public func currentRevision() -> WorkspaceRevision? { revision }
 
     public func restore(_ contents: BackupContents, retainingPreviousAt previous: URL, editor: EditorSessionState?) throws -> Workspace {
