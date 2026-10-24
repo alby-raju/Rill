@@ -30,7 +30,7 @@ public enum PostmanExporter {
     }
     private static func item(_ input: RequestDraft, include: Bool) throws -> [String: Any] {
         try Task.checkCancellation()
-        guard input.authProfileID == nil, input.tlsProfileID == nil,
+        guard input.graphql == nil, input.authProfileID == nil, input.tlsProfileID == nil,
               Set(input.headers.map { $0.name.lowercased() }).count == input.headers.count, input.headers.allSatisfy({ HTTPEncoding.isHeaderName($0.name) }) else { throw ForeignExportError.unsupported }
         var sensitive: Set<String> = ["authorization", "proxy-authorization", "cookie", "set-cookie", "x-api-key", "api-key"]
         if input.auth == .apiKey, input.apiKeyLocation != .query, let name = input.apiKeyName { sensitive.insert(name.lowercased()) }

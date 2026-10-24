@@ -57,6 +57,7 @@ public struct RequestDraft: Codable, Identifiable, Equatable, Sendable {
     public var foreignScripts: [ForeignScriptSource]?
     public var assertions: [ResponseAssertion]?
     public var extractions: [ResponseExtraction]?
+    public var graphql: GraphQLConfiguration?
     public var apiLink: APIRequestLink?
     public var preHook: RequestHook?
     public var postHook: RequestHook?

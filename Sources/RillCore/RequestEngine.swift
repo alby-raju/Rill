@@ -93,7 +93,12 @@ public enum RequestEngine {
             request.setValue(value, forHTTPHeaderField: name)
         }
         let body: Data?
-        switch draft.bodyMode {
+        if let graphql = draft.graphql {
+            guard draft.method == .POST else { throw GraphQLError.invalidInput }
+            let encoded = try Data(ResponseJSON.encoded(GraphQL.payload(graphql, resolve: expand)).utf8)
+            guard encoded.count <= 4 * 1024 * 1024 else { throw WorkflowError.limit }
+            body = encoded
+        } else { switch draft.bodyMode {
         case .none?: body = nil
         case .form?:
             let fields = try (draft.formFields ?? []).filter { $0.enabled && !$0.name.isEmpty }.map {
@@ -104,12 +109,13 @@ public enum RequestEngine {
         case .text?: body = Data(try expand(draft.body).utf8)
         case nil: body = draft.body.isEmpty ? nil : Data(try expand(draft.body).utf8)
         }
+        }
         if let body {
             guard draft.method != .GET && draft.method != .HEAD else { throw RillError.unsupportedBodyMethod }
             request.httpBody = body
-            let type = draft.bodyMode == .form ? "application/x-www-form-urlencoded" : try expand(draft.contentType)
+            let type = draft.graphql != nil ? "application/json" : draft.bodyMode == .form ? "application/x-www-form-urlencoded" : try expand(draft.contentType)
             guard !hasInvalidHeaderValue(type) else { throw RillError.invalidHeader("Content-Type") }
-            if draft.bodyMode == .form {
+            if draft.bodyMode == .form || draft.graphql != nil {
                 // A structured encoder owns its wire content type.
                 request.setValue(type, forHTTPHeaderField: "Content-Type")
             } else if request.value(forHTTPHeaderField: "Content-Type") == nil { request.setValue(type, forHTTPHeaderField: "Content-Type") }
@@ -133,7 +139,7 @@ public enum RequestEngine {
     }
     public static func freeze(_ input: RequestDraft, environment: Environment?, profiles: [AuthenticationProfile] = [], secrets: NamedSecretResolver? = nil) throws -> PreparedHTTPRequest {
         let draft = try AuthenticationProfiles.applying(to: input, profiles: profiles)
-        guard draft.bodyMode == .multipart || draft.bodyMode == .binary else { return PreparedHTTPRequest(request: try prepare(draft, environment: environment, secrets: secrets)) }
+        guard draft.graphql == nil && (draft.bodyMode == .multipart || draft.bodyMode == .binary) else { return PreparedHTTPRequest(request: try prepare(draft, environment: environment, secrets: secrets)) }
         guard draft.method != .GET && draft.method != .HEAD else { throw RillError.unsupportedBodyMethod }
         var headersOnly = draft; headersOnly.bodyMode = RequestBodyMode.none
         var request = try prepare(headersOnly, environment: environment, secrets: secrets)
@@ -175,6 +181,12 @@ public enum RequestEngine {
         if !draft.expectedStatus.isEmpty { checks.append(CheckResult(title: "Status equals \(draft.expectedStatus)", passed: Int(draft.expectedStatus) == http.statusCode)) }
         if !draft.bodyContains.isEmpty { checks.append(CheckResult(title: "Body contains \(draft.bodyContains)", passed: String(data: data, encoding: .utf8)?.contains(draft.bodyContains) == true)) }
         checks += ResponseRules.evaluate(draft.assertions ?? [], response: Exchange(requestID: draft.id, requestName: draft.name, method: draft.method, url: http.url?.absoluteString ?? "", status: http.statusCode, duration: 0, headers: headers, body: data, checks: []))
+        if draft.graphql != nil {
+            if let result = try? GraphQL.result(data) {
+                checks.append(CheckResult(title: "GraphQL response envelope", passed: result.valid))
+                checks.append(CheckResult(title: "GraphQL server errors", passed: result.errors.isEmpty))
+            } else { checks.append(CheckResult(title: "GraphQL response envelope invalid", passed: false)) }
+        }
         if let contract { checks += contract.responseChecks(Exchange(requestID: draft.id, requestName: draft.name, method: draft.method, url: http.url?.absoluteString ?? "", status: http.statusCode, duration: 0, headers: headers, body: data, checks: [])) }
         var summary = PreparedRequestSummary(request); summary.tlsPolicy = tlsProfile?.mode.rawValue ?? TLSMode.system.rawValue
         let elapsed = ProcessInfo.processInfo.systemUptime - start
@@ -182,7 +194,7 @@ public enum RequestEngine {
     }
 }
 
-private final class HTTPTransportDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+final class HTTPTransportDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
     let prepared: PreparedHTTPRequest
     let profile: TLSProfile?
     let identity: SecIdentity?
