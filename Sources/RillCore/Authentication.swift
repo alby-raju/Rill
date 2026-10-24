@@ -1,12 +1,13 @@
 import Foundation
 
 public enum AuthenticationError: LocalizedError {
-    case missingProfile, invalidName, missingSecret, readOnlyProvider
+    case missingProfile, invalidName, missingSecret, expiredToken, readOnlyProvider
     public var errorDescription: String? {
         switch self {
         case .missingProfile: "The selected authentication profile is missing. Select another profile or choose request-specific auth."
         case .invalidName: "Secret names must be 1–128 ASCII letters, digits, dots, hyphens or underscores."
         case .missingSecret: "The referenced secret is missing or empty. Update the native secret or the RILL_SECRET_ process provider."
+        case .expiredToken: "The OAuth access token expired. Acquire a new token before sending."
         case .readOnlyProvider: "Process-environment secrets are read-only. Change them before starting Rill."
         }
     }
@@ -20,6 +21,8 @@ public struct AuthenticationProfile: Codable, Identifiable, Equatable, Sendable 
     public var id = UUID()
     public var name = "New profile"
     public var kind: AuthKind = .bearer
+    public var oauth: OAuthConfiguration?
+    public var tokenExpiresAt: Date?
     public var username = ""
     public var secretName = ""
     public var apiKeyName = ""
@@ -30,6 +33,7 @@ public enum AuthenticationProfiles {
     public static func applying(to draft: RequestDraft, profiles: [AuthenticationProfile]) throws -> RequestDraft {
         guard let id = draft.authProfileID else { return draft }
         guard let profile = profiles.first(where: { $0.id == id }) else { throw AuthenticationError.missingProfile }
+        if profile.kind == .bearer, profile.oauth != nil, let expiration = profile.tokenExpiresAt, expiration <= Date() { throw AuthenticationError.expiredToken }
         var result = draft
         result.authProfileID = nil
         result.auth = profile.kind; result.username = profile.username

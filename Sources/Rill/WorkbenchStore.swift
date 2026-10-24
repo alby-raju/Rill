@@ -31,6 +31,10 @@ import UniformTypeIdentifiers
     @Published var search = ""
     @Published var focusedCollectionID: UUID?
     @Published var inspectedHistoryID: UUID?
+    @Published var oauthRunning = false
+    @Published var oauthStatus = ""
+    private var oauthTask: Task<Void, Never>?
+    private var oauthGeneration: UUID?
     @Published var showAuthentication = false
     @Published var showEnvironments = false
     @Published var showHistory = false
@@ -103,7 +107,7 @@ import UniformTypeIdentifiers
     var selected: RequestDraft? { editor.request(selection, in: workspace) }
     var environment: RillCore.Environment? { try? resolvedEnvironment(in: workspace) }
     var dirtyCount: Int { editor.drafts.filter { editor.isDirty($0.id, in: workspace) }.count }
-    var canEdit: Bool { !loading && !importing && !closing }
+    var canEdit: Bool { !loading && !importing && !closing && !oauthRunning }
     var saveStatus: String {
         if checkpointFailed { return "Draft checkpoint failed · edits retained in memory" }
         if dirtyCount > 0 { return "\(dirtyCount) unsaved draft\(dirtyCount == 1 ? "" : "s") · recovery checkpoints every 2s" }
@@ -311,6 +315,56 @@ import UniformTypeIdentifiers
         let wasRunning = running
         task?.cancel(); task = nil; activeContext = nil; running = false
         if wasRunning { lastFailure = .cancelled }
+    }
+    func cancelOAuth() {
+        oauthTask?.cancel(); oauthTask = nil; oauthGeneration = nil; oauthRunning = false; oauthStatus = "Authorization cancelled"
+    }
+    func acquireOAuth(profileID: UUID, browser: Bool) {
+        guard canEdit, persistenceAvailable, let profile = workspace.authProfiles?.first(where: { $0.id == profileID }), let configuration = profile.oauth else { return }
+        do {
+            let tokenKey = try NamedSecretResolver.environmentKey(for: profile.secretName)
+            guard !(workspace.namedSecrets ?? []).contains(where: { $0.name != profile.secretName && (try? NamedSecretResolver.environmentKey(for: $0.name)) == tokenKey }) else { throw OAuthError.invalidConfiguration }
+            if configuration.clientAuthentication != .none, try NamedSecretResolver.environmentKey(for: configuration.clientSecretName) == tokenKey { throw OAuthError.invalidConfiguration }
+        } catch { self.error = error.localizedDescription; return }
+        let secrets = NamedSecretResolver(catalog: workspace.namedSecrets ?? [])
+        let generation = UUID(); oauthGeneration = generation; oauthRunning = true; cancel()
+        oauthStatus = browser ? "Waiting for browser authorization (3 minute limit)…" : "Requesting access token…"
+        oauthTask = Task {
+            do {
+                let token: OAuthToken
+                if browser {
+                    let pkce = try PKCEChallenge()
+                    let callback = OAuthCallbackReceiver(expectedState: pkce.state)
+                    do {
+                        let redirect = try await callback.start()
+                        let address = try OAuthClient.authorizationURL(configuration: configuration, redirect: redirect, pkce: pkce)
+                        try Task.checkCancellation()
+                        guard NSWorkspace.shared.open(address) else { throw OAuthError.invalidConfiguration }
+                        let code = try await callback.waitForCode()
+                        token = try await OAuthClient.acquire(configuration: configuration, secrets: secrets, code: code, redirect: redirect, verifier: pkce.verifier)
+                        await callback.stop()
+                    } catch { await callback.stop(); throw error }
+                } else {
+                    token = try await OAuthClient.acquire(configuration: configuration, secrets: secrets)
+                }
+                try Task.checkCancellation()
+                guard oauthGeneration == generation, let index = workspace.authProfiles?.firstIndex(where: { $0.id == profileID }), workspace.authProfiles?[index] == profile else { throw OAuthError.invalidConfiguration }
+                let secret = (workspace.namedSecrets ?? []).first { $0.name == profile.secretName } ?? NamedSecret(name: profile.secretName)
+                // Persist the token only to Keychain; metadata below contains no token bytes.
+                try await secretVault.set(token.accessToken, for: secret)
+                try Task.checkCancellation()
+                if !(workspace.namedSecrets ?? []).contains(where: { $0.id == secret.id }) {
+                    if workspace.namedSecrets == nil { workspace.namedSecrets = [] }
+                    workspace.namedSecrets?.append(secret)
+                }
+                workspace.authProfiles?[index].kind = .bearer
+                workspace.authProfiles?[index].tokenExpiresAt = token.expiresAt
+                oauthStatus = "Token stored in native Keychain" + (token.expiresAt == nil ? " (provider supplied no expiry)" : " with provider expiry")
+            } catch is CancellationError { if oauthGeneration == generation { oauthStatus = "Authorization cancelled" } }
+            catch let error as URLError where error.code == .cancelled { if oauthGeneration == generation { oauthStatus = "Authorization cancelled" } }
+            catch { if oauthGeneration == generation { self.error = "OAuth did not complete. \(error.localizedDescription)"; oauthStatus = "Authorization failed" } }
+            if oauthGeneration == generation { oauthRunning = false; oauthTask = nil; oauthGeneration = nil }
+        }
     }
     func setNamedSecret(name: String, value: String, replacing id: UUID? = nil) {
         guard canEdit, persistenceAvailable else { return }

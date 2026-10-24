@@ -58,6 +58,7 @@ typealias ViewState<Value> = SwiftUI.State<Value>
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard let store else { return .terminateNow }
         guard !store.importing else { store.error = "Wait for the workspace operation to finish before quitting."; return .terminateCancel }
+        store.cancelOAuth()
         store.closing = true
         store.cancel()
         Task {
