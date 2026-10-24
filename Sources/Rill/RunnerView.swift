@@ -106,13 +106,13 @@ struct RunnerView: View {
                 let profiles = snapshot.authProfiles ?? [], secrets = NamedSecretResolver(catalog: snapshot.namedSecrets ?? []), tls = snapshot.tlsProfiles ?? []
                 if selectedMode == "Matrix" {
                     let environments = try snapshot.environments.filter { ids.contains($0.id) }.map { try EnvironmentResolver.resolve($0.id, in: snapshot.environments) }
-                    let result = try await MatrixRunner.run(requests: selectedRequests, environments: environments, concurrency: parallel, configuration: config, profiles: profiles, secrets: secrets, tlsProfiles: tls)
+                    let result = try await MatrixRunner.run(requests: selectedRequests, environments: environments, concurrency: parallel, configuration: config, profiles: profiles, secrets: secrets, tlsProfiles: tls, definitions: snapshot.apiDefinitions ?? [])
                     if generation == id { matrix = result }
                 } else if selectedMode == "Load", let request = selectedRequests.first(where: { $0.id == targetID }) {
-                    let result = try await LoadRunner.run(request: request, environment: environment, configuration: loadConfig, profiles: profiles, secrets: secrets, tlsProfiles: tls)
+                    let result = try await LoadRunner.run(request: request, environment: environment, configuration: loadConfig, profiles: profiles, secrets: secrets, tlsProfiles: tls, definitions: snapshot.apiDefinitions ?? [])
                     if generation == id { load = result }
                 } else {
-                    let result = try await CollectionRunner.run(requests: selectedRequests, environment: environment, configuration: config, profiles: profiles, secrets: secrets, tlsProfiles: tls, progress: { progress in
+                    let result = try await CollectionRunner.run(requests: selectedRequests, environment: environment, configuration: config, profiles: profiles, secrets: secrets, tlsProfiles: tls, definitions: snapshot.apiDefinitions ?? [], progress: { progress in
                         await MainActor.run { if generation == id { completed = progress.completed } }
                     })
                     if generation == id { report = result }

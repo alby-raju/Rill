@@ -64,7 +64,7 @@ public struct RunProgress: Sendable { public let completed: Int; public let requ
 public enum CollectionRunner {
     public typealias Executor = @Sendable (RequestDraft, [String: String]) async throws -> WorkflowStepResult
     public static func run(requests: [RequestDraft], environment: Environment?, configuration: RunConfiguration,
-                           profiles: [AuthenticationProfile] = [], secrets: NamedSecretResolver? = nil, tlsProfiles: [TLSProfile] = [],
+                           profiles: [AuthenticationProfile] = [], secrets: NamedSecretResolver? = nil, tlsProfiles: [TLSProfile] = [], definitions: [APIDefinitionSource] = [],
                            progress: (@Sendable (RunProgress) async -> Void)? = nil, executor: Executor? = nil) async throws -> RunReport {
         try configuration.validate()
         guard requests.count <= 10_000, requests.count * configuration.iterations <= 10_000, Set(requests.map(\.id)).count == requests.count else { throw WorkflowError.invalidConfiguration }
@@ -74,7 +74,7 @@ public enum CollectionRunner {
         var variables = WorkflowEngine.variables(in: environment), retained = 0, retainedChecks = 0
         try WorkflowEngine.validateVariables(variables)
         let execute: Executor = executor ?? { request, values in
-            try await WorkflowEngine.execute(request, variables: values, profiles: profiles, secrets: secrets, tlsProfiles: tlsProfiles)
+            try await WorkflowEngine.execute(request, variables: values, profiles: profiles, secrets: secrets, tlsProfiles: tlsProfiles, definitions: definitions)
         }
         func pause(_ milliseconds: Int) async throws {
             try Task.checkCancellation()

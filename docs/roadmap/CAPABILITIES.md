@@ -115,15 +115,15 @@ See [roadmap](../../ROADMAP.md) for sequencing and dependencies.
 
 | ID | Stage | Rill baseline/status | Capability | Acceptance evidence required | Reference keys | Rill verification / decision |
 | --- | --- | --- | --- | --- | --- | --- |
-| SPEC-01 | M5 | planned | OpenAPI 3.x and Swagger 2 loading | Load local JSON/YAML and explicit URLs; handle folded/literal blocks, BOM, anchors/aliases/flow maps with bounded parsing; report unsupported/malformed paths. | DOC-USER;TEST-openapi |  |
-| SPEC-02 | M5 | planned | Definition-to-request generation | Generate grouped requests from tags/operations, server variables, path/query/header parameters, examples/schema samples, local references and Basic/Bearer/API-key/OAuth2/OpenID auth metadata. | DOC-USER;TEST-openapi |  |
-| SPEC-03 | M5 | planned | Source identity and refresh preview | Persist source snapshots and generated identity; classify added/changed/removed/config-only drift; show plan before apply and preserve unchanged locally edited requests. | DOC-USER;DOC-ROADMAP;TEST-openapi;TEST-storage |  |
-| SPEC-04 | M5 | planned | Request and response contract checks | Validate required path/query/header/cookie parameters and request bodies, documented response status/media type and request/response schemas; missing headers and unknown unsupported rules must not pass silently. | DOC-ROADMAP;TEST-openapi |  |
-| SPEC-05 | M5 | planned | Explicit JSON Schema subset workbench | Support type/required/properties/enum/const/items/additionalProperties, numeric/string/array bounds, nullable, allOf/anyOf/oneOf and local refs; publish unsupported keywords and external-ref policy. | DOC-ROADMAP;CORE-openapi |  |
-| SPEC-06 | M5 | planned | Schema and example drift comparison | Detect operation response/shared-schema/example changes independent of formatting and preserve documented samples in mock/test generation. | DOC-ROADMAP;TEST-openapi |  |
-| SPEC-07 | M5 | planned | Linked positive contract test generation | Create at least one linked positive test per operation with documented success status; identify credentials/path/example gaps before run; do not claim negative-case coverage. | DOC-MODERN;TEST-modern |  |
-| MOCK-01 | M5 | planned | Local configurable mock server | Edit method/path/status/headers/body routes, bind explicitly, start/stop and recover from port conflicts without blocking UI; serve deterministic local fixtures. | DOC-USER;CORE-mock;TEST-v2 |  |
-| MOCK-02 | M5 | planned | Mocks from API definitions | Generate routes from documented response examples and bounded schema samples; preview changes and never imply complete schema conformance. | DOC-ROADMAP;CORE-mock |  |
+| SPEC-01 | M5 | partial | OpenAPI 3.x and Swagger 2 loading | Load local JSON/YAML and explicit URLs; handle folded/literal blocks, BOM, anchors/aliases/flow maps with bounded parsing; report unsupported/malformed paths. | DOC-USER;TEST-openapi | [M5 implementation and evidence](../milestones/M5.md) |
+| SPEC-02 | M5 | partial | Definition-to-request generation | Generate grouped requests from tags/operations, server variables, path/query/header parameters, examples/schema samples, local references and Basic/Bearer/API-key/OAuth2/OpenID auth metadata. | DOC-USER;TEST-openapi | [M5 implementation and evidence](../milestones/M5.md) |
+| SPEC-03 | M5 | partial | Source identity and refresh preview | Persist source snapshots and generated identity; classify added/changed/removed/config-only drift; show plan before apply and preserve unchanged locally edited requests. | DOC-USER;DOC-ROADMAP;TEST-openapi;TEST-storage | [M5 implementation and evidence](../milestones/M5.md) |
+| SPEC-04 | M5 | partial | Request and response contract checks | Validate required path/query/header/cookie parameters and request bodies, documented response status/media type and request/response schemas; missing headers and unknown unsupported rules must not pass silently. | DOC-ROADMAP;TEST-openapi | [M5 implementation and evidence](../milestones/M5.md) |
+| SPEC-05 | M5 | partial | Explicit JSON Schema subset workbench | Support type/required/properties/enum/const/items/additionalProperties, numeric/string/array bounds, nullable, allOf/anyOf/oneOf and local refs; publish unsupported keywords and external-ref policy. | DOC-ROADMAP;CORE-openapi | [M5 implementation and evidence](../milestones/M5.md) |
+| SPEC-06 | M5 | partial | Schema and example drift comparison | Detect operation response/shared-schema/example changes independent of formatting and preserve documented samples in mock/test generation. | DOC-ROADMAP;TEST-openapi | [M5 implementation and evidence](../milestones/M5.md) |
+| SPEC-07 | M5 | partial | Linked positive contract test generation | Create at least one linked positive test per operation with documented success status; identify credentials/path/example gaps before run; do not claim negative-case coverage. | DOC-MODERN;TEST-modern | [M5 implementation and evidence](../milestones/M5.md) |
+| MOCK-01 | M5 | partial | Local configurable mock server | Edit method/path/status/headers/body routes, bind explicitly, start/stop and recover from port conflicts without blocking UI; serve deterministic local fixtures. | DOC-USER;CORE-mock;TEST-v2 | [M5 implementation and evidence](../milestones/M5.md) |
+| MOCK-02 | M5 | partial | Mocks from API definitions | Generate routes from documented response examples and bounded schema samples; preview changes and never imply complete schema conformance. | DOC-ROADMAP;CORE-mock | [M5 implementation and evidence](../milestones/M5.md) |
 
 ## GraphQL and live streams
 
@@ -158,8 +158,8 @@ See [roadmap](../../ROADMAP.md) for sequencing and dependencies.
 
 | ID | Stage | Rill baseline/status | Capability | Acceptance evidence required | Reference keys | Rill verification / decision |
 | --- | --- | --- | --- | --- | --- | --- |
-| SCAN-01 | M5 | planned | Passive response-header checks | Evaluate HSTS, HTML CSP, sniffing and CORS hygiene with actionable evidence and limitations; findings are indicators rather than security certification. | DOC-MODERN;CORE-security;TEST-modern |  |
-| SCAN-02 | M5 | planned | Explicit bounded active probes | Opt-in GET/HEAD single-query quote/reflection probes and sequential rate sample capped at ten; validate target/method, cancel and disclose extra requests; no-429 is not proof of missing rate limits. | DOC-MODERN;TEST-modern |  |
+| SCAN-01 | M5 | partial | Passive response-header checks | Evaluate HSTS, HTML CSP, sniffing and CORS hygiene with actionable evidence and limitations; findings are indicators rather than security certification. | DOC-MODERN;CORE-security;TEST-modern | [M5 implementation and evidence](../milestones/M5.md) |
+| SCAN-02 | M5 | partial | Explicit bounded active probes | Opt-in GET/HEAD single-query quote/reflection probes and sequential rate sample capped at ten; validate target/method, cancel and disclose extra requests; no-429 is not proof of missing rate limits. | DOC-MODERN;TEST-modern | [M5 implementation and evidence](../milestones/M5.md) |
 
 ## Recovery, sharing and headless workflows
 

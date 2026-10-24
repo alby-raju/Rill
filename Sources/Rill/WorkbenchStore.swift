@@ -57,6 +57,7 @@ import UniformTypeIdentifiers
     @Published var showCommandImport = false
     @Published var showCommandExport = false
     @Published var showRunner = false
+    @Published var showAPITools = false
     @Published var showTLS = false
     @Published var showAuthentication = false
     @Published var showEnvironments = false
@@ -327,13 +328,14 @@ import UniformTypeIdentifiers
         } catch { self.error = error.localizedDescription; return }
         let settings = responseSettings
         let profiles = workspace.authProfiles ?? []
+        let definitions = workspace.apiDefinitions ?? []
         let secrets = NamedSecretResolver(catalog: workspace.namedSecrets ?? [])
         let context = ExecutionContext(request: draft, environment: environment); activeContext = context.id
         running = true; response = nil
         task = Task {
             defer { if activeContext == context.id { running = false; task = nil; activeContext = nil } }
             do {
-                let result = try await WorkflowEngine.execute(draft, variables: WorkflowEngine.variables(in: environment), budget: try ResponseBudget(downloadBytes: settings.downloadBytes, previewBytes: settings.previewBytes), profiles: profiles, secrets: secrets, tlsProfiles: tlsProfiles)
+                let result = try await WorkflowEngine.execute(draft, variables: WorkflowEngine.variables(in: environment), budget: try ResponseBudget(downloadBytes: settings.downloadBytes, previewBytes: settings.previewBytes), profiles: profiles, secrets: secrets, tlsProfiles: tlsProfiles, definitions: definitions)
                 let exchange = result.exchange
                 try Task.checkCancellation()
                 guard activeContext == context.id else { return }
@@ -555,6 +557,28 @@ import UniformTypeIdentifiers
                 }.value
             } catch { self.error = "Export did not complete. " + error.localizedDescription }
         }
+    }
+    func applyAPIDefinition(_ definition: APIDefinition, refreshing id: UUID?) async -> Bool {
+        guard canEdit, persistenceAvailable else { return false }
+        importing = true; cancel(); saveTask?.cancel(); saveGeneration = UUID()
+        defer { importing = false }
+        guard await saveWorkspaceNow() else { return false }
+        do {
+            let current = workspace
+            let plan = try await Task.detached { try APIImportPlan(definition, current: current, refreshing: id) }.value
+            let alert = NSAlert(); alert.messageText = id == nil ? "Import API definition?" : "Apply definition refresh?"
+            let counts = Dictionary(grouping: plan.changes, by: \.state).map { "\($0.key.rawValue): \($0.value.count)" }.sorted().joined(separator: " · ")
+            alert.informativeText = counts + "\n\nLocally edited requests are preserved. Removed locally edited requests are retained unlinked. Source snapshots/examples stay plain text."
+            let text = NSTextView(frame: NSRect(x: 0, y: 0, width: 570, height: 280)); text.isEditable = false
+            text.string = plan.changes.prefix(300).map { $0.state.rawValue + " · " + String($0.key.prefix(300)) }.joined(separator: "\n") + "\n\n" + plan.warnings.prefix(30).map { String($0.prefix(500)) }.joined(separator: "\n")
+            let scroll = NSScrollView(frame: text.frame); scroll.documentView = text; scroll.hasVerticalScroller = true; alert.accessoryView = scroll
+            alert.addButton(withTitle: "Cancel"); alert.addButton(withTitle: "Apply")
+            guard alert.runModal() == .alertSecondButtonReturn else { return false }
+            let updated = try await persistence.applyAPIPlan(plan, current: workspace)
+            applyingWorkspace = true; workspace = updated; applyingWorkspace = false
+            hasUnsavedChanges = false; persistenceHealth = .saved
+            return true
+        } catch { self.error = error.localizedDescription; return false }
     }
     func importForeign(_ format: ForeignImportFormat) {
         guard canEdit, persistenceAvailable else { return }

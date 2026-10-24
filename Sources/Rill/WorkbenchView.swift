@@ -38,6 +38,7 @@ struct WorkbenchView: View {
         .tint(accent)
         .sheet(isPresented: $store.showForeignScripts) { ForeignScriptReviewView().environmentObject(store) }
         .sheet(isPresented: $store.showCommandImport) { CommandImportView().environmentObject(store) }
+        .sheet(isPresented: $store.showAPITools) { APIToolsView().environmentObject(store) }
         .sheet(isPresented: $store.showRunner) { RunnerView().environmentObject(store) }
         .sheet(isPresented: $store.showCommandExport) { CommandExportView().environmentObject(store) }
         .sheet(isPresented: $store.showTLS) { TLSManagerView().environmentObject(store) }

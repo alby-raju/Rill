@@ -35,14 +35,14 @@ public struct LoadReport: Codable, Sendable {
 }
 public enum LoadRunner {
     public static func run(request: RequestDraft, environment: Environment?, configuration: LoadConfiguration,
-                           profiles: [AuthenticationProfile] = [], secrets: NamedSecretResolver? = nil, tlsProfiles: [TLSProfile] = [],
+                           profiles: [AuthenticationProfile] = [], secrets: NamedSecretResolver? = nil, tlsProfiles: [TLSProfile] = [], definitions: [APIDefinitionSource] = [],
                            executor: CollectionRunner.Executor? = nil) async throws -> LoadReport {
         try configuration.validate()
         let started = ProcessInfo.processInfo.systemUptime
         let values = WorkflowEngine.variables(in: environment)
         let budget = try ResponseBudget(downloadBytes: min(ResourceLimits.responseBytes, 32 * 1024 * 1024 / configuration.concurrency))
         let execute: CollectionRunner.Executor = executor ?? { draft, variables in
-            try await WorkflowEngine.execute(draft, variables: variables, budget: budget, profiles: profiles, secrets: secrets, tlsProfiles: tlsProfiles)
+            try await WorkflowEngine.execute(draft, variables: variables, budget: budget, profiles: profiles, secrets: secrets, tlsProfiles: tlsProfiles, definitions: definitions)
         }
         return await withTaskGroup(of: LatencySample.self) { group in
             func submit(_ index: Int) {

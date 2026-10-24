@@ -29,11 +29,11 @@ public enum WorkflowEngine {
     }
     public static func execute(_ request: RequestDraft, variables: [String: String], budget: ResponseBudget = .standard,
                                profiles: [AuthenticationProfile] = [], secrets: NamedSecretResolver? = nil,
-                               tlsProfiles: [TLSProfile] = []) async throws -> WorkflowStepResult {
+                               tlsProfiles: [TLSProfile] = [], definitions: [APIDefinitionSource] = []) async throws -> WorkflowStepResult {
         try Task.checkCancellation()
         let prepared = try prepare(request, variables: variables)
         var exchange = try await RequestEngine.execute(prepared.request, environment: environment(prepared.variables), budget: budget,
-                                                       profiles: profiles, secrets: secrets, tlsProfiles: tlsProfiles)
+                                                       profiles: profiles, secrets: secrets, tlsProfiles: tlsProfiles, definitions: definitions)
         exchange.checks += prepared.checks
         guard exchange.checks.allSatisfy(\.passed) else { return WorkflowStepResult(exchange: exchange, variables: variables, stop: false) }
         do {

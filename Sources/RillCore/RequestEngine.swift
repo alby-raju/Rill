@@ -146,15 +146,17 @@ public enum RequestEngine {
     private static func hasInvalidHeaderValue(_ value: String) -> Bool {
         value.unicodeScalars.contains { ($0.value < 32 && $0.value != 9) || $0.value == 127 }
     }
-    public static func execute(_ draft: RequestDraft, environment: Environment?, budget: ResponseBudget = .standard, profiles: [AuthenticationProfile] = [], secrets: NamedSecretResolver? = nil, tlsProfiles: [TLSProfile] = [], identities: any TLSIdentityProvider = SystemTLSIdentities()) async throws -> Exchange {
+    public static func execute(_ draft: RequestDraft, environment: Environment?, budget: ResponseBudget = .standard, profiles: [AuthenticationProfile] = [], secrets: NamedSecretResolver? = nil, tlsProfiles: [TLSProfile] = [], identities: any TLSIdentityProvider = SystemTLSIdentities(), definitions: [APIDefinitionSource] = [], followRedirects: Bool = true) async throws -> Exchange {
         try Task.checkCancellation()
         let tlsProfile = try TLSProfiles.selected(draft.tlsProfileID, from: tlsProfiles)
         let identity = try tlsProfile?.identityReference.map { try identities.identity(for: $0) }
         let frozen = try freeze(draft, environment: environment, profiles: profiles, secrets: secrets)
         defer { frozen.removeTemporaryBody() }
         let request = frozen.request
+        let contract = try APIContractContext(draft.apiLink, definitions: definitions)
+        if let contract { guard try contract.requestChecks(request).allSatisfy(\.passed) else { throw ContractError.requestRejected } }
         let configuration = HTTPClientConfiguration.make()
-        let session = URLSession(configuration: configuration, delegate: HTTPTransportDelegate(prepared: frozen, profile: tlsProfile, identity: identity), delegateQueue: nil)
+        let session = URLSession(configuration: configuration, delegate: HTTPTransportDelegate(prepared: frozen, profile: tlsProfile, identity: identity, followRedirects: followRedirects), delegateQueue: nil)
         defer { session.invalidateAndCancel() }
         let start = ProcessInfo.processInfo.systemUptime
         let (bytes, response) = try await session.bytes(for: request)
@@ -173,6 +175,7 @@ public enum RequestEngine {
         if !draft.expectedStatus.isEmpty { checks.append(CheckResult(title: "Status equals \(draft.expectedStatus)", passed: Int(draft.expectedStatus) == http.statusCode)) }
         if !draft.bodyContains.isEmpty { checks.append(CheckResult(title: "Body contains \(draft.bodyContains)", passed: String(data: data, encoding: .utf8)?.contains(draft.bodyContains) == true)) }
         checks += ResponseRules.evaluate(draft.assertions ?? [], response: Exchange(requestID: draft.id, requestName: draft.name, method: draft.method, url: http.url?.absoluteString ?? "", status: http.statusCode, duration: 0, headers: headers, body: data, checks: []))
+        if let contract { checks += contract.responseChecks(Exchange(requestID: draft.id, requestName: draft.name, method: draft.method, url: http.url?.absoluteString ?? "", status: http.statusCode, duration: 0, headers: headers, body: data, checks: [])) }
         var summary = PreparedRequestSummary(request); summary.tlsPolicy = tlsProfile?.mode.rawValue ?? TLSMode.system.rawValue
         let elapsed = ProcessInfo.processInfo.systemUptime - start
         return Exchange(requestID: draft.id, requestName: draft.name, method: draft.method, url: http.url?.absoluteString ?? request.url!.absoluteString, status: http.statusCode, duration: elapsed, headers: headers, body: data, checks: checks, preparedRequest: summary, previewLimit: budget.previewBytes, downloadLimit: budget.downloadBytes, events: [ExecutionEvent(elapsed: 0, title: "Prepared request; transport started"), ExecutionEvent(elapsed: headersElapsed, title: "Response headers received"), ExecutionEvent(elapsed: elapsed, title: "Response body complete")])
@@ -183,7 +186,8 @@ private final class HTTPTransportDelegate: NSObject, URLSessionTaskDelegate, @un
     let prepared: PreparedHTTPRequest
     let profile: TLSProfile?
     let identity: SecIdentity?
-    init(prepared: PreparedHTTPRequest, profile: TLSProfile?, identity: SecIdentity?) { self.prepared = prepared; self.profile = profile; self.identity = identity }
+    let followRedirects: Bool
+    init(prepared: PreparedHTTPRequest, profile: TLSProfile?, identity: SecIdentity?, followRedirects: Bool = true) { self.prepared = prepared; self.profile = profile; self.identity = identity; self.followRedirects = followRedirects }
     func urlSession(_ session: URLSession, task: URLSessionTask, didReceive challenge: URLAuthenticationChallenge, completionHandler: @escaping @Sendable (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
         switch challenge.protectionSpace.authenticationMethod {
         case NSURLAuthenticationMethodServerTrust:
@@ -206,6 +210,6 @@ private final class HTTPTransportDelegate: NSObject, URLSessionTaskDelegate, @un
             return "\(scheme)://\(host):\(url.port ?? (scheme == "https" ? 443 : 80))"
         }
         // Do not forward custom credential headers or replay bodies to another origin.
-        completionHandler(origin(request.url) == origin(prepared.request.url) ? request : nil)
+        completionHandler(followRedirects && origin(request.url) == origin(prepared.request.url) ? request : nil)
     }
 }

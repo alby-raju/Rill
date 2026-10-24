@@ -45,6 +45,10 @@ public enum WorkspaceFile {
               profiles.allSatisfy({ !$0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }),
               Set(try secrets.map { try NamedSecretResolver.environmentKey(for: $0.name) }).count == secrets.count else { throw WorkspaceError.invalidStructure }
         for secret in secrets { try NamedSecretResolver.validateName(secret.name) }
+        let sources = workspace.apiDefinitions ?? []
+        guard unique(sources.map(\.id)), sources.count <= 64, sources.allSatisfy({ $0.snapshot.count <= 8 * 1024 * 1024 && $0.location.utf8.count <= 4096 && $0.title.utf8.count <= 4096 }) else { throw WorkspaceError.invalidStructure }
+        let sourceIDs = Set(sources.map(\.id))
+        for source in sources { _ = try JSONValueParser(source.snapshot).parse() }
         let collections = Set(workspace.collections.map(\.id))
         let environments = Set(workspace.environments.map(\.id))
         guard unique(workspace.collections.map(\.id)), unique(workspace.requests.map(\.id)),
@@ -53,6 +57,9 @@ public enum WorkspaceFile {
             throw WorkspaceError.invalidStructure
         }
         for request in workspace.requests {
+            if let link = request.apiLink {
+                guard sourceIDs.contains(link.sourceID), link.operationKey.utf8.count <= 8192, link.baseline.count <= 2 * 1024 * 1024 else { throw WorkspaceError.invalidStructure }
+            }
             try ResponseRules.validate(request.assertions ?? [], request.extractions ?? [])
             for hook in [request.preHook, request.postHook].compactMap({ $0 }) { try HookRuntime.validateStorage(hook) }
             let scripts = request.foreignScripts ?? []

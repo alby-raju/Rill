@@ -18,7 +18,7 @@ public struct MatrixReport: Sendable {
 }
 public enum MatrixRunner {
     public static func run(requests: [RequestDraft], environments: [Environment], concurrency: Int, configuration: RunConfiguration,
-                           profiles: [AuthenticationProfile] = [], secrets: NamedSecretResolver? = nil, tlsProfiles: [TLSProfile] = []) async throws -> MatrixReport {
+                           profiles: [AuthenticationProfile] = [], secrets: NamedSecretResolver? = nil, tlsProfiles: [TLSProfile] = [], definitions: [APIDefinitionSource] = []) async throws -> MatrixReport {
         guard (1...16).contains(environments.count), (1...4).contains(concurrency), Set(environments.map(\.id)).count == environments.count else { throw WorkflowError.invalidConfiguration }
         try configuration.validate()
         var shared = configuration; shared.retentionBytes = min(configuration.retentionBytes, 32 * 1024 * 1024 / environments.count)
@@ -27,7 +27,7 @@ public enum MatrixRunner {
             func submit(_ index: Int) {
                 let environment = environments[index]
                 group.addTask {
-                    let report = try await CollectionRunner.run(requests: requests, environment: environment, configuration: settings, profiles: profiles, secrets: secrets, tlsProfiles: tlsProfiles)
+                    let report = try await CollectionRunner.run(requests: requests, environment: environment, configuration: settings, profiles: profiles, secrets: secrets, tlsProfiles: tlsProfiles, definitions: definitions)
                     return (index, MatrixRun(environmentID: environment.id, report: report))
                 }
             }

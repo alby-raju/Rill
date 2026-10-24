@@ -1,0 +1,7 @@
+# API definition parsing and contracts (2026-10-24)
+
+Reuse the existing exact pinned Yams 6.2.2/libyaml parser and its notices/resources. There is no new package/runtime. A separate preflight adds API-definition-only support for prior completed YAML anchors and aliases. Recursive/forward/duplicate anchors reject; expanded node/depth weights are computed before Yams builds the document. Limits remain 8 MiB, 100,000 events/expanded nodes, depth64 and 1 MiB/scalar; anchor names cap at128 bytes. Foreign workspace imports retain the default alias prohibition. Merge-key semantics are unsupported and must fail rather than silently changing schemas. Ordinary flow maps and literal/folded scalar blocks use the maintained parser.
+
+JSON uses the independently authored bounded parser with exact decimal normalization and literal UTF-8 keys. The JSON Schema workbench implements an explicit subset; unsupported keywords/external references cannot yield a pass. No schema/ref loading sends requests implicitly. Metadata snapshots may contain sensitive examples and stay plain text in native files/backups; reports omit instance values.
+
+Sources reviewed: [OpenAPI3.1.1](https://spec.openapis.org/oas/v3.1.1.html), [Swagger2](https://spec.openapis.org/oas/v2.0.html), [JSON Schema2020-12 validation vocabulary](https://json-schema.org/draft/2020-12/json-schema-validation). This subset is not full validation of any schema dialect. Existing Yams upgrade/removal gates apply. No implementation, test or asset from the original archive is reused.

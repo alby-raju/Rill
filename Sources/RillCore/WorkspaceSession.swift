@@ -109,6 +109,21 @@ public actor WorkspaceSession {
         for request in updated.requests where plan.requestIDs.contains(request.id) { credentials[request.id] = request.credential }
         return updated
     }
+    public func applyAPIPlan(_ plan: APIImportPlan, current: Workspace) throws -> Workspace {
+        try Task.checkCancellation()
+        guard let revision else { throw WorkspaceError.unavailable }
+        let updated = try plan.applying(to: current)
+        for request in updated.requests {
+            guard request.credential == (credentials[request.id] ?? "") else { throw WorkspaceError.conflict }
+        }
+        let retained = Set(updated.requests.map(\.id))
+        for (id, value) in credentials where !retained.contains(id) { guard value.isEmpty else { throw WorkspaceError.conflict } }
+        var disk = updated; disk.history = []
+        for index in disk.requests.indices { disk.requests[index].credential = "" }
+        self.revision = try repository.commit(disk, expecting: revision)
+        credentials = Dictionary(uniqueKeysWithValues: updated.requests.map { ($0.id, $0.credential) })
+        return updated
+    }
     public func currentRevision() -> WorkspaceRevision? { revision }
 
     public func restore(_ contents: BackupContents, retainingPreviousAt previous: URL, editor: EditorSessionState?) throws -> Workspace {
