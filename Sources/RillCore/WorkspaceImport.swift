@@ -7,6 +7,11 @@ public enum WorkspaceImport {
         try WorkspaceFile.validate(incoming)
         try WorkspaceFile.validate(existing)
         var result = existing
+        var sourceIDs: [UUID: UUID] = [:]
+        for var source in incoming.apiDefinitions ?? [] {
+            let old = source.id; source.id = UUID(); sourceIDs[old] = source.id
+            if result.apiDefinitions == nil { result.apiDefinitions = [] }; result.apiDefinitions?.append(source)
+        }
         var collections: [UUID: UUID] = [:]
         let tlsIDs = Dictionary(uniqueKeysWithValues: (incoming.tlsProfiles ?? []).map { ($0.id, UUID()) })
         for var profile in incoming.tlsProfiles ?? [] {
@@ -52,6 +57,7 @@ public enum WorkspaceImport {
             request.id = UUID()
             request.collectionID = request.collectionID.flatMap { collections[$0] }
             request.credential = ""
+            if let id = request.apiLink?.sourceID { request.apiLink?.sourceID = sourceIDs[id]!; request.apiLink?.baseline = Data() }
             request.preHook?.enabled = false; request.postHook?.enabled = false
             if let id = request.tlsProfileID { request.tlsProfileID = tlsIDs[id] ?? UUID() }
             if let id = request.authProfileID { request.authProfileID = profileIDs[id] ?? UUID() }

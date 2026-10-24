@@ -57,6 +57,7 @@ public struct RequestDraft: Codable, Identifiable, Equatable, Sendable {
     public var foreignScripts: [ForeignScriptSource]?
     public var assertions: [ResponseAssertion]?
     public var extractions: [ResponseExtraction]?
+    public var apiLink: APIRequestLink?
     public var preHook: RequestHook?
     public var postHook: RequestHook?
     public var expectedStatus = ""
@@ -124,6 +125,7 @@ public struct Workspace: Codable, Equatable, Sendable {
     public var collections: [RequestCollection] = []
     public var requests: [RequestDraft] = []
     public var environments: [Environment] = []
+    public var apiDefinitions: [APIDefinitionSource]?
     public var authProfiles: [AuthenticationProfile]?
     public var namedSecrets: [NamedSecret]?
     public var tlsProfiles: [TLSProfile]?

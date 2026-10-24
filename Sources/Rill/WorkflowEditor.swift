@@ -6,6 +6,13 @@ struct WorkflowEditor: View {
     @ViewState<String> private var stage = "Rules"
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
+            if request.apiLink != nil {
+                HStack {
+                    Toggle("Check linked API contract", isOn: Binding(get: { request.apiLink?.checkContract ?? false }, set: { request.apiLink?.checkContract = $0 }))
+                    Button("Unlink API source") { request.apiLink = nil }
+                }
+                Text(request.apiLink?.operationKey ?? "").font(.caption).foregroundStyle(.secondary)
+            }
             Picker("Workflow", selection: $stage) { Text("Rules and extraction").tag("Rules"); Text("Pre-request").tag("Pre"); Text("Post-response").tag("Post") }.pickerStyle(.segmented)
             if stage == "Rules" {
                 ScrollView {
