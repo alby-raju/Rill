@@ -45,7 +45,7 @@ public enum WorkspaceFile {
         }
         for request in workspace.requests {
             guard request.collectionID.map({ collections.contains($0) }) ?? true,
-                  fieldsValid(request.headers), fieldsValid(request.parameters),
+                  fieldsValid(request.headers), fieldsValid(request.parameters), fieldsValid(request.formFields ?? []),
                   request.timeout.isFinite, request.timeout > 0 else { throw WorkspaceError.invalidStructure }
         }
         for environment in workspace.environments {

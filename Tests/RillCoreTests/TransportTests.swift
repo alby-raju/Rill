@@ -52,4 +52,21 @@ import XCTest
         }
     }
 
+    func testStructuredFormAndAuthMatchPreparedWireRequest() async throws {
+        var request = try draft("/echo?existing=%2f")
+        request.method = .POST; request.bodyMode = .form
+        request.formFields = [Field(name: "name", value: "a+b c")]
+        request.auth = .apiKey; request.apiKeyName = "X-Key"; request.credential = "fixture-token"
+        let exchange = try await RequestEngine.execute(request, environment: nil)
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: exchange.body) as? [String: Any])
+        XCTAssertEqual(object["method"] as? String, "POST")
+        XCTAssertEqual(object["path"] as? String, "/echo?existing=%2f")
+        let body = try XCTUnwrap(Data(base64Encoded: try XCTUnwrap(object["body"] as? String)))
+        XCTAssertEqual(String(decoding: body, as: UTF8.self), "name=a%2Bb+c")
+        let headers = try XCTUnwrap(object["headers"] as? [String: String])
+        XCTAssertEqual(headers.first { $0.key.lowercased() == "x-key" }?.value, "fixture-token")
+        XCTAssertEqual(exchange.preparedRequest?.bodyBytes, body.count)
+        XCTAssertEqual(exchange.preparedRequest?.headers.first { $0.name.lowercased() == "x-key" }?.value, "[redacted]")
+    }
+
 }

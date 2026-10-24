@@ -24,7 +24,7 @@ struct ResponseView: View {
                 VStack(spacing: 12) { ProgressView().controlSize(.small); Text("Following the request…").font(.callout).foregroundStyle(.secondary) }.frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let exchange {
                 HStack {
-                    Picker("Response section", selection: $section) { Text("Body").tag("Body"); Text("Headers (\(exchange.headers.count))").tag("Headers"); Text("Checks (\(exchange.checks.count))").tag("Checks") }.pickerStyle(.segmented).frame(width: 310)
+                    Picker("Response section", selection: $section) { Text("Body").tag("Body"); Text("Headers (\(exchange.headers.count))").tag("Headers"); Text("Checks (\(exchange.checks.count))").tag("Checks"); Text("Request").tag("Request") }.pickerStyle(.segmented).frame(maxWidth: 440)
                     Spacer()
                     if section == "Body" { Toggle("Pretty JSON", isOn: $pretty).toggleStyle(.checkbox); Button { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(exchange.previewIsTruncated ? exchange.text : pretty ? exchange.prettyText : exchange.text, forType: .string) } label: { Image(systemName: "doc.on.doc") }.help("Copy response body"); Button { export(exchange) } label: { Image(systemName: "square.and.arrow.up") }.help("Export response") }
                 }.font(.caption).padding(.horizontal, 20).padding(.vertical, 10)
@@ -36,6 +36,18 @@ struct ResponseView: View {
                     ScrollView([.vertical, .horizontal]) { Text(exchange.previewText(pretty: pretty)).font(.system(size: fontSize, design: .monospaced)).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .topLeading).padding(20) }.frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if section == "Headers" {
                     List(exchange.headers) { field in HStack(alignment: .top) { Text(field.name).fontWeight(.medium).frame(width: 190, alignment: .leading); Text(field.value).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading); Button { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(field.value, forType: .string) } label: { Image(systemName: "doc.on.doc") }.buttonStyle(.plain).help("Copy header value") }.font(.system(size: 11, design: .monospaced)) }
+                } else if section == "Request" {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Effective response URL: " + exchange.url).textSelection(.enabled)
+                            if let summary = exchange.preparedRequest {
+                                Text(summary.method + " " + summary.url).textSelection(.enabled)
+                                Text("Prepared body: \(summary.bodyBytes.map { String($0) + " bytes" } ?? "none")")
+                                ForEach(summary.headers) { field in Text(field.name + ": " + field.value).textSelection(.enabled) }
+                            }
+                            Text("Initial prepared request before redirects and transport-added headers. Query values and custom header values are masked; URL paths and response URLs may still contain sensitive data. Timing is total elapsed time; DNS/connect/TLS phases are not measured.").foregroundStyle(.secondary)
+                        }.font(.system(size: fontSize, design: .monospaced)).frame(maxWidth: .infinity, alignment: .leading).padding(20)
+                    }
                 } else if exchange.checks.isEmpty {
                     ContentUnavailableView("No checks configured", systemImage: "checkmark.seal", description: Text("Add an expected status or body match in Checks."))
                 } else {

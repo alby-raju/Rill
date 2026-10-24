@@ -201,20 +201,19 @@ struct RequestEditor: View {
                         switch section {
                         case "Parameters": FieldEditor(fields: $request.parameters, noun: "parameter")
                         case "Headers": FieldEditor(fields: $request.headers, noun: "header")
-                        case "Body":
-                            VStack(spacing: 8) {
-                                HStack {
-                                    Picker("Content type", selection: $request.contentType) { Text("JSON").tag("application/json"); Text("Text").tag("text/plain"); Text("XML").tag("application/xml"); Text("Form encoded").tag("application/x-www-form-urlencoded") }.frame(width: 220)
-                                    Spacer()
-                                    Button("Format JSON") { formatBody() }.disabled(request.contentType != "application/json")
-                                }
-                                CodeEditor(text: $request.body, contentType: request.contentType, completions: InputSuggestions.variables(in: store.environment)).id(request.id)
-                            }.padding(16)
+                        case "Body": BodyComposer(request: $request)
                         case "Auth":
                             Form {
                                 Picker("Authentication", selection: $request.auth) { ForEach(AuthKind.allCases, id: \.self) { Text($0.rawValue).tag($0) } }
+                                if request.auth == .apiKey {
+                                    TextField("Key name", text: Binding(get: { request.apiKeyName ?? "" }, set: { request.apiKeyName = $0 }))
+                                    Picker("Send in", selection: Binding(get: { request.apiKeyLocation ?? .header }, set: { request.apiKeyLocation = $0 })) {
+                                        ForEach(APIKeyLocation.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                                    }
+                                }
                                 if request.auth == .basic { TextField("Username", text: $request.username) }
-                                if request.auth != .none { SecureField(request.auth == .bearer ? "Token or {{variable}}" : "Password", text: $request.credential); Text("Saved in macOS Keychain.").font(.caption).foregroundStyle(.secondary) }
+                                if request.auth != .none { SecureField(request.auth == .basic ? "Password" : "Token or {{variable}}", text: $request.credential); Text("Saved in macOS Keychain.").font(.caption).foregroundStyle(.secondary) }
+                                Text("Selected auth replaces a matching header or query key. Auth credentials are excluded from exports; ordinary fields are exported as entered.").font(.caption).foregroundStyle(.secondary)
                             }.padding(20)
                         default:
                             Form {

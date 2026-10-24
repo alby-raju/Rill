@@ -75,7 +75,7 @@ final class WorkspaceWorkflowTests: XCTestCase {
     func testNestedVariablesAcrossEveryRequestLayerAndCyclesFailBeforeSend() throws {
         var environment = Environment(name: "Local")
         environment.variables = [Field(name: "host", value: "example.invalid"), Field(name: "base", value: "https://{{host}}"), Field(name: "token", value: "{{value}}"), Field(name: "value", value: "secret")]
-        var request = RequestDraft(); request.url = "{{base}}/test"; request.auth = .bearer; request.credential = "{{token}}"; request.body = "{{token}}"
+        var request = RequestDraft(); request.method = .POST; request.url = "{{base}}/test"; request.auth = .bearer; request.credential = "{{token}}"; request.body = "{{token}}"
         request.parameters = [Field(name: "q", value: "{{token}}")]
         request.headers = [Field(name: "X-Test", value: "{{token}}")]
         let prepared = try RequestEngine.prepare(request, environment: environment)
