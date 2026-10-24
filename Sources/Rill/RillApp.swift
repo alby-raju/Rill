@@ -47,9 +47,10 @@ typealias ViewState<Value> = SwiftUI.State<Value>
         Settings {
             Form {
                 Picker("Appearance", selection: $appearance) { Text("System").tag("system"); Text("Light").tag("light"); Text("Dark").tag("dark") }
-                Text("Authentication tokens and passwords are stored in macOS Keychain. Headers, bodies, URLs and environment values are stored locally as entered. Response history is kept only for this session.")
+                Text("Authentication tokens and passwords are stored in macOS Keychain. Headers, bodies, URLs and environment values are stored locally as entered. Response history is session-only unless you explicitly enable durable snapshots below.")
                     .font(.callout).foregroundStyle(.secondary)
-            }.padding(24).frame(width: 450)
+                ResponseSettingsView().environmentObject(store)
+            }.padding(24).frame(width: 650, height: 650)
         }
     }
 }

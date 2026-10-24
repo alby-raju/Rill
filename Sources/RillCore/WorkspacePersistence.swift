@@ -53,7 +53,7 @@ public enum WorkspaceFile {
         for request in workspace.requests {
             guard request.collectionID.map({ collections.contains($0) }) ?? true,
                   fieldsValid(request.headers), fieldsValid(request.parameters), fieldsValid(request.formFields ?? []), unique((request.multipartParts ?? []).map(\.id)),
-                  request.timeout.isFinite, request.timeout > 0 else { throw WorkspaceError.invalidStructure }
+                  request.timeout.isFinite, (1...300).contains(request.timeout) else { throw WorkspaceError.invalidStructure }
         }
         for environment in workspace.environments {
             _ = try EnvironmentResolver.resolve(environment.id, in: workspace.environments)
@@ -61,8 +61,11 @@ public enum WorkspaceFile {
         }
         // History may intentionally outlive a deleted request.
         for exchange in workspace.history {
-            guard unique(exchange.checks.map(\.id)), fieldsValid(exchange.headers),
+            guard (exchange.events?.count ?? 0) <= 32, unique((exchange.events ?? []).map(\.id)), (exchange.events ?? []).allSatisfy({ $0.elapsed.isFinite && $0.elapsed >= 0 }), unique(exchange.checks.map(\.id)), fieldsValid(exchange.headers),
                   exchange.duration.isFinite, exchange.duration >= 0,
+                  exchange.downloadLimit.map({ (1...(256 * 1024 * 1024)).contains($0) }) ?? true,
+                  exchange.previewLimit.map({ (128...(8 * 1024 * 1024)).contains($0) }) ?? true,
+                  exchange.originalBodyBytes.map({ $0 >= exchange.body.count }) ?? true,
                   (100...599).contains(exchange.status) else { throw WorkspaceError.invalidStructure }
         }
     }
@@ -88,9 +91,17 @@ public enum WorkspaceFile {
         try checkJSONBounds(data)
         // Version 1 is the initial supported schema. Future migrations must be
         // explicit; unknown schemas are never normalized and overwritten.
-        let workspace: Workspace
+        var workspace: Workspace
         do { workspace = try JSONDecoder().decode(Workspace.self, from: data) }
         catch { throw WorkspaceError.invalidStructure }
+        // Version-one builds previously accepted positive values outside the
+        // effective transport range. Stage that known legacy normalization in
+        // memory; the original bytes change only on a successful atomic save.
+        if workspace.version == 1 {
+            for index in workspace.requests.indices where workspace.requests[index].timeout.isFinite && workspace.requests[index].timeout > 0 {
+                workspace.requests[index].timeout = min(max(workspace.requests[index].timeout, 1), 300)
+            }
+        }
         try validate(workspace)
         return workspace
     }

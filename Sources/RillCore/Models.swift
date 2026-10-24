@@ -16,6 +16,11 @@ public struct PreparedRequestSummary: Codable, Equatable, Sendable {
     public var url: String
     public var headers: [Field]
     public var bodyBytes: Int?
+    public var tlsPolicy: String?
+    public func write(to url: URL) throws {
+        let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        try WorkspaceFile.atomicWrite(encoder.encode(self), to: url)
+    }
     public init(_ request: URLRequest) {
         method = request.httpMethod ?? "GET"
         var components = request.url.flatMap { URLComponents(url: $0, resolvingAgainstBaseURL: false) }
@@ -71,6 +76,12 @@ public struct CheckResult: Codable, Identifiable, Equatable, Sendable {
     public var passed: Bool
     public init(title: String, passed: Bool) { self.title = title; self.passed = passed }
 }
+public struct ExecutionEvent: Codable, Identifiable, Equatable, Sendable {
+    public var id = UUID()
+    public var elapsed: Double
+    public var title: String
+    public init(elapsed: Double, title: String) { self.elapsed = elapsed; self.title = title }
+}
 public struct Exchange: Codable, Identifiable, Equatable, Sendable {
     public var id = UUID()
     public var date = Date()
@@ -84,18 +95,22 @@ public struct Exchange: Codable, Identifiable, Equatable, Sendable {
     public var body: Data
     public var checks: [CheckResult]
     public var preparedRequest: PreparedRequestSummary?
+    public var previewLimit: Int?
+    public var downloadLimit: Int?
+    public var originalBodyBytes: Int?
+    public var bodyWasTruncated: Bool?
+    public var events: [ExecutionEvent]?
+    public var previewByteLimit: Int { min(max(previewLimit ?? ResourceLimits.previewBytes, 128), 8 * 1024 * 1024) }
     public var text: String { String(data: body, encoding: .utf8) ?? "Binary response (\(body.count) bytes). Export to inspect." }
-    public var previewIsTruncated: Bool { body.count > ResourceLimits.previewBytes }
+    public var previewIsTruncated: Bool { body.count > previewByteLimit }
     public func previewText(pretty: Bool) -> String {
-        guard !previewIsTruncated else { return String(decoding: body.prefix(ResourceLimits.previewBytes), as: UTF8.self) }
+        guard !previewIsTruncated else { return String(decoding: body.prefix(previewByteLimit), as: UTF8.self) }
         return pretty ? prettyText : text
     }
     public var prettyText: String {
-        guard body.count <= ResourceLimits.previewBytes else { return previewText(pretty: false) }
-        guard let object = try? JSONSerialization.jsonObject(with: body, options: [.fragmentsAllowed]),
-              let data = try? JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys, .fragmentsAllowed]),
-              let text = String(data: data, encoding: .utf8) else { return text }
-        return text
+        guard body.count <= previewByteLimit, bodyWasTruncated != true else { return previewText(pretty: false) }
+        guard let raw = String(data: body, encoding: .utf8), let formatted = try? JSONTextFormatter.pretty(raw) else { return text }
+        return formatted
     }
 }
 public struct Workspace: Codable, Equatable, Sendable {

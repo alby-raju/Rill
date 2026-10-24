@@ -31,6 +31,24 @@ import UniformTypeIdentifiers
     @Published var search = ""
     @Published var focusedCollectionID: UUID?
     @Published var inspectedHistoryID: UUID?
+    @Published var responseSettings = ResponseSettings() {
+        didSet {
+            do { try responseSettings.validate() } catch { responseSettings = oldValue; self.error = error.localizedDescription; return }
+            if let data = try? JSONEncoder().encode(responseSettings) { UserDefaults.standard.set(data, forKey: "responseSettings") }
+            trimSessionHistory()
+            if responseSettings.recordSnapshots && !oldValue.recordSnapshots { Task { await loadDurableHistory() } }
+            if historyAvailable && (responseSettings.recordSnapshots || oldValue.recordSnapshots) {
+                let settings = responseSettings
+                Task {
+                    do { try await historyArchive.apply(settings: settings) }
+                    catch { historyAvailable = false; historyStatus = "Snapshot retention update failed; archive preserved"; self.error = error.localizedDescription }
+                }
+            }
+            if !responseSettings.recordSnapshots { historyStatus = "Durable snapshots disabled; existing archive retained" }
+        }
+    }
+    @Published var historyStatus = "Durable snapshots disabled"
+    private var historyAvailable = true
     @Published var oauthRunning = false
     @Published var oauthStatus = ""
     private var oauthTask: Task<Void, Never>?
@@ -57,6 +75,7 @@ import UniformTypeIdentifiers
     private var checkpointNeeded = false
     private var checkpointGeneration = UUID()
     private var checkpointAvailable = true
+    private let historyArchive: ExchangeHistory
     private let secretVault = NamedSecretVault()
     private let persistence: WorkspaceSession
     private let editorPersistence: EditorSessionPersistence
@@ -64,6 +83,8 @@ import UniformTypeIdentifiers
 
     init() {
         directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Rill")
+        historyArchive = ExchangeHistory(url: directory.appendingPathComponent("exchange-history.json"))
+        if let data = UserDefaults.standard.data(forKey: "responseSettings"), let settings = try? JSONDecoder().decode(ResponseSettings.self, from: data), (try? settings.validate()) != nil { responseSettings = settings }
         persistence = WorkspaceSession(url: directory.appendingPathComponent("workspace.json"))
         editorPersistence = EditorSessionPersistence(url: directory.appendingPathComponent("editor-session.json"))
         Task {
@@ -71,6 +92,7 @@ import UniformTypeIdentifiers
             do {
                 workspace = try await persistence.open()
                 persistenceHealth = .saved
+                if responseSettings.recordSnapshots { await loadDurableHistory() }
                 do {
                     editor = try await editorPersistence.open(in: workspace)
                     if editor.drafts.contains(where: { editor.isDirty($0.id, in: workspace) }) {
@@ -299,6 +321,7 @@ import UniformTypeIdentifiers
                 guard alert.runModal() == .alertSecondButtonReturn else { return }
             }
         } catch { self.error = error.localizedDescription; return }
+        let settings = responseSettings
         let profiles = workspace.authProfiles ?? []
         let secrets = NamedSecretResolver(catalog: workspace.namedSecrets ?? [])
         let context = ExecutionContext(request: draft, environment: environment); activeContext = context.id
@@ -306,12 +329,16 @@ import UniformTypeIdentifiers
         task = Task {
             defer { if activeContext == context.id { running = false; task = nil; activeContext = nil } }
             do {
-                let exchange = try await RequestEngine.execute(draft, environment: environment, profiles: profiles, secrets: secrets, tlsProfiles: tlsProfiles)
+                let exchange = try await RequestEngine.execute(draft, environment: environment, budget: try ResponseBudget(downloadBytes: settings.downloadBytes, previewBytes: settings.previewBytes), profiles: profiles, secrets: secrets, tlsProfiles: tlsProfiles)
                 try Task.checkCancellation()
                 guard activeContext == context.id else { return }
                 if context.matches(request: selected, environment: self.environment) { response = exchange }
                 workspace.history.insert(exchange, at: 0)
-                while workspace.history.count > ResourceLimits.historyCount || workspace.history.reduce(0, { $0 + $1.body.count }) > ResourceLimits.historyBytes { workspace.history.removeLast() }
+                trimSessionHistory()
+                if responseSettings.recordSnapshots && historyAvailable {
+                    do { try await historyArchive.record(exchange, settings: responseSettings); historyStatus = "Durable snapshots enabled" }
+                    catch { historyAvailable = false; historyStatus = "Snapshot save failed; archive preserved"; self.error = "Could not save response snapshot. \(error.localizedDescription)" }
+                }
             } catch is CancellationError { }
             catch let failure as URLError where failure.code == .cancelled { }
             catch {
@@ -325,6 +352,33 @@ import UniformTypeIdentifiers
         let wasRunning = running
         task?.cancel(); task = nil; activeContext = nil; running = false
         if wasRunning { lastFailure = .cancelled }
+    }
+    private func trimSessionHistory() {
+        while workspace.history.count > responseSettings.sessionCount || workspace.history.reduce(0, { $0 + $1.body.count }) > responseSettings.sessionBytes { workspace.history.removeLast() }
+    }
+    private func loadDurableHistory() async {
+        guard historyAvailable else { return }
+        do {
+            let saved = try await historyArchive.open()
+            guard responseSettings.recordSnapshots else { return }
+            let existing = Set(workspace.history.map(\.id))
+            workspace.history += saved.filter { !existing.contains($0.id) }
+            workspace.history.sort { $0.date > $1.date }; trimSessionHistory()
+            historyStatus = "Durable snapshots enabled"
+        } catch {
+            historyAvailable = false; historyStatus = "Snapshot archive unavailable; original preserved"
+            self.error = "Could not open response snapshots. \(error.localizedDescription)"
+        }
+    }
+    func clearHistory() {
+        let alert = NSAlert(); alert.messageText = "Clear response history?"
+        alert.informativeText = "This clears the session and persisted snapshot archive. Current response inspection remains available."
+        alert.addButton(withTitle: "Cancel"); alert.addButton(withTitle: "Clear History")
+        guard alert.runModal() == .alertSecondButtonReturn else { return }
+        Task {
+            do { try await historyArchive.clear(); workspace.history = []; inspectedHistoryID = nil; historyStatus = responseSettings.recordSnapshots ? "Durable snapshots enabled" : "Durable snapshots disabled" }
+            catch { self.error = "Could not clear snapshots; the original archive is preserved. \(error.localizedDescription)" }
+        }
     }
     func cancelOAuth() {
         oauthTask?.cancel(); oauthTask = nil; oauthGeneration = nil; oauthRunning = false; oauthStatus = "Authorization cancelled"

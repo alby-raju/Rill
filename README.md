@@ -28,9 +28,9 @@ The bundle is written to `dist/Rill.app`. It is ad-hoc signed for local developm
 - Native body editor with syntax colors, line numbers, find, zoom, wrap, undo and variable suggestions; lossless JSON formatting.
 - Secret-scrubbed `.rillbackup` workspace/draft backups and restore with a retained pre-restore copy.
 - Ephemeral URLSession execution, 1–300 second timeout, cancellation, system TLS verification by default and a 16 MiB response limit.
-- Response body, formatted JSON, selectable text, copy/export, headers, status, latency and size.
+- Safe JSON/XML/HTML-source/text/binary/raster previews, raw export, response metadata, prepared-request inspector and transport timeline.
 - Status and body-contains checks.
-- Session history bounded to 50 exchanges and 32 MiB of bodies.
+- Configurable response/preview/history budgets; opt-in durable redacted snapshots (bodies omitted by default), per-exchange inspection and exact semantic JSON comparison.
 - Validated, conflict-aware background workspace persistence and Rill JSON import/export with regenerated identities.
 - Named TLS trust profiles, custom anchors and Keychain client identities; explicit per-profile insecure development mode.
 - Explicit OAuth2 client-credentials and browser PKCE acquisition into named Keychain tokens.
@@ -43,7 +43,7 @@ Requests are sent only when you choose Send. A fresh workspace has no preconfigu
 
 Workspace: `~/Library/Application Support/Rill/workspace.json`.
 
-Saved Auth-tab credentials use Keychain service `app.rill.credentials`; draft credentials use `app.rill.drafts`, and named values use `app.rill.namedsecrets`. Draft checkpoints are separate in `editor-session.json` beside the workspace. Headers, URLs, usernames, bodies and environment values are stored as entered, including any secrets you type there. Exports include those values. Response history is session-only. Avoid credentials in URLs and use the Auth tab for tokens/passwords.
+Saved Auth-tab credentials use Keychain service `app.rill.credentials`; draft credentials use `app.rill.drafts`, and named values use `app.rill.namedsecrets`. Draft checkpoints are separate in `editor-session.json` beside the workspace. Headers, URLs, usernames, bodies and environment values are stored as entered, including any secrets you type there. Exports include those values. Response history is session-only by default. Optional durable snapshots are stored in `exchange-history.json`; retained bodies may contain sensitive data. Avoid credentials in URLs and use the Auth tab for tokens/passwords.
 
 ## Verification
 
