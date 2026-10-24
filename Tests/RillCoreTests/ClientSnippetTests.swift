@@ -39,16 +39,33 @@ import XCTest
         draft.headers = []; draft.method = .GET; draft.body = "body"
         XCTAssertThrowsError(try FrozenClientRequest.capture(draft, environment: nil))
     }
+    func testCustomAPIKeyMaskingAndTargetRepresentability() throws {
+        var draft = RequestDraft(); draft.url = "https://example.test"; draft.auth = .apiKey
+        draft.apiKeyLocation = .header; draft.apiKeyName = "X-Custom-Credential"; draft.credential = "never-export"
+        let frozen = try FrozenClientRequest.capture(draft, environment: nil)
+        XCTAssertEqual(frozen.headers.first { $0.key.lowercased() == "x-custom-credential" }?.value, "[REDACTED]")
+        draft.auth = .none; draft.headers = [Field(name: "__proto__", value: "literal")]
+        let reserved = try FrozenClientRequest.capture(draft, environment: nil)
+        XCTAssertThrowsError(try ClientSnippetGenerator.generate(reserved, target: .axios))
+        XCTAssertThrowsError(try ClientSnippetGenerator.generate(reserved, target: .fetch))
+        XCTAssertNoThrow(try ClientSnippetGenerator.generate(reserved, target: .requests))
+        for value in [" leading", "trailing ", "embedded\tvalue", "Unicode 🐟"] {
+            draft.headers = [Field(name: "X-Test", value: value)]
+            XCTAssertThrowsError(try FrozenClientRequest.capture(draft, environment: nil))
+        }
+    }
     func testEmitSyntheticExecutableFixturesWhenRequested() throws {
         guard let path = ProcessInfo.processInfo.environment["RILL_SNIPPET_FIXTURES"] else { return }
         let directory = URL(fileURLWithPath: path, isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let file = directory.appendingPathComponent("synthetic.bin")
         try Data([0, 255, 13, 10, 42]).write(to: file)
-        for kind in ["raw", "binary", "multipart", "empty", "head"] {
+        for kind in ["raw", "binary", "multipart", "empty", "head", "large", "redirect", "overflow"] {
             var draft = RequestDraft(); draft.url = "http://127.0.0.1:18750/echo?q=%2F&x=a+b"; draft.method = .POST
             draft.headers = [Field(name: "X-Literal", value: "quotes \" and ' and $HOME"), Field(name: "X-Empty", value: "")]
-            if kind == "raw" { draft.bodyMode = .text; draft.body = "Unicode 🐟\n$HOME \"quoted\""; draft.contentType = "application/json" }
+            if kind == "redirect" || kind == "overflow" { draft.url = "http://127.0.0.1:18750/" + kind }
+            if kind == "large" { draft.bodyMode = .text; draft.body = String(repeating: "🦦", count: 24_000); draft.contentType = "text/plain" }
+            else if kind == "raw" { draft.bodyMode = .text; draft.body = "Unicode 🐟\n$HOME \"quoted\""; draft.contentType = "application/json" }
             else if kind == "binary" { draft.bodyMode = .binary; draft.binaryFile = try UploadFileReference.capture(file) }
             else if kind == "multipart" {
                 draft.bodyMode = .multipart
@@ -57,7 +74,7 @@ import XCTest
                 draft.multipartParts = [text, part]
             } else { draft.bodyMode = RequestBodyMode.none; if kind == "head" { draft.method = .HEAD } }
             let frozen = try FrozenClientRequest.capture(draft, environment: nil)
-            let expected: [String: Any] = ["method": frozen.method, "url": frozen.url, "headers": frozen.headers, "body": frozen.body?.base64EncodedString() ?? ""]
+            let expected: [String: Any] = ["method": frozen.method, "url": frozen.url, "headers": frozen.headers, "body": frozen.body?.base64EncodedString() ?? "", "overflow": kind == "overflow"]
             let folder = directory.appendingPathComponent(kind, isDirectory: true)
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             try JSONSerialization.data(withJSONObject: expected, options: [.sortedKeys]).write(to: folder.appendingPathComponent("expected.json"))

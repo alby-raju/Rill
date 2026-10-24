@@ -36,21 +36,24 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_error(400); return
         body = self.rfile.read(length)
         received.put((self.command, self.path, {k.lower(): v for k, v in self.headers.items()}, body))
-        payload = b"synthetic response"
-        self.send_response(200)
+        payload = b"x" * 16777217 if self.path == "/overflow" else b"synthetic response"
+        self.send_response(302 if self.path == "/redirect" else 200)
+        if self.path == "/redirect": self.send_header("Location", "http://127.0.0.1:1/never-follow")
         self.send_header("Content-Length", str(len(payload)))
         self.end_headers()
-        if self.command != "HEAD": self.wfile.write(payload)
+        if self.command != "HEAD":
+            try: self.wfile.write(payload)
+            except (BrokenPipeError, ConnectionResetError): pass
     do_GET = do_HEAD = do_POST = do_PUT = do_PATCH = do_DELETE = do_OPTIONS = handle_request
 server = http.server.ThreadingHTTPServer(("127.0.0.1", 18750), Handler)
 server.daemon_threads = True
 thread = threading.Thread(target=server.serve_forever, daemon=True); thread.start()
 
-def run(command, cwd, timeout=120):
+def run(command, cwd, timeout=120, check=True):
     # Avoid proxy/runtime injection in this independent SDK interoperability check.
     env = {k: v for k, v in os.environ.items() if k.lower() not in {
         "http_proxy", "https_proxy", "all_proxy", "node_options", "java_tool_options", "jdk_java_options"}}
-    return subprocess.run(command, cwd=cwd, env=env, check=True, capture_output=True, timeout=timeout)
+    return subprocess.run(command, cwd=cwd, env=env, check=check, capture_output=True, timeout=timeout)
 
 def command_for(target, source, folder):
     if target in {"requests", "httpx"}:
@@ -92,14 +95,15 @@ try:
             with tempfile.TemporaryDirectory(prefix="rill-client-") as temp:
                 folder = pathlib.Path(temp)
                 try:
-                    result = run(command_for(target, source, folder), folder, timeout=30)
+                    result = run(command_for(target, source, folder), folder, timeout=30, check=False)
+                    assert (result.returncode != 0) == expected.get("overflow", False), (target, "exit status", result.stderr.decode(errors="replace")[:1000])
                     method, path, headers, body = received.get(timeout=2)
                     assert method == expected["method"], (target, "method")
                     assert path == parts.path + ("?" + parts.query if parts.query else ""), (target, "URL")
                     assert body == base64.b64decode(expected["body"]), (target, "body")
                     for key, value in expected["headers"].items():
                         assert headers.get(key.lower()) == value, (target, "header", key)
-                    assert result.stdout == (b"" if method == "HEAD" else b"synthetic response"), (target, "response")
+                    assert result.stdout == (b"" if method == "HEAD" or expected.get("overflow", False) else b"synthetic response"), (target, "response")
                     assert received.empty(), (target, "unexpected extra request")
                 except subprocess.CalledProcessError as error:
                     raise RuntimeError(f"{case.name}/{target}: {error.stderr.decode(errors='replace')[:4000]}") from error

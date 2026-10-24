@@ -52,7 +52,7 @@ public struct FrozenClientRequest: Sendable {
         let sensitive: Set<String> = ["authorization", "proxy-authorization", "cookie", "set-cookie", "x-api-key", "api-key", "x-auth-token", customKey]
         for (key, value) in headers {
             let lower = key.lowercased()
-            guard !["host", "connection", "transfer-encoding", "expect", "upgrade", "trailer"].contains(lower), value.unicodeScalars.allSatisfy({ $0.value < 128 }) else { throw CommandError.unsupported("transport-owned or non-ASCII client header") }
+            guard !["host", "connection", "transfer-encoding", "expect", "upgrade", "trailer"].contains(lower), value.unicodeScalars.allSatisfy({ $0.value >= 32 && $0.value < 127 }), value == value.trimmingCharacters(in: .whitespacesAndNewlines) else { throw CommandError.unsupported("transport-owned or non-ASCII client header") }
             if lower == "content-length" {
                 guard Int(value) == (body?.count ?? 0) else { throw CommandError.unsupported("mismatched Content-Length") }
                 headers.removeValue(forKey: key)
@@ -70,8 +70,14 @@ public enum ClientSnippetGenerator {
     }
     public static func generate(_ request: FrozenClientRequest, target: ClientTarget) throws -> String {
         try Task.checkCancellation()
+        if target == .fetch || target == .axios {
+            guard !request.headers.keys.contains(where: { ["__proto__", "constructor", "prototype"].contains($0.lowercased()) }) else {
+                throw CommandError.unsupported("reserved JavaScript header property")
+            }
+        }
         let method = try literal(request.method), url = try literal(request.url)
         let headers = "{" + (try request.headers.sorted { $0.key.lowercased() < $1.key.lowercased() }.map { try literal($0.key) + ": " + literal($0.value) }).joined(separator: ", ") + "}"
+        let javascriptHeaders = "JSON.parse(" + (try literal(headers)) + ")"
         let encoded = try literal(request.body?.base64EncodedString() ?? "")
         let seconds = String(request.timeout), milliseconds = String(Int(request.timeout * 1000))
         let pythonBody = request.body == nil ? "None" : "base64.b64decode(\(encoded))"
@@ -107,7 +113,7 @@ public enum ClientSnippetGenerator {
             result = """
             // Node 22+; save as request.mjs. \(note)
             const response = await fetch(\(url), {
-              method: \(method), headers: \(headers), body: \(nodeBody),
+              method: \(method), headers: \(javascriptHeaders), body: \(nodeBody),
               redirect: 'manual', signal: AbortSignal.timeout(\(milliseconds))
             });
             const chunks = []; let size = 0;
@@ -124,7 +130,7 @@ public enum ClientSnippetGenerator {
             result = """
             // Node 22+; npm install axios; save as request.mjs. \(note)
             import axios from 'axios';
-            const headers = \(headers);
+            const headers = \(javascriptHeaders);
             if (!Object.keys(headers).some(key => key.toLowerCase() === 'content-type')) headers['Content-Type'] = false;
             const response = await axios({
               url: \(url), method: \(method), headers, data: \(nodeBody),
