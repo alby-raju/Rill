@@ -207,7 +207,7 @@ enum APISamples {
         if let sample = schema["example"] ?? schema["default"] ?? schema["const"] ?? schema["enum"]?.array?.first { budget.bytes += try ResponseJSON.encoded(sample).utf8.count; guard budget.bytes <= 1024 * 1024 else { throw SchemaError.limit }; return sample }
         if let alternatives = schema["oneOf"]?.array ?? schema["anyOf"]?.array { guard let first = alternatives.first else { throw SchemaError.invalid }; return try walk(first, root: root, depth: depth + 1, references: references, budget: &budget) }
         switch schema["type"]?.string {
-        case "object", nil where schema["properties"] != nil:
+        case "object", nil:
             var object: [JSONKey: JSONValue] = [:]
             let properties = schema["properties"]?.object ?? [:]
             guard properties.count <= 128 else { throw SchemaError.limit }

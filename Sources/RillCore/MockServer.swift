@@ -65,8 +65,11 @@ public actor MockServer {
         guard generation == id, connections.count < 32 else { connection.cancel(); return }
         let key = UUID(); connections[key] = connection
         connection.stateUpdateHandler = { [weak self] state in
-            if case .failed = state { Task { await self?.close(key) } }
-            if case .cancelled = state { Task { await self?.close(key) } }
+            guard let owner = self else { return }
+            switch state {
+            case .failed, .cancelled: Task { await owner.close(key) }
+            default: break
+            }
         }
         connection.start(queue: queue)
         queue.asyncAfter(deadline: .now() + 5) { [weak self] in Task { await self?.close(key) } }
