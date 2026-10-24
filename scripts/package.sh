@@ -24,6 +24,9 @@ cat > "$RILL_APP/Contents/Info.plist" <<'PLIST'
 <key>NSAppTransportSecurity</key><dict><key>NSAllowsArbitraryLoads</key><true/></dict>
 </dict></plist>
 PLIST
+for RILL_RESOURCE in "$RILL_BIN"/*.bundle(N); do
+  ditto "$RILL_RESOURCE" "$RILL_APP/Contents/Resources/${RILL_RESOURCE:t}"
+done
 cp "$RILL_ROOT/THIRD_PARTY_NOTICES.txt" "$RILL_APP/Contents/Resources/THIRD_PARTY_NOTICES.txt"
 plutil -lint "$RILL_APP/Contents/Info.plist"
 codesign --force --sign - "$RILL_APP"

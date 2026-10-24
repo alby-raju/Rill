@@ -25,7 +25,9 @@ typealias ViewState<Value> = SwiftUI.State<Value>
                 Button("Import Postman JSON…") { store.importForeign(.postman) }
                 Button("Import HTTPie Desktop JSON…") { store.importForeign(.httpieDesktop) }
                 Button("Import Insomnia JSON / YAML…") { store.importForeign(.insomnia) }
+                Button("Import Bruno File / Folder / ZIP…") { store.importForeign(.bruno) }
                 Button("Import Rill Workspace…") { store.importWorkspace() }
+                Button("Export Bruno Bundle…") { store.exportInterchange("Bruno bundle") }
                 Button("Export Insomnia Collection…") { store.exportInterchange("Insomnia collection") }
                 Button("Export Postman Collection…") { store.exportInterchange("Postman collection") }
                 Button("Export Postman Environment…") { store.exportInterchange("Postman environment") }.disabled(store.environment == nil)

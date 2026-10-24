@@ -77,12 +77,13 @@ final class ImportCredentialStaging: @unchecked Sendable {
 }
 
 public enum ForeignImportFormat: String, Sendable {
-    case postman = "Postman JSON", httpieDesktop = "HTTPie Desktop JSON", insomnia = "Insomnia JSON / YAML"
+    case postman = "Postman JSON", httpieDesktop = "HTTPie Desktop JSON", insomnia = "Insomnia JSON / YAML", bruno = "Bruno file / folder / ZIP"
     public func load(from url: URL) throws -> ForeignWorkspaceImport {
         switch self {
         case .postman: try PostmanImporter.load(from: url)
         case .httpieDesktop: try HTTPieDesktopImporter.load(from: url)
         case .insomnia: try InsomniaImporter.load(from: url)
+        case .bruno: try BrunoImporter.load(from: url)
         }
     }
 }

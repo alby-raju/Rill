@@ -528,11 +528,11 @@ import UniformTypeIdentifiers
     func exportInterchange(_ target: String) {
         guard canEdit else { return }
         let alert = NSAlert(); alert.messageText = "Export " + target + "?"
-        alert.informativeText = "URLs, bodies, file paths and unmarked variables may contain secrets. Postman and Insomnia export saved requests; Insomnia includes the selected environment. Foreign scripts are omitted to avoid enabling them in another app; native secret references need local configuration. HAR exports the current draft without sending it, with an explicitly unexecuted response placeholder. Masked HAR also redacts query values and nonessential headers. File references are exported as metadata only; unsupported profiles or bodies fail before writing."
+        alert.informativeText = "URLs, bodies, file paths and unmarked variables may contain secrets. Postman and Insomnia export saved requests; Insomnia includes the selected environment. Foreign scripts are omitted to avoid enabling them in another app; Bruno exports a ZIP bundle with plain environments and omits scripts; form/file-body exports fail explicitly. Native secret references need local configuration. HAR exports the current draft without sending it, with an explicitly unexecuted response placeholder. Masked HAR also redacts query values and nonessential headers. File references are exported as metadata only; unsupported profiles or bodies fail before writing."
         alert.addButton(withTitle: "Cancel"); alert.addButton(withTitle: "Export Masked"); alert.addButton(withTitle: "Include Auth Values")
         let choice = alert.runModal(); guard choice != .alertFirstButtonReturn else { return }
         let include = choice == .alertThirdButtonReturn
-        let panel = NSSavePanel(); panel.nameFieldStringValue = "Rill-" + target + (target == "HAR" ? ".har" : (target == "Insomnia collection" ? ".yaml" : ".json"))
+        let panel = NSSavePanel(); panel.nameFieldStringValue = "Rill-" + target + (target == "HAR" ? ".har" : (target == "Insomnia collection" ? ".yaml" : (target == "Bruno bundle" ? ".zip" : ".json")))
         guard panel.runModal() == .OK, let url = panel.url else { return }
         let snapshot = workspace, request = selected, environment = environment
         let resolver = NamedSecretResolver(catalog: snapshot.namedSecrets ?? [])
@@ -541,12 +541,14 @@ import UniformTypeIdentifiers
                 try await Task.detached {
                     let data: Data
                     switch target {
+                    case "Bruno bundle": data = try BrunoExporter.bundle(snapshot, includeCredentials: include)
                     case "Insomnia collection": data = try InsomniaExporter.collection(snapshot, environment: environment, includeCredentials: include)
                     case "Postman collection": data = try PostmanExporter.collection(snapshot, includeCredentials: include)
                     case "Postman environment": guard let environment else { throw ForeignExportError.unsupported }; data = try PostmanExporter.environment(environment)
                     default: guard let request else { throw ForeignExportError.unsupported }; data = try HARExporter.request(request, environment: environment, includeCredentials: include, profiles: snapshot.authProfiles ?? [], secrets: resolver)
                     }
-                    if target == "Insomnia collection" { try InsomniaExportFile.write(data, to: url) }
+                    if target == "Bruno bundle" { try BrunoExportFile.write(data, to: url) }
+                    else if target == "Insomnia collection" { try InsomniaExportFile.write(data, to: url) }
                     else { try ForeignExportFile.write(data, to: url) }
                 }.value
             } catch { self.error = "Export did not complete. " + error.localizedDescription }
@@ -555,7 +557,8 @@ import UniformTypeIdentifiers
     func importForeign(_ format: ForeignImportFormat) {
         guard canEdit, persistenceAvailable else { return }
         let panel = NSOpenPanel()
-        panel.allowedContentTypes = format == .insomnia ? [.json, .yaml] : [.json]
+        panel.canChooseDirectories = format == .bruno
+        panel.allowedContentTypes = format == .bruno ? [UTType(filenameExtension: "bru") ?? .plainText, .zip, .json] : (format == .insomnia ? [.json, .yaml] : [.json])
         guard panel.runModal() == .OK, let url = panel.url else { return }
         importing = true; cancel(); saveTask?.cancel(); saveGeneration = UUID()
         Task {
