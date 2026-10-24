@@ -8,6 +8,11 @@ public enum WorkspaceImport {
         try WorkspaceFile.validate(existing)
         var result = existing
         var collections: [UUID: UUID] = [:]
+        let tlsIDs = Dictionary(uniqueKeysWithValues: (incoming.tlsProfiles ?? []).map { ($0.id, UUID()) })
+        for var profile in incoming.tlsProfiles ?? [] {
+            profile.id = tlsIDs[profile.id]!; profile.requiresClientIdentity = profile.requiresClientIdentity || profile.identityReference != nil; profile.identityReference = nil
+            if result.tlsProfiles == nil { result.tlsProfiles = [] }; result.tlsProfiles?.append(profile)
+        }
         let profileIDs = Dictionary(uniqueKeysWithValues: (incoming.authProfiles ?? []).map { ($0.id, UUID()) })
         var secretNames: [String: String] = [:]
         var used = Set(try (existing.namedSecrets ?? []).map { try NamedSecretResolver.environmentKey(for: $0.name) })
@@ -46,6 +51,7 @@ public enum WorkspaceImport {
             request.id = UUID()
             request.collectionID = request.collectionID.flatMap { collections[$0] }
             request.credential = ""
+            if let id = request.tlsProfileID { request.tlsProfileID = tlsIDs[id] ?? UUID() }
             if let id = request.authProfileID { request.authProfileID = profileIDs[id] ?? UUID() }
             request.url = rewrite(request.url); request.body = rewrite(request.body); request.username = rewrite(request.username)
             request.contentType = rewrite(request.contentType); request.apiKeyName = request.apiKeyName.map(rewrite)

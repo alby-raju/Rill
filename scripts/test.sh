@@ -6,12 +6,23 @@ cd "$RILL_ROOT"
 RILL_FIXTURE_LOG="$(mktemp -t rill-fixture)"
 python3 scripts/http-fixture.py > "$RILL_FIXTURE_LOG" 2>&1 &
 RILL_FIXTURE_PID=$!
+RILL_TLS_DIRECTORY="$(mktemp -d -t rill-tls)"
+RILL_TLS_LOG="$(mktemp -t rill-tls-log)"
+python3 scripts/tls-fixture.py "$RILL_TLS_DIRECTORY" > "$RILL_TLS_LOG" 2>&1 &
+RILL_TLS_PID=$!
 cleanup() {
   RILL_EXIT_STATUS=$?
   trap - EXIT
   kill "$RILL_FIXTURE_PID" 2>/dev/null || true
+  kill "$RILL_TLS_PID" 2>/dev/null || true
+  python3 - "$RILL_TLS_DIRECTORY" <<'PY_CLEANUP'
+import shutil
+import sys
+shutil.rmtree(sys.argv[1], ignore_errors=True)
+PY_CLEANUP
   if [ "$RILL_EXIT_STATUS" -ne 0 ]; then
     cat "$RILL_FIXTURE_LOG"
+    cat "$RILL_TLS_LOG"
   fi
   exit "$RILL_EXIT_STATUS"
 }
@@ -54,4 +65,35 @@ then
   cat "$RILL_FIXTURE_LOG"
   exit 1
 fi
+export RILL_TEST_TLS_DIR="$RILL_TLS_DIRECTORY"
+export RILL_TEST_TLS_URL=https://localhost:18750
+export RILL_TEST_MTLS_URL=https://localhost:18751
+python3 - "$RILL_TLS_PID" <<'PY_TLS_READY'
+import http.client
+import os
+import ssl
+import sys
+import time
+pid = int(sys.argv[1])
+deadline = time.monotonic() + 30
+while time.monotonic() < deadline:
+    os.kill(pid, 0)
+    try:
+        # This readiness probe connects only to our disposable loopback fixture.
+        connection = http.client.HTTPSConnection('127.0.0.1', 18750, timeout=0.5, context=ssl._create_unverified_context())
+        try:
+            connection.request('GET', '/json')
+            response = connection.getresponse()
+            if response.getheader('X-Fixture') == 'RillTLS':
+                time.sleep(0.1)
+                os.kill(pid, 0)
+                break
+        finally:
+            connection.close()
+    except OSError:
+        pass
+    time.sleep(0.1)
+else:
+    sys.exit('The TLS fixture did not become ready within 30 seconds.')
+PY_TLS_READY
 swift test "$@"

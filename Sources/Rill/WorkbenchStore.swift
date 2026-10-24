@@ -8,7 +8,7 @@ import UniformTypeIdentifiers
             guard !loading, !applyingWorkspace, workspace.needsSave(comparedTo: oldValue) else { return }
             let previous = editor.request(selection, in: oldValue)
             let oldEnvironment = try? resolvedEnvironment(in: oldValue)
-            if previous != selected || oldEnvironment != environment || workspace.authProfiles != oldValue.authProfiles || workspace.namedSecrets != oldValue.namedSecrets { response = nil; cancel() }
+            if previous != selected || oldEnvironment != environment || workspace.authProfiles != oldValue.authProfiles || workspace.namedSecrets != oldValue.namedSecrets || workspace.tlsProfiles != oldValue.tlsProfiles { response = nil; cancel() }
             hasUnsavedChanges = true; persist()
         }
     }
@@ -35,6 +35,7 @@ import UniformTypeIdentifiers
     @Published var oauthStatus = ""
     private var oauthTask: Task<Void, Never>?
     private var oauthGeneration: UUID?
+    @Published var showTLS = false
     @Published var showAuthentication = false
     @Published var showEnvironments = false
     @Published var showHistory = false
@@ -289,6 +290,15 @@ import UniformTypeIdentifiers
         let environment: RillCore.Environment?
         do { environment = try resolvedEnvironment(in: workspace) }
         catch { self.error = error.localizedDescription; return }
+        let tlsProfiles = workspace.tlsProfiles ?? []
+        do {
+            if let profile = try TLSProfiles.selected(draft.tlsProfileID, from: tlsProfiles), profile.mode == .insecure {
+                let alert = NSAlert(); alert.messageText = "Send with insecure TLS?"
+                alert.informativeText = "Profile \(profile.name) disables certificate and hostname verification for this request."
+                alert.addButton(withTitle: "Cancel"); alert.addButton(withTitle: "Send with Insecure TLS")
+                guard alert.runModal() == .alertSecondButtonReturn else { return }
+            }
+        } catch { self.error = error.localizedDescription; return }
         let profiles = workspace.authProfiles ?? []
         let secrets = NamedSecretResolver(catalog: workspace.namedSecrets ?? [])
         let context = ExecutionContext(request: draft, environment: environment); activeContext = context.id
@@ -296,7 +306,7 @@ import UniformTypeIdentifiers
         task = Task {
             defer { if activeContext == context.id { running = false; task = nil; activeContext = nil } }
             do {
-                let exchange = try await RequestEngine.execute(draft, environment: environment, profiles: profiles, secrets: secrets)
+                let exchange = try await RequestEngine.execute(draft, environment: environment, profiles: profiles, secrets: secrets, tlsProfiles: tlsProfiles)
                 try Task.checkCancellation()
                 guard activeContext == context.id else { return }
                 if context.matches(request: selected, environment: self.environment) { response = exchange }

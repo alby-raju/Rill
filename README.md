@@ -27,11 +27,12 @@ The bundle is written to `dist/Rill.app`. It is ad-hoc signed for local developm
 - Inherited environments and bounded nested `{{name}}` expansion with explicit missing/cyclic-variable errors.
 - Native body editor with syntax colors, line numbers, find, zoom, wrap, undo and variable suggestions; lossless JSON formatting.
 - Secret-scrubbed `.rillbackup` workspace/draft backups and restore with a retained pre-restore copy.
-- Ephemeral URLSession execution, 1–300 second timeout, cancellation, default system TLS verification and a 16 MiB response limit.
+- Ephemeral URLSession execution, 1–300 second timeout, cancellation, system TLS verification by default and a 16 MiB response limit.
 - Response body, formatted JSON, selectable text, copy/export, headers, status, latency and size.
 - Status and body-contains checks.
 - Session history bounded to 50 exchanges and 32 MiB of bodies.
 - Validated, conflict-aware background workspace persistence and Rill JSON import/export with regenerated identities.
+- Named TLS trust profiles, custom anchors and Keychain client identities; explicit per-profile insecure development mode.
 - Explicit OAuth2 client-credentials and browser PKCE acquisition into named Keychain tokens.
 - Authentication credentials in macOS Keychain; reusable auth profiles and named `{{secret:name}}` values with a read-only `RILL_SECRET_` process fallback. Credentials are excluded from exported workspaces.
 - System/light/dark appearance and keyboard shortcuts: Cmd+N, Cmd+Enter, Cmd+K, Cmd+Shift+E, Cmd+period.
