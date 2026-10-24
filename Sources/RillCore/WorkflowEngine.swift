@@ -16,7 +16,12 @@ public enum WorkflowEngine {
         environment.variables = variables.sorted { $0.key < $1.key }.map { Field(name: $0.key, value: $0.value) }
         return environment
     }
+    public static func validateVariables(_ values: [String: String]) throws {
+        guard values.count <= 1024, values.allSatisfy({ $0.key.utf8.count <= 128 && $0.value.utf8.count <= 1024 * 1024 }),
+              values.reduce(0, { $0 + $1.key.utf8.count + $1.value.utf8.count }) <= 4 * 1024 * 1024 else { throw WorkflowError.limit }
+    }
     public static func prepare(_ request: RequestDraft, variables: [String: String]) throws -> HookOutcome {
+        try validateVariables(variables)
         try ResponseRules.validate(request.assertions ?? [], request.extractions ?? [])
         let result = try HookRuntime.execute(request.preHook, request: request, variables: variables)
         guard !result.stop, result.next == nil, result.checks.allSatisfy(\.passed) else { throw WorkflowError.hookFailure }
@@ -34,7 +39,9 @@ public enum WorkflowEngine {
         do {
             var updates = prepared.variables
             for (key, value) in try ResponseRules.extract(request.extractions ?? [], response: exchange) { updates[key] = value }
+            try validateVariables(updates)
             let post = try HookRuntime.execute(request.postHook, request: prepared.request, variables: updates, response: exchange)
+            try validateVariables(post.variables)
             exchange.checks += post.checks
             guard post.checks.allSatisfy(\.passed) else { return WorkflowStepResult(exchange: exchange, variables: variables, stop: false) }
             return WorkflowStepResult(exchange: exchange, variables: post.variables, next: post.next, stop: post.stop)

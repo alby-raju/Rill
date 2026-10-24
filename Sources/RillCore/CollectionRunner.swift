@@ -27,6 +27,10 @@ public struct RunAttempt: Codable, Identifiable, Sendable {
     public var status: Int?
     public var duration: Double
     public var checks: [CheckResult]
+    public var checkCount: Int? = nil
+    public var failedCheckCount: Int? = nil
+    public var checksOmitted: Bool? = nil
+    public var checkSignature: String? = nil
     public var failure: String?
     public var fingerprint: String?
     public var retainedBody: Data?
@@ -67,7 +71,8 @@ public enum CollectionRunner {
         let started = ProcessInfo.processInfo.systemUptime
         var report = RunReport(requestedSteps: requests.count * configuration.iterations)
         report.cancelled = Task.isCancelled
-        var variables = WorkflowEngine.variables(in: environment), retained = 0
+        var variables = WorkflowEngine.variables(in: environment), retained = 0, retainedChecks = 0
+        try WorkflowEngine.validateVariables(variables)
         let execute: Executor = executor ?? { request, values in
             try await WorkflowEngine.execute(request, variables: values, profiles: profiles, secrets: secrets, tlsProfiles: tlsProfiles)
         }
@@ -105,8 +110,19 @@ public enum CollectionRunner {
                             if result.exchange.body.count <= configuration.retentionBytes - retained {
                                 outcome.retainedBody = result.exchange.body; retained += result.exchange.body.count
                             } else { outcome.bodyOmitted = true }
+                            outcome.checkCount = outcome.checks.count
+                            outcome.failedCheckCount = outcome.checks.filter { !$0.passed }.count
+                            outcome.checkSignature = SHA256.hash(data: Data(outcome.checks.map { $0.passed ? "1" : "0" }.joined().utf8)).map { String(format: "%02x", $0) }.joined()
+                            if outcome.checks.count <= 100_000 - retainedChecks {
+                                retainedChecks += outcome.checks.count
+                                outcome.checks = outcome.checks.enumerated().map { index, check in CheckResult(title: "Check \(index + 1)", passed: check.passed) }
+                                outcome.checksOmitted = false
+                            } else { outcome.checks = []; outcome.checksOmitted = true }
                             finalPassed = outcome.state == .passed
-                            if finalPassed { variables = result.variables; stop = result.stop }
+                            if finalPassed {
+                                do { try WorkflowEngine.validateVariables(result.variables); variables = result.variables; stop = result.stop }
+                                catch { finalPassed = false; outcome.state = .failed; outcome.failure = WorkflowError.limit.rawValue; next = nil }
+                            }
                             report.outcomes.append(outcome)
                             if let progress { await progress(RunProgress(completed: report.outcomes.count, requestID: request.id, state: outcome.state)) }
                         } catch is CancellationError { throw CancellationError() }

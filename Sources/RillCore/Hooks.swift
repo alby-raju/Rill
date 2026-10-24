@@ -129,7 +129,7 @@ public enum HookRuntime {
                 if result.stop { return }
             }
         }
-        do { try run(operations) }
+        do { try checkBudget(); try run(operations); try checkBudget() }
         catch is CancellationError { throw CancellationError() }
         catch let error as WorkflowError { throw error }
         catch { throw WorkflowError.hookFailure }

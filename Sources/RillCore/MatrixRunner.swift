@@ -42,11 +42,11 @@ public enum MatrixRunner {
         let comparisons = requests.map { request in
             let outcomes = runs.map { $0.report.outcomes.last { $0.requestID == request.id && $0.state != .notRun } }
             let states = outcomes.map { "\($0?.state.rawValue ?? "notRun")/\($0?.status ?? 0)" }
-            let checks = outcomes.map { $0?.checks.map(\.passed) ?? [] }
+            let checks = outcomes.map { $0?.checkSignature }
             let fingerprints = outcomes.map { $0?.fingerprint }
             return MatrixComparison(requestID: request.id, statesDiffer: Set(states).count > 1,
-                                    checksDiffer: checks.dropFirst().contains { $0 != checks.first },
-                                    bodiesDiffer: fingerprints.dropFirst().contains { $0 != fingerprints.first }, includesNotRun: outcomes.contains { $0 == nil })
+                                    checksDiffer: checks.dropFirst().contains { $0 != checks[0] },
+                                    bodiesDiffer: fingerprints.dropFirst().contains { $0 != fingerprints[0] }, includesNotRun: outcomes.contains { $0 == nil })
         }
         return MatrixReport(runs: runs, comparisons: comparisons)
     }

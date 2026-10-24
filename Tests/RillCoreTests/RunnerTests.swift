@@ -259,4 +259,23 @@ actor ConcurrencyProbe {
         XCTAssertTrue(cancelled.samples.contains { $0.state == .notRun })
     }
 
+    func testDetailedCheckRetentionAndVariableBudgetsAreGlobal() async throws {
+        let checks = Array(repeating: CheckResult(title: "private-expected-value", passed: true), count: 1024)
+        var config = RunConfiguration(); config.iterations = 100
+        let report = try await CollectionRunner.run(requests: [RequestDraft()], environment: nil, configuration: config, executor: { request, variables in
+            var exchange = Self.exchange(request); exchange.checks = checks
+            return WorkflowStepResult(exchange: exchange, variables: variables, stop: false)
+        })
+        XCTAssertTrue(report.passed)
+        XCTAssertLessThanOrEqual(report.outcomes.reduce(0) { $0 + $1.checks.count }, 100_000)
+        XCTAssertEqual(report.outcomes.last?.checksOmitted, true)
+        XCTAssertEqual(report.outcomes.last?.checkCount, 1024)
+        XCTAssertEqual(report.outcomes.last?.failedCheckCount, 0)
+        XCTAssertFalse(report.outcomes.flatMap(\.checks).contains { $0.title.contains("private-expected-value") })
+        let large = Dictionary(uniqueKeysWithValues: (0..<5).map { ("v\($0)", String(repeating: "x", count: 900_000)) })
+        XCTAssertThrowsError(try WorkflowEngine.validateVariables(large))
+        var hook = RequestHook(); hook.enabled = true
+        XCTAssertThrowsError(try HookRuntime.execute(hook, request: RequestDraft(), variables: large))
+    }
+
 }

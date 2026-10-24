@@ -6,7 +6,7 @@ public enum RunReportExporter {
     private static func sanitized(_ report: RunReport) -> RunReport {
         var copy = report
         for index in copy.outcomes.indices {
-            copy.outcomes[index].retainedBody = nil; copy.outcomes[index].bodyOmitted = true; copy.outcomes[index].fingerprint = nil
+            copy.outcomes[index].retainedBody = nil; copy.outcomes[index].bodyOmitted = true; copy.outcomes[index].fingerprint = nil; copy.outcomes[index].checkSignature = nil
             copy.outcomes[index].checks = copy.outcomes[index].checks.enumerated().map { offset, check in CheckResult(title: "Check \(offset + 1)", passed: check.passed) }
             if copy.outcomes[index].failure != nil { copy.outcomes[index].failure = "Execution unsuccessful; runtime details omitted" }
         }
