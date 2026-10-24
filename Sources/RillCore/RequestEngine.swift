@@ -86,6 +86,7 @@ public enum RequestEngine {
                 HTTPEncoding.formComponent(try expand($0.name)) + "=" + HTTPEncoding.formComponent(try expand($0.value))
             }
             body = Data(fields.joined(separator: "&").utf8)
+        case .multipart?, .binary?: throw UploadError.requiresFreeze
         case .text?: body = Data(try expand(draft.body).utf8)
         case nil: body = draft.body.isEmpty ? nil : Data(try expand(draft.body).utf8)
         }
@@ -116,16 +117,29 @@ public enum RequestEngine {
         }
         return request
     }
+    public static func freeze(_ draft: RequestDraft, environment: Environment?) throws -> PreparedHTTPRequest {
+        guard draft.bodyMode == .multipart || draft.bodyMode == .binary else { return PreparedHTTPRequest(request: try prepare(draft, environment: environment)) }
+        guard draft.method != .GET && draft.method != .HEAD else { throw RillError.unsupportedBodyMethod }
+        var headersOnly = draft; headersOnly.bodyMode = RequestBodyMode.none
+        var request = try prepare(headersOnly, environment: environment)
+        let upload = try UploadBody.create(draft, environment: environment)
+        request.httpBodyStream = InputStream(url: upload.url)
+        request.setValue(String(upload.count), forHTTPHeaderField: "Content-Length")
+        if draft.bodyMode == .multipart || request.value(forHTTPHeaderField: "Content-Type") == nil { request.setValue(upload.contentType, forHTTPHeaderField: "Content-Type") }
+        return PreparedHTTPRequest(request: request, temporaryBody: upload.url)
+    }
     private static func hasInvalidHeaderValue(_ value: String) -> Bool {
         value.unicodeScalars.contains { ($0.value < 32 && $0.value != 9) || $0.value == 127 }
     }
     public static func execute(_ draft: RequestDraft, environment: Environment?, budget: ResponseBudget = .standard) async throws -> Exchange {
         try Task.checkCancellation()
-        let request = try prepare(draft, environment: environment)
+        let frozen = try freeze(draft, environment: environment)
+        defer { frozen.removeTemporaryBody() }
+        let request = frozen.request
         let configuration = URLSessionConfiguration.ephemeral
         configuration.httpShouldSetCookies = false
         configuration.urlCache = nil
-        let session = URLSession(configuration: configuration)
+        let session = URLSession(configuration: configuration, delegate: HTTPTransportDelegate(prepared: frozen), delegateQueue: nil)
         defer { session.invalidateAndCancel() }
         let start = ProcessInfo.processInfo.systemUptime
         let (bytes, response) = try await session.bytes(for: request)
@@ -143,5 +157,21 @@ public enum RequestEngine {
         if !draft.expectedStatus.isEmpty { checks.append(CheckResult(title: "Status equals \(draft.expectedStatus)", passed: Int(draft.expectedStatus) == http.statusCode)) }
         if !draft.bodyContains.isEmpty { checks.append(CheckResult(title: "Body contains \(draft.bodyContains)", passed: String(data: data, encoding: .utf8)?.contains(draft.bodyContains) == true)) }
         return Exchange(requestID: draft.id, requestName: draft.name, method: draft.method, url: http.url?.absoluteString ?? request.url!.absoluteString, status: http.statusCode, duration: ProcessInfo.processInfo.systemUptime - start, headers: headers, body: data, checks: checks, preparedRequest: PreparedRequestSummary(request))
+    }
+}
+
+private final class HTTPTransportDelegate: NSObject, URLSessionTaskDelegate, Sendable {
+    let prepared: PreparedHTTPRequest
+    init(prepared: PreparedHTTPRequest) { self.prepared = prepared }
+    func urlSession(_ session: URLSession, task: URLSessionTask, needNewBodyStream completionHandler: @escaping @Sendable (InputStream?) -> Void) {
+        completionHandler(prepared.newBodyStream())
+    }
+    func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest, completionHandler: @escaping @Sendable (URLRequest?) -> Void) {
+        func origin(_ url: URL?) -> String? {
+            guard let url, let scheme = url.scheme?.lowercased(), let host = url.host?.lowercased() else { return nil }
+            return "\(scheme)://\(host):\(url.port ?? (scheme == "https" ? 443 : 80))"
+        }
+        // Do not forward custom credential headers or replay bodies to another origin.
+        completionHandler(origin(request.url) == origin(prepared.request.url) ? request : nil)
     }
 }
