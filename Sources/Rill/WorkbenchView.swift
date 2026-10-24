@@ -38,6 +38,8 @@ struct WorkbenchView: View {
         .tint(accent)
         .sheet(isPresented: $store.showForeignScripts) { ForeignScriptReviewView().environmentObject(store) }
         .sheet(isPresented: $store.showCommandImport) { CommandImportView().environmentObject(store) }
+        .sheet(isPresented: $store.showGRPC) { GRPCWorkbenchView().environmentObject(store) }
+        .sheet(isPresented: $store.showBrokers) { BrokerWorkbenchView().environmentObject(store) }
         .sheet(isPresented: $store.showLiveStreams) { LiveStreamsView().environmentObject(store) }
         .sheet(isPresented: $store.showAPITools) { APIToolsView().environmentObject(store) }
         .sheet(isPresented: $store.showRunner) { RunnerView().environmentObject(store) }

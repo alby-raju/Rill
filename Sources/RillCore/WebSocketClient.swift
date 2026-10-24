@@ -35,11 +35,13 @@ public actor WebSocketClient {
     private var requestedProtocol: String?
     private var sentBytes = 0, inFlight = 0, retainedBytes = 0, records = 0
     private var timeout = 30.0
+    private var messageLimit = 1024 * 1024
     public init() {}
-    public func connect(_ input: RequestDraft, environment: Environment?, subprotocol: String? = nil,
+    public func connect(_ input: RequestDraft, environment: Environment?, subprotocol: String? = nil, maximumMessageBytes: Int = 1024 * 1024,
                         profiles: [AuthenticationProfile] = [], secrets: NamedSecretResolver? = nil, tlsProfiles: [TLSProfile] = [],
                         onRecord: @escaping @Sendable (StreamRecord) async -> Void) async throws {
         guard socket == nil else { throw StreamError.busy }
+        guard (1...(1024 * 1024 + 65536)).contains(maximumMessageBytes) else { throw WorkflowError.limit }; messageLimit = maximumMessageBytes
         var draft = input
         guard var url = URLComponents(string: draft.url), ["ws", "wss"].contains(url.scheme?.lowercased() ?? ""), url.host?.isEmpty == false else { throw StreamError.invalidEndpoint }
         let scheme = url.scheme!.lowercased(); url.scheme = scheme == "wss" ? "https" : "http"
@@ -60,7 +62,7 @@ public actor WebSocketClient {
         let configuration = HTTPClientConfiguration.make()
         let session = URLSession(configuration: configuration, delegate: delegate, delegateQueue: nil)
         self.session = session
-        let socket = session.webSocketTask(with: request); socket.maximumMessageSize = 1024 * 1024; self.socket = socket
+        let socket = session.webSocketTask(with: request); socket.maximumMessageSize = messageLimit; self.socket = socket
         deadline = Task { [weak self] in
             do { try await Task.sleep(for: .seconds(300)); await self?.expired(id) } catch { }
         }
@@ -72,7 +74,7 @@ public actor WebSocketClient {
         try await withTaskCancellationHandler {
             try Task.checkCancellation()
             try await withCheckedThrowingContinuation { ready = $0; socket.resume() }
-        } onCancel: { Task { await self.stop() } }
+        } onCancel: { Task { await self.stopIfCurrent(id) } }
     }
     fileprivate func opened(_ selected: String?, generation id: UUID) async {
         guard generation == id, let socket else { return }
@@ -93,7 +95,7 @@ public actor WebSocketClient {
                 case .data(let data): record = StreamRecord(direction: .inbound, kind: .binary, data: data)
                 @unknown default: throw GraphQLError.protocolFailure
                 }
-                guard record.data.count <= 1024 * 1024 else { throw WorkflowError.limit }
+                guard record.data.count <= messageLimit else { throw WorkflowError.limit }
                 guard records < 1000, retainedBytes <= 8 * 1024 * 1024 - record.data.count else { throw WorkflowError.limit }
                 await emit(record, generation: id)
             }
@@ -103,7 +105,7 @@ public actor WebSocketClient {
     public func send(data: Data) async throws { try await send(.data(data), data: data, kind: .binary) }
     private func send(_ message: URLSessionWebSocketTask.Message, data: Data, kind: StreamKind) async throws {
         guard connected, let socket else { throw StreamError.notConnected }
-        guard data.count <= 1024 * 1024 else { throw WorkflowError.limit }
+        guard data.count <= messageLimit else { throw WorkflowError.limit }
         guard inFlight < 16, sentBytes <= 4 * 1024 * 1024 - data.count else { throw StreamError.busy }
         guard records < 1000, retainedBytes <= 8 * 1024 * 1024 - data.count else { throw WorkflowError.limit }
         inFlight += 1; sentBytes += data.count
@@ -142,10 +144,11 @@ public actor WebSocketClient {
         guard generation == id else { return }
         ready?.resume(throwing: error ?? StreamError.notConnected); ready = nil
         await emit(StreamRecord(direction: .system, kind: error == nil ? .close : .error, data: Data(code.utf8)), generation: id)
-        stop()
+        if generation == id { stop() }
     }
     private func handshakeExpired(_ id: UUID) async { if generation == id && ready != nil { await ended(generation: id, code: "Handshake timed out", error: URLError(.timedOut)) } }
     private func expired(_ id: UUID) async { if generation == id { await ended(generation: id, code: "Session reached its five-minute lifetime", error: nil) } }
+    private func stopIfCurrent(_ id: UUID) { if generation == id { stop() } }
     public func stop() {
         generation = UUID(); connected = false
         ready?.resume(throwing: CancellationError()); ready = nil

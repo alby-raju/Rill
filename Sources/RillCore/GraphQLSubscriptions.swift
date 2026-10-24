@@ -9,10 +9,11 @@ public actor GraphQLSubscriptionClient {
     private var callback: (@Sendable (StreamRecord) async -> Void)?
     private var operationID = ""
     private var generation = UUID()
+    private var stopping = false
     public init() {}
     public func start(_ input: RequestDraft, environment: Environment?, initPayload: String = "{}", profiles: [AuthenticationProfile] = [],
                       secrets: NamedSecretResolver? = nil, tlsProfiles: [TLSProfile] = [], onRecord: @escaping @Sendable (StreamRecord) async -> Void) async throws {
-        guard phase == .idle || phase == .finished, let configuration = input.graphql, initPayload.utf8.count <= 65536 else { throw GraphQLError.invalidInput }
+        guard !stopping, phase == .idle || phase == .finished, let configuration = input.graphql, initPayload.utf8.count <= 65536 else { throw GraphQLError.invalidInput }
         let prepared = try WorkflowEngine.prepare(input, variables: WorkflowEngine.variables(in: environment))
         func resolve(_ text: String) throws -> String {
             try VariableExpansion.resolve(text, values: prepared.variables, secretLookup: { name in guard let secrets else { throw AuthenticationError.missingSecret }; return try secrets.resolve(name) })
@@ -32,12 +33,12 @@ public actor GraphQLSubscriptionClient {
                 if phase == .acknowledged { return }
                 guard phase == .awaitingAck else { throw GraphQLError.protocolFailure }
                 try await withCheckedThrowingContinuation { ready = $0 }
-            } onCancel: { Task { await self.stop() } }
+            } onCancel: { Task { await self.stopIfCurrent(id) } }
             timer?.cancel(); timer = nil
             guard generation == id else { throw CancellationError() }
             phase = .subscribed
             try await send(.object([JSONKey("id"): .string(Data(operationID.utf8)), JSONKey("type"): .string(Data("subscribe".utf8)), JSONKey("payload"): payload]))
-        } catch { await stop(); throw error }
+        } catch { if generation == id { await stop() }; throw error }
     }
     private func send(_ value: JSONValue) async throws { try await socket.send(text: ResponseJSON.encoded(value)) }
     private func received(_ record: StreamRecord, generation id: UUID) async {
@@ -93,7 +94,10 @@ public actor GraphQLSubscriptionClient {
         if let callback { await callback(StreamRecord(direction: .system, kind: .error, data: Data("Subscription acknowledgement timed out".utf8))) }
         await stop()
     }
+    private func stopIfCurrent(_ id: UUID) async { if generation == id { await stop() } }
     public func stop() async {
+        guard !stopping else { return }; stopping = true
+        defer { stopping = false }
         let sendComplete = phase == .subscribed, id = operationID
         generation = UUID(); ready?.resume(throwing: CancellationError()); ready = nil; timer?.cancel(); timer = nil
         phase = .finished; callback = nil
