@@ -36,6 +36,8 @@ public enum WorkspaceFile {
         guard workspace.version == 1 else { throw WorkspaceError.unsupportedVersion(workspace.version) }
         func unique(_ values: [UUID]) -> Bool { Set(values).count == values.count }
         func fieldsValid(_ fields: [Field]) -> Bool { unique(fields.map(\.id)) }
+        guard unique((workspace.tlsProfiles ?? []).map(\.id)) else { throw WorkspaceError.invalidStructure }
+        for profile in workspace.tlsProfiles ?? [] { try TLSProfiles.validate(profile) }
         let profiles = workspace.authProfiles ?? [], secrets = workspace.namedSecrets ?? []
         guard unique(profiles.map(\.id)), unique(secrets.map(\.id)),
               profiles.allSatisfy({ !$0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }),

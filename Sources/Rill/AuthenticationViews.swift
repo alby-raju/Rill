@@ -6,6 +6,15 @@ struct AuthenticationComposer: View {
     @Binding var request: RequestDraft
     var body: some View {
         Form {
+            Picker("TLS profile", selection: $request.tlsProfileID) {
+                Text("System defaults").tag(nil as UUID?)
+                ForEach(store.workspace.tlsProfiles ?? []) { Text(($0.mode == .insecure ? "⚠︎ " : "") + $0.name).tag(Optional($0.id)) }
+                if let id = request.tlsProfileID, !(store.workspace.tlsProfiles ?? []).contains(where: { $0.id == id }) { Text("Missing TLS profile").tag(Optional(id)) }
+            }
+            if let profile = (store.workspace.tlsProfiles ?? []).first(where: { $0.id == request.tlsProfileID }), profile.mode == .insecure {
+                Text("INSECURE TLS: certificate and hostname verification disabled.").foregroundStyle(.red).font(.caption)
+            }
+            Button("Manage TLS profiles…") { store.showTLS = true }
             Picker("Profile", selection: $request.authProfileID) {
                 Text("Request-specific auth").tag(nil as UUID?)
                 ForEach(store.workspace.authProfiles ?? []) { Text($0.name).tag(Optional($0.id)) }

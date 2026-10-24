@@ -135,15 +135,17 @@ public enum RequestEngine {
     private static func hasInvalidHeaderValue(_ value: String) -> Bool {
         value.unicodeScalars.contains { ($0.value < 32 && $0.value != 9) || $0.value == 127 }
     }
-    public static func execute(_ draft: RequestDraft, environment: Environment?, budget: ResponseBudget = .standard, profiles: [AuthenticationProfile] = [], secrets: NamedSecretResolver? = nil) async throws -> Exchange {
+    public static func execute(_ draft: RequestDraft, environment: Environment?, budget: ResponseBudget = .standard, profiles: [AuthenticationProfile] = [], secrets: NamedSecretResolver? = nil, tlsProfiles: [TLSProfile] = [], identities: any TLSIdentityProvider = SystemTLSIdentities()) async throws -> Exchange {
         try Task.checkCancellation()
+        let tlsProfile = try TLSProfiles.selected(draft.tlsProfileID, from: tlsProfiles)
+        let identity = try tlsProfile?.identityReference.map { try identities.identity(for: $0) }
         let frozen = try freeze(draft, environment: environment, profiles: profiles, secrets: secrets)
         defer { frozen.removeTemporaryBody() }
         let request = frozen.request
         let configuration = URLSessionConfiguration.ephemeral
         configuration.httpShouldSetCookies = false
         configuration.urlCache = nil
-        let session = URLSession(configuration: configuration, delegate: HTTPTransportDelegate(prepared: frozen), delegateQueue: nil)
+        let session = URLSession(configuration: configuration, delegate: HTTPTransportDelegate(prepared: frozen, profile: tlsProfile, identity: identity), delegateQueue: nil)
         defer { session.invalidateAndCancel() }
         let start = ProcessInfo.processInfo.systemUptime
         let (bytes, response) = try await session.bytes(for: request)
@@ -164,9 +166,24 @@ public enum RequestEngine {
     }
 }
 
-private final class HTTPTransportDelegate: NSObject, URLSessionTaskDelegate, Sendable {
+private final class HTTPTransportDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
     let prepared: PreparedHTTPRequest
-    init(prepared: PreparedHTTPRequest) { self.prepared = prepared }
+    let profile: TLSProfile?
+    let identity: SecIdentity?
+    init(prepared: PreparedHTTPRequest, profile: TLSProfile?, identity: SecIdentity?) { self.prepared = prepared; self.profile = profile; self.identity = identity }
+    func urlSession(_ session: URLSession, task: URLSessionTask, didReceive challenge: URLAuthenticationChallenge, completionHandler: @escaping @Sendable (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+        switch challenge.protectionSpace.authenticationMethod {
+        case NSURLAuthenticationMethodServerTrust:
+            guard let profile, profile.mode != .system else { completionHandler(.performDefaultHandling, nil); return }
+            guard let trust = challenge.protectionSpace.serverTrust else { completionHandler(.cancelAuthenticationChallenge, nil); return }
+            if profile.mode == .insecure || TLSProfiles.evaluate(trust, host: challenge.protectionSpace.host, profile: profile) { completionHandler(.useCredential, URLCredential(trust: trust)) }
+            else { completionHandler(.cancelAuthenticationChallenge, nil) }
+        case NSURLAuthenticationMethodClientCertificate:
+            guard let identity, challenge.previousFailureCount == 0 else { completionHandler(.cancelAuthenticationChallenge, nil); return }
+            completionHandler(.useCredential, URLCredential(identity: identity, certificates: nil, persistence: .forSession))
+        default: completionHandler(.performDefaultHandling, nil)
+        }
+    }
     func urlSession(_ session: URLSession, task: URLSessionTask, needNewBodyStream completionHandler: @escaping @Sendable (InputStream?) -> Void) {
         completionHandler(prepared.newBodyStream())
     }

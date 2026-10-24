@@ -43,6 +43,7 @@ public struct RequestDraft: Codable, Identifiable, Equatable, Sendable {
     public var binaryFile: UploadFileReference?
     public var apiKeyName: String?
     public var apiKeyLocation: APIKeyLocation?
+    public var tlsProfileID: UUID?
     public var authProfileID: UUID?
     public var auth: AuthKind = .none
     public var username = ""
@@ -105,6 +106,7 @@ public struct Workspace: Codable, Equatable, Sendable {
     public var environments: [Environment] = []
     public var authProfiles: [AuthenticationProfile]?
     public var namedSecrets: [NamedSecret]?
+    public var tlsProfiles: [TLSProfile]?
     public var selectedEnvironmentID: UUID?
     public var history: [Exchange] = []
     public init() {}
