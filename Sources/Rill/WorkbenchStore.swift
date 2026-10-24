@@ -53,6 +53,7 @@ import UniformTypeIdentifiers
     @Published var oauthStatus = ""
     private var oauthTask: Task<Void, Never>?
     private var oauthGeneration: UUID?
+    @Published var showForeignScripts = false
     @Published var showCommandImport = false
     @Published var showCommandExport = false
     @Published var showTLS = false
@@ -527,11 +528,11 @@ import UniformTypeIdentifiers
     func exportInterchange(_ target: String) {
         guard canEdit else { return }
         let alert = NSAlert(); alert.messageText = "Export " + target + "?"
-        alert.informativeText = "URLs, bodies, file paths and unmarked variables may contain secrets. Postman exports saved requests and separate environments; native secret references need local configuration. HAR exports the current draft without sending it, with an explicitly unexecuted response placeholder. Masked HAR also redacts query values and nonessential headers. File references are exported as metadata only; unsupported profiles or bodies fail before writing."
+        alert.informativeText = "URLs, bodies, file paths and unmarked variables may contain secrets. Postman and Insomnia export saved requests; Insomnia includes the selected environment. Foreign scripts are omitted to avoid enabling them in another app; native secret references need local configuration. HAR exports the current draft without sending it, with an explicitly unexecuted response placeholder. Masked HAR also redacts query values and nonessential headers. File references are exported as metadata only; unsupported profiles or bodies fail before writing."
         alert.addButton(withTitle: "Cancel"); alert.addButton(withTitle: "Export Masked"); alert.addButton(withTitle: "Include Auth Values")
         let choice = alert.runModal(); guard choice != .alertFirstButtonReturn else { return }
         let include = choice == .alertThirdButtonReturn
-        let panel = NSSavePanel(); panel.nameFieldStringValue = "Rill-" + target + (target == "HAR" ? ".har" : ".json")
+        let panel = NSSavePanel(); panel.nameFieldStringValue = "Rill-" + target + (target == "HAR" ? ".har" : (target == "Insomnia collection" ? ".yaml" : ".json"))
         guard panel.runModal() == .OK, let url = panel.url else { return }
         let snapshot = workspace, request = selected, environment = environment
         let resolver = NamedSecretResolver(catalog: snapshot.namedSecrets ?? [])
@@ -540,18 +541,21 @@ import UniformTypeIdentifiers
                 try await Task.detached {
                     let data: Data
                     switch target {
+                    case "Insomnia collection": data = try InsomniaExporter.collection(snapshot, environment: environment, includeCredentials: include)
                     case "Postman collection": data = try PostmanExporter.collection(snapshot, includeCredentials: include)
                     case "Postman environment": guard let environment else { throw ForeignExportError.unsupported }; data = try PostmanExporter.environment(environment)
                     default: guard let request else { throw ForeignExportError.unsupported }; data = try HARExporter.request(request, environment: environment, includeCredentials: include, profiles: snapshot.authProfiles ?? [], secrets: resolver)
                     }
-                    try ForeignExportFile.write(data, to: url)
+                    if target == "Insomnia collection" { try InsomniaExportFile.write(data, to: url) }
+                    else { try ForeignExportFile.write(data, to: url) }
                 }.value
             } catch { self.error = "Export did not complete. " + error.localizedDescription }
         }
     }
     func importForeign(_ format: ForeignImportFormat) {
         guard canEdit, persistenceAvailable else { return }
-        let panel = NSOpenPanel(); panel.allowedContentTypes = [.json]
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = format == .insomnia ? [.json, .yaml] : [.json]
         guard panel.runModal() == .OK, let url = panel.url else { return }
         importing = true; cancel(); saveTask?.cancel(); saveGeneration = UUID()
         Task {
@@ -598,7 +602,7 @@ import UniformTypeIdentifiers
     func createBackup() {
         guard canEdit else { return }
         let alert = NSAlert(); alert.messageText = "Create workspace backup"
-        alert.informativeText = "Auth passwords and tokens are omitted. URLs, headers, bodies and environment values remain as entered and may contain sensitive data."
+        alert.informativeText = "Auth passwords and tokens are omitted. URLs, headers, bodies, environment values and foreign script text remain as entered and may contain sensitive data."
         alert.addButton(withTitle: "Cancel"); alert.addButton(withTitle: "Workspace Only"); alert.addButton(withTitle: "Include Drafts")
         let choice = alert.runModal(); guard choice != .alertFirstButtonReturn else { return }
         let panel = NSSavePanel(); panel.nameFieldStringValue = "Rill-workspace.rillbackup"
