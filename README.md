@@ -65,3 +65,5 @@ See the [phased roadmap](ROADMAP.md), [122-capability register](docs/roadmap/CAP
 ## Scope
 
 This is the first working native foundation, not full parity with the old application. See [implementation status](docs/IMPLEMENTATION.md) for remaining work. No original Java source, scripts, assets, tests or dependencies were copied or translated into this project. The supplied archive's user documentation was read to identify workflows.
+
+Postman v2.0/v2.1 JSON collections and environments can be imported from the File menu with a loss preview. Supported inherited auth is flattened, nested folders become collection breadcrumbs, and marked environment secrets move to Keychain. Scripts, OAuth helper imports and scoped folder/request variables are not supported; unsupported auth/body data fails before Apply. File references require local reselection. See [M3 details](docs/milestones/M3.md).
