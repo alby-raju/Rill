@@ -549,7 +549,7 @@ import UniformTypeIdentifiers
             } catch { self.error = "Export did not complete. " + error.localizedDescription }
         }
     }
-    func importPostman() {
+    func importForeign(_ format: ForeignImportFormat) {
         guard canEdit, persistenceAvailable else { return }
         let panel = NSOpenPanel(); panel.allowedContentTypes = [.json]
         guard panel.runModal() == .OK, let url = panel.url else { return }
@@ -559,9 +559,9 @@ import UniformTypeIdentifiers
             do {
                 guard await saveWorkspaceNow() else { return }
                 let current = workspace
-                let plan = try await Task.detached { try ForeignImportPlan(PostmanImporter.load(from: url), current: current) }.value
+                let plan = try await Task.detached { try ForeignImportPlan(format.load(from: url), current: current) }.value
                 let preview = plan.preview
-                let alert = NSAlert(); alert.messageText = "Import Postman export?"
+                let alert = NSAlert(); alert.messageText = "Import " + format.rawValue + "?"
                 alert.informativeText = "Add \(preview.collections) collection(s), \(preview.requests) request(s), \(preview.environments) environment(s) and \(preview.secretDescriptors) secret descriptor(s).\n\n" + preview.warnings.joined(separator: "\n\n")
                 let text = NSTextView(frame: NSRect(x: 0, y: 0, width: 460, height: 160)); text.isEditable = false
                 text.string = preview.requestNames.joined(separator: "\n")
@@ -572,7 +572,7 @@ import UniformTypeIdentifiers
                 applyingWorkspace = true; workspace = updated; applyingWorkspace = false
                 hasUnsavedChanges = false; persistenceHealth = .saved
             } catch {
-                self.error = "Postman import did not complete. \(error.localizedDescription)"
+                self.error = "Foreign import did not complete. \(error.localizedDescription)"
                 if (error as? WorkspaceError) == .conflict { persistenceAvailable = false; persistenceHealth = .conflict }
             }
         }

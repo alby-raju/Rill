@@ -22,7 +22,8 @@ typealias ViewState<Value> = SwiftUI.State<Value>
                 Button("New Collection") { store.newCollection() }.keyboardShortcut("n", modifiers: [.command, .shift])
                 Divider()
                 Button("Import cURL / HTTPie / HAR…") { store.showCommandImport = true }
-                Button("Import Postman JSON…") { store.importPostman() }
+                Button("Import Postman JSON…") { store.importForeign(.postman) }
+                Button("Import HTTPie Desktop JSON…") { store.importForeign(.httpieDesktop) }
                 Button("Import Rill Workspace…") { store.importWorkspace() }
                 Button("Export Postman Collection…") { store.exportInterchange("Postman collection") }
                 Button("Export Postman Environment…") { store.exportInterchange("Postman environment") }.disabled(store.environment == nil)
