@@ -33,7 +33,7 @@ struct CommandImportView: View {
             if har && !entries.isEmpty {
                 Picker("Captured request", selection: $entryIndex) {
                     ForEach(entries.indices, id: \.self) { Text(entries[$0].request.name).tag($0) }
-                }.onChange(of: entryIndex) { _, index in preview = entries[index] }
+                }.onChange(of: entryIndex) { _, index in if entries.indices.contains(index) { preview = entries[index] } }
             }
             if let preview {
                 ScrollView {

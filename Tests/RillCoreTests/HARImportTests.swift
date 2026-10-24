@@ -11,6 +11,7 @@ final class HARImportTests: XCTestCase {
         XCTAssertEqual(result.count, 2); XCTAssertNotEqual(result[0].request.id, result[1].request.id)
         XCTAssertEqual(result[0].request.credential, "private-token"); XCTAssertEqual(result[0].request.auth, .bearer)
         XCTAssertTrue(result[0].request.headers.isEmpty)
+        XCTAssertEqual(result[0].request.bodyMode, RequestBodyMode.none)
         XCTAssertEqual(try RequestEngine.prepare(result[0].request, environment: nil).url?.absoluteString, "https://example.test/?x=%2f&x=2")
         XCTAssertTrue(result[0].warnings.contains { $0.contains("Cookie objects") })
         XCTAssertFalse(result[0].warnings.joined().contains("private-token"))

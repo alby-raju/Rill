@@ -23,7 +23,7 @@ public enum HARImporter {
             guard let source = entry["request"] as? [String: Any],
                   let methodText = source["method"] as? String, let method = HTTPMethod(rawValue: methodText),
                   let address = source["url"] as? String else { throw HARImportError.unsupported }
-            var request = RequestDraft(); request.method = method; request.url = address; request.bodyMode = .none
+            var request = RequestDraft(); request.method = method; request.url = address; request.bodyMode = RequestBodyMode.none
             var warnings = ["Only the selected request is imported. Captured responses, timings, pages, connection metadata and extensions are omitted.", "URL query spelling is authoritative; HAR queryString metadata is not appended a second time. Rill transport defaults apply."]
             guard let headers = source["headers"] as? [[String: Any]], headers.count <= 10_000 else { throw HARImportError.invalid }
             var omittedTransportHeaders = false
