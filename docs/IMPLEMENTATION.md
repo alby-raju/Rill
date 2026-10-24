@@ -12,7 +12,9 @@ The package separates serializable models and request execution (`RillCore`) fro
 
 The archive documents a much larger product than this first native build. These features are not implemented or represented as working controls:
 
-- OpenAPI/Swagger, Postman, Insomnia, Bruno, HAR and cURL import/conversion.
+- OpenAPI/Swagger, Postman, Insomnia, Bruno, HAR and HTTPie Desktop import/conversion.
+
+[M3](milestones/M3.md) adds native import plans and a documented subset of cURL/HTTPie command import/generation.
 - Cookie management.
 
 [M2](milestones/M2.md) adds structured forms, API-key auth, streaming file/multipart uploads and prepared request inspection, safe response previews, opt-in durable snapshots and semantic JSON comparison. Interoperability and installed-app acceptance remain partial.

@@ -67,6 +67,22 @@ public actor WorkspaceSession {
         for id in plan.addedRequestIDs { credentials[id] = "" }
         return updated
     }
+    public func importRequest(_ incoming: RequestDraft, current: Workspace) throws -> (workspace: Workspace, requestID: UUID) {
+        try Task.checkCancellation()
+        guard let revision else { throw WorkspaceError.unavailable }
+        for request in current.requests { guard credentials[request.id] == request.credential else { throw WorkspaceError.conflict } }
+        var request = incoming; request.id = UUID()
+        var updated = current; updated.requests.append(request)
+        var disk = updated; disk.history = []
+        for index in disk.requests.indices { disk.requests[index].credential = "" }
+        self.revision = try repository.commitWithCompanion(disk, expecting: revision, beforeWrite: {
+            if !request.credential.isEmpty { try credentialStore.write(request.credential, id: request.id) }
+        }, onWriteFailure: {
+            if !request.credential.isEmpty { try credentialStore.write("", id: request.id) }
+        })
+        credentials[request.id] = request.credential
+        return (updated, request.id)
+    }
     public func currentRevision() -> WorkspaceRevision? { revision }
 
     public func restore(_ contents: BackupContents, retainingPreviousAt previous: URL, editor: EditorSessionState?) throws -> Workspace {
