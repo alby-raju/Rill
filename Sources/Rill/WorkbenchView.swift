@@ -36,6 +36,7 @@ struct WorkbenchView: View {
         .disabled(store.loading || store.importing || store.closing)
         .overlay { if store.loading { ProgressView("Opening workspace…").padding(24).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12)) } }
         .tint(accent)
+        .sheet(isPresented: $store.showAuthentication) { AuthenticationManager().environmentObject(store) }
         .sheet(isPresented: $store.showEnvironments) { EnvironmentEditor().environmentObject(store) }
         .sheet(isPresented: $store.showHistory) { HistoryView().environmentObject(store) }
         .sheet(isPresented: $store.showPalette) { RequestSearch().environmentObject(store) }
@@ -203,18 +204,7 @@ struct RequestEditor: View {
                         case "Headers": FieldEditor(fields: $request.headers, noun: "header")
                         case "Body": BodyComposer(request: $request)
                         case "Auth":
-                            Form {
-                                Picker("Authentication", selection: $request.auth) { ForEach(AuthKind.allCases, id: \.self) { Text($0.rawValue).tag($0) } }
-                                if request.auth == .apiKey {
-                                    TextField("Key name", text: Binding(get: { request.apiKeyName ?? "" }, set: { request.apiKeyName = $0 }))
-                                    Picker("Send in", selection: Binding(get: { request.apiKeyLocation ?? .header }, set: { request.apiKeyLocation = $0 })) {
-                                        ForEach(APIKeyLocation.allCases, id: \.self) { Text($0.rawValue).tag($0) }
-                                    }
-                                }
-                                if request.auth == .basic { TextField("Username", text: $request.username) }
-                                if request.auth != .none { SecureField(request.auth == .basic ? "Password" : "Token or {{variable}}", text: $request.credential); Text("Saved in macOS Keychain.").font(.caption).foregroundStyle(.secondary) }
-                                Text("Selected auth replaces a matching header or query key. Auth credentials are excluded from exports; ordinary fields are exported as entered.").font(.caption).foregroundStyle(.secondary)
-                            }.padding(20)
+                            AuthenticationComposer(request: $request)
                         default:
                             Form {
                                 TextField("Expected HTTP status", text: $request.expectedStatus, prompt: Text("e.g. 200"))

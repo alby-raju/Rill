@@ -32,11 +32,14 @@ public enum RequestEngine {
         try VariableExpansion.resolve(text, values: variables)
     }
 
-    public static func prepare(_ draft: RequestDraft, environment: Environment?) throws -> URLRequest {
+    public static func prepare(_ input: RequestDraft, environment: Environment?, profiles: [AuthenticationProfile] = [], secrets: NamedSecretResolver? = nil) throws -> URLRequest {
+        let draft = try AuthenticationProfiles.applying(to: input, profiles: profiles)
         let variables = environment?.variables.filter { $0.enabled && !$0.name.isEmpty }.reduce(into: [String: String]()) { $0[$1.name] = $1.value } ?? [:]
         var expandedBytes = 0
         func expand(_ value: String) throws -> String {
-            let result = try resolve(value, variables: variables)
+            let result = try VariableExpansion.resolve(value, values: variables, secretLookup: { name in
+                guard let secrets else { throw AuthenticationError.missingSecret }; return try secrets.resolve(name)
+            })
             expandedBytes += result.utf8.count
             guard expandedBytes <= ResourceLimits.workspaceBytes else { throw EditingError.expansionLimit }
             return result
@@ -117,12 +120,13 @@ public enum RequestEngine {
         }
         return request
     }
-    public static func freeze(_ draft: RequestDraft, environment: Environment?) throws -> PreparedHTTPRequest {
-        guard draft.bodyMode == .multipart || draft.bodyMode == .binary else { return PreparedHTTPRequest(request: try prepare(draft, environment: environment)) }
+    public static func freeze(_ input: RequestDraft, environment: Environment?, profiles: [AuthenticationProfile] = [], secrets: NamedSecretResolver? = nil) throws -> PreparedHTTPRequest {
+        let draft = try AuthenticationProfiles.applying(to: input, profiles: profiles)
+        guard draft.bodyMode == .multipart || draft.bodyMode == .binary else { return PreparedHTTPRequest(request: try prepare(draft, environment: environment, secrets: secrets)) }
         guard draft.method != .GET && draft.method != .HEAD else { throw RillError.unsupportedBodyMethod }
         var headersOnly = draft; headersOnly.bodyMode = RequestBodyMode.none
-        var request = try prepare(headersOnly, environment: environment)
-        let upload = try UploadBody.create(draft, environment: environment)
+        var request = try prepare(headersOnly, environment: environment, secrets: secrets)
+        let upload = try UploadBody.create(draft, environment: environment, secrets: secrets)
         request.httpBodyStream = InputStream(url: upload.url)
         request.setValue(String(upload.count), forHTTPHeaderField: "Content-Length")
         if draft.bodyMode == .multipart || request.value(forHTTPHeaderField: "Content-Type") == nil { request.setValue(upload.contentType, forHTTPHeaderField: "Content-Type") }
@@ -131,9 +135,9 @@ public enum RequestEngine {
     private static func hasInvalidHeaderValue(_ value: String) -> Bool {
         value.unicodeScalars.contains { ($0.value < 32 && $0.value != 9) || $0.value == 127 }
     }
-    public static func execute(_ draft: RequestDraft, environment: Environment?, budget: ResponseBudget = .standard) async throws -> Exchange {
+    public static func execute(_ draft: RequestDraft, environment: Environment?, budget: ResponseBudget = .standard, profiles: [AuthenticationProfile] = [], secrets: NamedSecretResolver? = nil) async throws -> Exchange {
         try Task.checkCancellation()
-        let frozen = try freeze(draft, environment: environment)
+        let frozen = try freeze(draft, environment: environment, profiles: profiles, secrets: secrets)
         defer { frozen.removeTemporaryBody() }
         let request = frozen.request
         let configuration = URLSessionConfiguration.ephemeral

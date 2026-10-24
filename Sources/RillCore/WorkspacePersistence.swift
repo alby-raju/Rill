@@ -36,6 +36,11 @@ public enum WorkspaceFile {
         guard workspace.version == 1 else { throw WorkspaceError.unsupportedVersion(workspace.version) }
         func unique(_ values: [UUID]) -> Bool { Set(values).count == values.count }
         func fieldsValid(_ fields: [Field]) -> Bool { unique(fields.map(\.id)) }
+        let profiles = workspace.authProfiles ?? [], secrets = workspace.namedSecrets ?? []
+        guard unique(profiles.map(\.id)), unique(secrets.map(\.id)),
+              profiles.allSatisfy({ !$0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }),
+              Set(try secrets.map { try NamedSecretResolver.environmentKey(for: $0.name) }).count == secrets.count else { throw WorkspaceError.invalidStructure }
+        for secret in secrets { try NamedSecretResolver.validateName(secret.name) }
         let collections = Set(workspace.collections.map(\.id))
         let environments = Set(workspace.environments.map(\.id))
         guard unique(workspace.collections.map(\.id)), unique(workspace.requests.map(\.id)),

@@ -8,7 +8,7 @@ import UniformTypeIdentifiers
             guard !loading, !applyingWorkspace, workspace.needsSave(comparedTo: oldValue) else { return }
             let previous = editor.request(selection, in: oldValue)
             let oldEnvironment = try? resolvedEnvironment(in: oldValue)
-            if previous != selected || oldEnvironment != environment { response = nil; cancel() }
+            if previous != selected || oldEnvironment != environment || workspace.authProfiles != oldValue.authProfiles || workspace.namedSecrets != oldValue.namedSecrets { response = nil; cancel() }
             hasUnsavedChanges = true; persist()
         }
     }
@@ -31,6 +31,7 @@ import UniformTypeIdentifiers
     @Published var search = ""
     @Published var focusedCollectionID: UUID?
     @Published var inspectedHistoryID: UUID?
+    @Published var showAuthentication = false
     @Published var showEnvironments = false
     @Published var showHistory = false
     @Published var showPalette = false
@@ -51,6 +52,7 @@ import UniformTypeIdentifiers
     private var checkpointNeeded = false
     private var checkpointGeneration = UUID()
     private var checkpointAvailable = true
+    private let secretVault = NamedSecretVault()
     private let persistence: WorkspaceSession
     private let editorPersistence: EditorSessionPersistence
     private let directory: URL
@@ -283,12 +285,14 @@ import UniformTypeIdentifiers
         let environment: RillCore.Environment?
         do { environment = try resolvedEnvironment(in: workspace) }
         catch { self.error = error.localizedDescription; return }
+        let profiles = workspace.authProfiles ?? []
+        let secrets = NamedSecretResolver(catalog: workspace.namedSecrets ?? [])
         let context = ExecutionContext(request: draft, environment: environment); activeContext = context.id
         running = true; response = nil
         task = Task {
             defer { if activeContext == context.id { running = false; task = nil; activeContext = nil } }
             do {
-                let exchange = try await RequestEngine.execute(draft, environment: environment)
+                let exchange = try await RequestEngine.execute(draft, environment: environment, profiles: profiles, secrets: secrets)
                 try Task.checkCancellation()
                 guard activeContext == context.id else { return }
                 if context.matches(request: selected, environment: self.environment) { response = exchange }
@@ -307,6 +311,38 @@ import UniformTypeIdentifiers
         let wasRunning = running
         task?.cancel(); task = nil; activeContext = nil; running = false
         if wasRunning { lastFailure = .cancelled }
+    }
+    func setNamedSecret(name: String, value: String, replacing id: UUID? = nil) {
+        guard canEdit, persistenceAvailable else { return }
+        let secret = (workspace.namedSecrets ?? []).first { $0.id == id } ?? NamedSecret(name: name)
+        do {
+            let key = try NamedSecretResolver.environmentKey(for: secret.name)
+            guard !(workspace.namedSecrets ?? []).contains(where: { $0.id != secret.id && (try? NamedSecretResolver.environmentKey(for: $0.name)) == key }) else { throw WorkspaceError.invalidStructure }
+        } catch { self.error = error.localizedDescription; return }
+        importing = true; cancel()
+        Task {
+            defer { importing = false }
+            do {
+                try await secretVault.set(value, for: secret)
+                if !(workspace.namedSecrets ?? []).contains(where: { $0.id == secret.id }) {
+                    if workspace.namedSecrets == nil { workspace.namedSecrets = [] }
+                    workspace.namedSecrets?.append(secret)
+                }
+            } catch { self.error = error.localizedDescription }
+        }
+    }
+    func deleteNamedSecret(_ secret: NamedSecret) {
+        guard canEdit, persistenceAvailable else { return }
+        let alert = NSAlert(); alert.messageText = "Delete native secret \(secret.name)?"
+        alert.informativeText = "Profiles and templates retain their references. They will fail if no secret is available. A matching RILL_SECRET_ process value becomes eligible after native metadata is removed."
+        alert.addButton(withTitle: "Cancel"); alert.addButton(withTitle: "Delete")
+        guard alert.runModal() == .alertSecondButtonReturn else { return }
+        importing = true; cancel()
+        Task {
+            defer { importing = false }
+            do { try await secretVault.delete(secret); workspace.namedSecrets?.removeAll { $0.id == secret.id } }
+            catch { self.error = error.localizedDescription }
+        }
     }
     func searchResults(_ query: String) -> [WorkspaceSearchResult] {
         var effective = workspace

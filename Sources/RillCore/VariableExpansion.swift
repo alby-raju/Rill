@@ -1,7 +1,7 @@
 import Foundation
 
 public enum VariableExpansion {
-    public static func resolve(_ text: String, values: [String: String]) throws -> String {
+    public static func resolve(_ text: String, values: [String: String], secretLookup: ((String) throws -> String)? = nil) throws -> String {
         let regex = try NSRegularExpression(pattern: #"\{\{\s*([^{}]+?)\s*\}\}"#)
         var cache: [String: String] = [:], visiting = Set<String>(), cachedBytes = 0, substitutions = 0
         func expand(_ input: String, depth: Int) throws -> String {
@@ -21,8 +21,14 @@ public enum VariableExpansion {
                 if let cached = cache[key] { value = cached }
                 else {
                     guard visiting.insert(key).inserted else { throw EditingError.variableCycle(key) }
-                    guard let raw = values[key] else { throw RillError.missingVariable(key) }
-                    value = try expand(raw, depth: depth + 1)
+                    if key.hasPrefix("secret:") {
+                        guard let secretLookup else { throw AuthenticationError.missingSecret }
+                        // Secrets are opaque bytes represented as UTF-8 text, never templates.
+                        value = try secretLookup(String(key.dropFirst(7)))
+                    } else {
+                        guard let raw = values[key] else { throw RillError.missingVariable(key) }
+                        value = try expand(raw, depth: depth + 1)
+                    }
                     visiting.remove(key)
                     cachedBytes += value.utf8.count
                     guard value.utf8.count <= 1024 * 1024, cachedBytes <= ResourceLimits.workspaceBytes else { throw EditingError.expansionLimit }

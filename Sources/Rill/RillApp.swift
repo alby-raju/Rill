@@ -39,6 +39,7 @@ typealias ViewState<Value> = SwiftUI.State<Value>
                 Button("Send Request") { store.send() }.keyboardShortcut(.return, modifiers: .command).disabled(store.running || store.loading)
                 Button("Cancel Request") { store.cancel() }.keyboardShortcut(".")
                 Button("Find Request") { store.showPalette = true }.keyboardShortcut("k")
+                Button("Authentication and Secrets") { store.showAuthentication = true }
                 Button("Environments") { store.showEnvironments = true }.keyboardShortcut("e", modifiers: [.command, .shift])
             }
         }
