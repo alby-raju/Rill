@@ -79,6 +79,14 @@ public struct Workspace: Codable, Equatable, Sendable {
     public var selectedEnvironmentID: UUID?
     public var history: [Exchange] = []
     public init() {}
+    /// Session history and the internal storage token are not user edits.
+    /// Credentials still count because they must be saved in the companion store.
+    public func needsSave(comparedTo previous: Workspace) -> Bool {
+        var current = self, earlier = previous
+        current.history = []; earlier.history = []
+        current.storageRevision = nil; earlier.storageRevision = nil
+        return current != earlier
+    }
     public static var starter: Workspace {
         var workspace = Workspace()
         let collection = RequestCollection(name: "My first collection")

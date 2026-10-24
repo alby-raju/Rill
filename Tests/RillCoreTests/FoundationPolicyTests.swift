@@ -63,4 +63,14 @@ final class FoundationPolicyTests: XCTestCase {
         XCTAssertThrowsError(try ResponseBudget(downloadBytes: 0))
         XCTAssertThrowsError(try ResponseBudget(downloadBytes: 256 * 1024 * 1024 + 1))
     }
+    func testSessionHistoryDoesNotTriggerSavesButCredentialEditsDo() {
+        let original = Workspace.starter
+        var workspace = original
+        workspace.history = [Exchange(requestID: original.requests[0].id, requestName: "History", method: .GET, url: "http://localhost", status: 200, duration: 1, headers: [], body: Data(), checks: [])]
+        workspace.storageRevision = UUID()
+        XCTAssertFalse(workspace.needsSave(comparedTo: original))
+        workspace.requests[0].credential = "new-secret"
+        XCTAssertTrue(workspace.needsSave(comparedTo: original))
+    }
+
 }

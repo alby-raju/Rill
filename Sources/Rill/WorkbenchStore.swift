@@ -5,13 +5,14 @@ import UniformTypeIdentifiers
 @MainActor final class WorkbenchStore: ObservableObject {
     @Published var workspace = Workspace.starter {
         didSet {
-            guard !loading else { return }
+            guard !loading, workspace.needsSave(comparedTo: oldValue) else { return }
             let previousRequest = oldValue.requests.first { $0.id == selection }
             let previousEnvironment = oldValue.environments.first { $0.id == oldValue.selectedEnvironmentID }
             if previousRequest != selected || previousEnvironment != environment {
                 response = nil
                 cancel()
             }
+            hasUnsavedChanges = true
             persist()
         }
     }
@@ -29,6 +30,7 @@ import UniformTypeIdentifiers
     @Published var loading = true
     @Published var importing = false
     @Published var closing = false
+    @Published private(set) var hasUnsavedChanges = false
     private var lastFailure: DiagnosticFailure?
     private var saveTask: Task<Void, Never>?
     private var saveGeneration = UUID()
@@ -69,7 +71,7 @@ import UniformTypeIdentifiers
         persist()
     }
     func persist() {
-        guard !loading, persistenceAvailable else { return }
+        guard !loading, persistenceAvailable, hasUnsavedChanges else { return }
         saveTask?.cancel()
         let generation = UUID()
         saveGeneration = generation
@@ -80,7 +82,7 @@ import UniformTypeIdentifiers
                 try await Task.sleep(for: .milliseconds(250))
                 persistenceHealth = .saving
                 try await persistence.save(snapshot)
-                if saveGeneration == generation { persistenceHealth = .saved }
+                if saveGeneration == generation { persistenceHealth = .saved; hasUnsavedChanges = false }
             } catch is CancellationError { }
             catch {
                 guard saveGeneration == generation else { return }
@@ -143,7 +145,7 @@ import UniformTypeIdentifiers
         if wasRunning { lastFailure = .cancelled }
     }
     func flushPendingChanges() async -> Bool {
-        if loading || persistenceHealth == .saved { return true }
+        if loading || !hasUnsavedChanges { return true }
         guard persistenceAvailable else { return false }
         saveTask?.cancel()
         saveGeneration = UUID()
@@ -151,6 +153,7 @@ import UniformTypeIdentifiers
         do {
             try await persistence.save(workspace)
             persistenceHealth = .saved
+            hasUnsavedChanges = false
             return true
         } catch {
             lastFailure = DiagnosticFailure.classify(error)
