@@ -570,7 +570,11 @@ import UniformTypeIdentifiers
             let counts = Dictionary(grouping: plan.changes, by: \.state).map { "\($0.key.rawValue): \($0.value.count)" }.sorted().joined(separator: " · ")
             alert.informativeText = counts + "\n\nLocally edited requests are preserved. Removed locally edited requests are retained unlinked. Source snapshots/examples stay plain text."
             let text = NSTextView(frame: NSRect(x: 0, y: 0, width: 570, height: 280)); text.isEditable = false
-            text.string = plan.changes.prefix(300).map { $0.state.rawValue + " · " + String($0.key.prefix(300)) }.joined(separator: "\n") + "\n\n" + plan.warnings.prefix(30).map { String($0.prefix(500)) }.joined(separator: "\n")
+            let changeLines: [String] = plan.changes.prefix(300).map { change in
+                "\(change.state.rawValue) · \(String(change.key.prefix(300)))"
+            }
+            let warningLines = plan.warnings.prefix(30).map { String($0.prefix(500)) }
+            text.string = changeLines.joined(separator: "\n") + "\n\n" + warningLines.joined(separator: "\n")
             let scroll = NSScrollView(frame: text.frame); scroll.documentView = text; scroll.hasVerticalScroller = true; alert.accessoryView = scroll
             alert.addButton(withTitle: "Cancel"); alert.addButton(withTitle: "Apply")
             guard alert.runModal() == .alertSecondButtonReturn else { return false }

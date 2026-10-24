@@ -99,7 +99,15 @@ struct APIToolsView: View {
                 let schema = Data(schema.utf8), instance = Data(instance.utf8)
                 perform {
                     let validation = try await detached { try JSONSchema.validate(instance: instance, schema: schema) }
-                    result = validation.valid ? "Valid for the supported subset" : validation.findings.map { $0.keyword + " at " + ($0.path.isEmpty ? "/" : $0.path) + ": " + $0.message }.joined(separator: "\n") + "\n" + validation.unsupported.map { "Unsupported: " + $0 }.joined(separator: "\n")
+                    if validation.valid { result = "Valid for the supported subset" }
+                    else {
+                        let findings: [String] = validation.findings.map { finding in
+                            let path = finding.path.isEmpty ? "/" : finding.path
+                            return "\(finding.keyword) at \(path): \(finding.message)"
+                        }
+                        let unsupported = validation.unsupported.map { "Unsupported: " + $0 }
+                        result = (findings + unsupported).joined(separator: "\n")
+                    }
                 }
             }.disabled(busy)
             ScrollView { Text(result).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading) }.frame(height: 130)
