@@ -524,6 +524,34 @@ import UniformTypeIdentifiers
             } catch { self.error = "Import failed without applying incoming changes. \(error.localizedDescription)"; if (error as? WorkspaceError) == .conflict { persistenceAvailable = false; persistenceHealth = .conflict } }
         }
     }
+    func importPostman() {
+        guard canEdit, persistenceAvailable else { return }
+        let panel = NSOpenPanel(); panel.allowedContentTypes = [.json]
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        importing = true; cancel(); saveTask?.cancel(); saveGeneration = UUID()
+        Task {
+            defer { importing = false }
+            do {
+                guard await saveWorkspaceNow() else { return }
+                let current = workspace
+                let plan = try await Task.detached { try ForeignImportPlan(PostmanImporter.load(from: url), current: current) }.value
+                let preview = plan.preview
+                let alert = NSAlert(); alert.messageText = "Import Postman export?"
+                alert.informativeText = "Add \(preview.collections) collection(s), \(preview.requests) request(s), \(preview.environments) environment(s) and \(preview.secretDescriptors) secret descriptor(s).\n\n" + preview.warnings.joined(separator: "\n\n")
+                let text = NSTextView(frame: NSRect(x: 0, y: 0, width: 460, height: 160)); text.isEditable = false
+                text.string = preview.requestNames.joined(separator: "\n")
+                let scroll = NSScrollView(frame: text.frame); scroll.documentView = text; scroll.hasVerticalScroller = true; alert.accessoryView = scroll
+                alert.addButton(withTitle: "Cancel"); alert.addButton(withTitle: "Apply Import")
+                guard alert.runModal() == .alertSecondButtonReturn else { return }
+                let updated = try await persistence.applyForeignImport(plan, current: workspace)
+                applyingWorkspace = true; workspace = updated; applyingWorkspace = false
+                hasUnsavedChanges = false; persistenceHealth = .saved
+            } catch {
+                self.error = "Postman import did not complete. \(error.localizedDescription)"
+                if (error as? WorkspaceError) == .conflict { persistenceAvailable = false; persistenceHealth = .conflict }
+            }
+        }
+    }
     func importCommand(_ result: CommandImport) async -> Bool {
         guard canEdit, persistenceAvailable else { return false }
         importing = true; cancel(); saveTask?.cancel(); saveGeneration = UUID()

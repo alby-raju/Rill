@@ -7,10 +7,12 @@ public actor WorkspaceSession {
     private var revision: WorkspaceRevision?
     private var credentials: [UUID: String] = [:]
     private let credentialStore: any CredentialStore
+    private let namedCredentialStore: any CredentialStore
 
-    public init(url: URL, credentials: any CredentialStore = KeychainCredentialStore()) {
+    public init(url: URL, credentials: any CredentialStore = KeychainCredentialStore(), namedCredentials: any CredentialStore = KeychainCredentialStore(service: "app.rill.namedsecrets")) {
         repository = WorkspaceRepository(url: url)
         credentialStore = credentials
+        namedCredentialStore = namedCredentials
     }
 
     public func open() throws -> Workspace {
@@ -82,6 +84,30 @@ public actor WorkspaceSession {
         })
         credentials[request.id] = request.credential
         return (updated, request.id)
+    }
+    public func applyForeignImport(_ plan: ForeignImportPlan, current: Workspace) throws -> Workspace {
+        try Task.checkCancellation()
+        guard let revision else { throw WorkspaceError.unavailable }
+        for request in current.requests { guard credentials[request.id] == request.credential else { throw WorkspaceError.conflict } }
+        let updated = try plan.applying(to: current)
+        var disk = updated; disk.history = []
+        for i in disk.requests.indices { disk.requests[i].credential = "" }
+        let staging = ImportCredentialStaging()
+        self.revision = try repository.commitWithCompanion(disk, expecting: revision, beforeWrite: {
+            do {
+                for request in updated.requests where plan.requestIDs.contains(request.id) && !request.credential.isEmpty {
+                    try Task.checkCancellation()
+                    try staging.write(request.credential, id: request.id, store: credentialStore)
+                }
+                for (id, value) in plan.secretValues.sorted(by: { $0.key.uuidString < $1.key.uuidString }) where !value.isEmpty {
+                    try Task.checkCancellation()
+                    try staging.write(value, id: id, store: namedCredentialStore)
+                }
+                try Task.checkCancellation()
+            } catch { let original = error; try staging.rollback(); throw original }
+        }, onWriteFailure: { try staging.rollback() })
+        for request in updated.requests where plan.requestIDs.contains(request.id) { credentials[request.id] = request.credential }
+        return updated
     }
     public func currentRevision() -> WorkspaceRevision? { revision }
 
