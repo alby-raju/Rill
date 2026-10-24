@@ -49,7 +49,7 @@ public enum BrunoExporter {
         return data
     }
     public static func request(_ draft: RequestDraft, sequence: Int = 1, includeCredentials: Bool = false) throws -> Data {
-        guard draft.authProfileID == nil, draft.tlsProfileID == nil else { throw ForeignExportError.unsupported }
+        guard draft.graphql == nil, draft.authProfileID == nil, draft.tlsProfileID == nil else { throw ForeignExportError.unsupported }
         let mode = draft.bodyMode ?? (draft.body.isEmpty ? .none : .text)
         guard mode == .none || mode == .text, mode == .none || (draft.method != .GET && draft.method != .HEAD), !draft.body.contains("\r"), draft.body.utf8.count <= 1024 * 1024 else { throw ForeignExportError.unsupported }
         var auth = "none", authBlock = "", headers = draft.headers, query = draft.parameters, address = draft.url

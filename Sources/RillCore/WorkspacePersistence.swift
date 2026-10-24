@@ -57,6 +57,7 @@ public enum WorkspaceFile {
             throw WorkspaceError.invalidStructure
         }
         for request in workspace.requests {
+            if let graphql = request.graphql { try GraphQL.validateStorage(graphql) }
             if let link = request.apiLink {
                 guard sourceIDs.contains(link.sourceID), link.operationKey.utf8.count <= 8192, link.baseline.count <= 2 * 1024 * 1024 else { throw WorkspaceError.invalidStructure }
             }

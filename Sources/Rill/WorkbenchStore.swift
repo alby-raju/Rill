@@ -58,6 +58,7 @@ import UniformTypeIdentifiers
     @Published var showCommandExport = false
     @Published var showRunner = false
     @Published var showAPITools = false
+    @Published var showLiveStreams = false
     @Published var showTLS = false
     @Published var showAuthentication = false
     @Published var showEnvironments = false

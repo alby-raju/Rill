@@ -6,6 +6,7 @@ struct CodeEditor: View {
     @Binding var text: String
     var contentType: String
     var completions: [String]
+    var label = "Request body editor"
     @AppStorage("editorFontSize") private var fontSize = 12.0
     @AppStorage("editorWrap") private var wrap = true
     @ViewState<String> private var query = ""
@@ -21,7 +22,7 @@ struct CodeEditor: View {
                 Button("A+") { fontSize = min(26, fontSize + 1) }
             }.font(.caption)
             NativeCodeEditor(text: $text, contentType: contentType, fontSize: fontSize, wrap: wrap, query: query, searchStep: searchStep, completions: completions)
-                .accessibilityLabel("Request body editor")
+                .accessibilityLabel(label)
         }
     }
 }
@@ -39,7 +40,7 @@ private struct NativeCodeEditor: NSViewRepresentable {
         let scroll = NSScrollView()
         scroll.hasVerticalScroller = true; scroll.hasHorizontalScroller = true
         scroll.borderType = .noBorder; scroll.drawsBackground = false
-        let view = NSTextView(frame: .zero)
+        let view = CompletionTextView(frame: .zero)
         view.isRichText = false; view.allowsUndo = true
         view.isAutomaticQuoteSubstitutionEnabled = false
         view.isAutomaticDashSubstitutionEnabled = false
@@ -131,6 +132,13 @@ private struct NativeCodeEditor: NSViewRepresentable {
                 return result
             }
         }
+    }
+}
+
+private final class CompletionTextView: NSTextView {
+    override func keyDown(with event: NSEvent) {
+        if event.keyCode == 49 && event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .control { complete(nil) }
+        else { super.keyDown(with: event) }
     }
 }
 

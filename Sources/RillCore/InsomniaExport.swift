@@ -6,7 +6,7 @@ public enum InsomniaExporter {
         try WorkspaceFile.validate(workspace)
         func request(_ draft: RequestDraft) throws -> [String: Any] {
             try Task.checkCancellation()
-            guard draft.authProfileID == nil, draft.tlsProfileID == nil,
+            guard draft.graphql == nil, draft.authProfileID == nil, draft.tlsProfileID == nil,
                   Set(draft.headers.map { $0.name.lowercased() }).count == draft.headers.count,
                   (draft.foreignScripts ?? []).allSatisfy({ !$0.enabled }) else { throw ForeignExportError.unsupported }
             let mode = draft.bodyMode ?? (draft.body.isEmpty ? .none : .text)

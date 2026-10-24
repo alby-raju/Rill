@@ -47,6 +47,7 @@ typealias ViewState<Value> = SwiftUI.State<Value>
                 Button("Move Request Earlier") { store.reorderSelected(-1) }.keyboardShortcut(.upArrow, modifiers: .option)
                 Button("Move Request Later") { store.reorderSelected(1) }.keyboardShortcut(.downArrow, modifiers: .option)
                 Divider()
+                Button("WebSocket / SSE / Subscriptions…") { store.showLiveStreams = true }.disabled(store.selected == nil)
                 Button("API Definitions / Contracts / Mocks…") { store.showAPITools = true }
                 Button("Collection Runner / Matrix / Load…") { store.showRunner = true }
                 Button("Generate Command…") { store.showCommandExport = true }.disabled(store.selection == nil)
