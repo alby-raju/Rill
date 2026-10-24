@@ -12,9 +12,9 @@ The package separates serializable models and request execution (`RillCore`) fro
 
 The archive documents a much larger product than this first native build. These features are not implemented or represented as working controls:
 
-- OpenAPI/Swagger and Bruno ingestion; remaining interchange representations and producer acceptance.
+- OpenAPI/Swagger ingestion; remaining interchange representations, generated clients and producer acceptance.
 
-[M3](milestones/M3.md) adds reviewed native/Postman/HTTPie Desktop/Insomnia imports, HAR request selection, Postman/Insomnia/HAR exports and a documented subset of cURL/HTTPie command generation. Unsupported representations fail explicitly; manual producer/UI acceptance remains pending.
+[M3](milestones/M3.md) adds reviewed native/Postman/HTTPie Desktop/Insomnia/Bruno imports, HAR request selection, Postman/Insomnia/HAR/Bruno exports and a documented subset of cURL/HTTPie command generation. Unsupported representations fail explicitly; manual producer/UI acceptance remains pending.
 - Cookie management.
 
 [M2](milestones/M2.md) adds structured forms, API-key auth, streaming file/multipart uploads and prepared request inspection, safe response previews, opt-in durable snapshots and semantic JSON comparison. Interoperability and installed-app acceptance remain partial.
