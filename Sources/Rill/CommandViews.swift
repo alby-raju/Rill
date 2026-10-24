@@ -4,6 +4,9 @@ import RillCore
 struct CommandImportView: View {
     @EnvironmentObject private var store: WorkbenchStore
     @SwiftUI.Environment(\.dismiss) private var dismiss
+    @ViewState<Bool> private var har = false
+    @ViewState<[CommandImport]> private var entries = []
+    @ViewState<Int> private var entryIndex = 0
     @ViewState<String> private var input = ""
     @ViewState<CommandImport?> private var preview: CommandImport?
     @ViewState<String?> private var error: String?
@@ -11,21 +14,27 @@ struct CommandImportView: View {
     @ViewState<Task<Void, Never>?> private var parseTask: Task<Void, Never>? = nil
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack { Text("Import cURL or HTTPie").font(.title2); Spacer(); Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction) }
-            Text("Paste one command. Rill parses text without a shell, substitutions, file reads or traffic. Unsupported options fail explicitly.").font(.caption).foregroundStyle(.secondary)
+            HStack { Text("Import request").font(.title2); Spacer(); Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction) }
+            Text("Paste one command or a HAR JSON log. Review the selected request before Apply. Unsupported data fails explicitly.").font(.caption).foregroundStyle(.secondary)
+            Toggle("HAR 1.2 JSON (select one captured request)", isOn: $har)
             TextEditor(text: $input).font(.system(.body, design: .monospaced)).frame(minHeight: 160)
             Button(parsing ? "Parsing…" : "Preview import") {
-                let snapshot = input; parsing = true; error = nil; preview = nil
+                let snapshot = input, isHAR = har; parsing = true; error = nil; preview = nil
                 parseTask?.cancel()
                 parseTask = Task {
-                    let worker = Task.detached { try CommandImporter.parse(snapshot) }
+                    let worker = Task.detached { try isHAR ? HARImporter.parse(Data(snapshot.utf8)) : [CommandImporter.parse(snapshot)] }
                     do {
                         let result = try await withTaskCancellationHandler { try await worker.value } onCancel: { worker.cancel() }
-                        if input == snapshot && !Task.isCancelled { preview = result }
+                        if input == snapshot && !Task.isCancelled { entries = result; entryIndex = 0; preview = result.first }
                     } catch { if input == snapshot && !Task.isCancelled { self.error = error.localizedDescription } }
                     parsing = false
                 }
             }.disabled(parsing || input.isEmpty)
+            if har && !entries.isEmpty {
+                Picker("Captured request", selection: $entryIndex) {
+                    ForEach(entries.indices, id: \.self) { Text(entries[$0].request.name).tag($0) }
+                }.onChange(of: entryIndex) { _, index in preview = entries[index] }
+            }
             if let preview {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 8) {
@@ -39,7 +48,8 @@ struct CommandImportView: View {
             }
             if let error { Text(error).foregroundStyle(.red).textSelection(.enabled) }
         }.padding(24).frame(width: 800, height: 620).disabled(store.importing)
-        .onChange(of: input) { _, _ in parseTask?.cancel(); preview = nil; error = nil }
+        .onChange(of: input) { _, _ in parseTask?.cancel(); entries = []; preview = nil; error = nil }
+        .onChange(of: har) { _, _ in parseTask?.cancel(); entries = []; preview = nil; error = nil }
         .onDisappear { parseTask?.cancel(); input = ""; preview = nil }
     }
 }

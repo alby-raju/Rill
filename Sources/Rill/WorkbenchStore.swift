@@ -537,7 +537,7 @@ import UniformTypeIdentifiers
             hasUnsavedChanges = false; persistenceHealth = .saved; selection = imported.requestID
             return true
         } catch {
-            self.error = "Command import did not complete. \(error.localizedDescription)"
+            self.error = "Request import did not complete. \(error.localizedDescription)"
             if (error as? WorkspaceError) == .conflict { persistenceAvailable = false; persistenceHealth = .conflict }
             return false
         }

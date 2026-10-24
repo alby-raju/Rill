@@ -21,7 +21,7 @@ typealias ViewState<Value> = SwiftUI.State<Value>
                 Button("New Request") { store.newRequest() }.keyboardShortcut("n")
                 Button("New Collection") { store.newCollection() }.keyboardShortcut("n", modifiers: [.command, .shift])
                 Divider()
-                Button("Import cURL / HTTPie…") { store.showCommandImport = true }
+                Button("Import cURL / HTTPie / HAR…") { store.showCommandImport = true }
                 Button("Import Rill Workspace…") { store.importWorkspace() }
                 Button("Export Rill Workspace…") { store.exportWorkspace() }
                 Button("Export Support Diagnostics…") { store.exportDiagnostics() }
