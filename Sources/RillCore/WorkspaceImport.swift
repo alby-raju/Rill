@@ -23,10 +23,11 @@ public enum WorkspaceImport {
             if result.namedSecrets == nil { result.namedSecrets = [] }
             result.namedSecrets?.append(NamedSecret(name: name))
         }
+        let secretPattern = try NSRegularExpression(pattern: #"\{\{\s*secret:([A-Za-z0-9_.-]+)\s*\}\}"#)
         func rewrite(_ text: String) -> String {
-            let regex = try! NSRegularExpression(pattern: #"\{\{\s*secret:([A-Za-z0-9_.-]+)\s*\}\}"#)
+            guard !secretNames.isEmpty else { return text }
             var result = text
-            for match in regex.matches(in: text, range: NSRange(text.startIndex..., in: text)).reversed() {
+            for match in secretPattern.matches(in: text, range: NSRange(text.startIndex..., in: text)).reversed() {
                 guard let keyRange = Range(match.range(at: 1), in: text), let range = Range(match.range, in: result), let name = secretNames[String(text[keyRange])] else { continue }
                 result.replaceSubrange(range, with: "{{secret:" + name + "}}")
             }
