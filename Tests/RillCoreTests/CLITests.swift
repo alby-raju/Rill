@@ -67,4 +67,22 @@ import XCTest
         do { _ = try await RequestEngine.execute(request, environment: nil); XCTFail("Listener survived cancellation") } catch { }
     }
 
+    func testAPIRefreshAndHeadlessLiveCommandsUseSharedServices() async throws {
+        guard let base = ProcessInfo.processInfo.environment["RILL_TEST_LIVE_URL"] else { throw XCTSkip("Live fixture required") }
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("rill-cli-api-" + UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let workspace = directory.appendingPathComponent("workspace.json"), source = directory.appendingPathComponent("api.json")
+        try WorkspaceFile.save(Workspace(), to: workspace)
+        let definition: [String: Any] = ["openapi": "3.1.1", "info": ["title": "Fixture"], "servers": [["url": base]], "paths": ["/health": ["get": ["responses": ["200": ["description": "ok"]]]]]]
+        try JSONSerialization.data(withJSONObject: definition).write(to: source)
+        let preview = try await cli(["openapi-import", source.path, "--workspace", workspace.path]); XCTAssertEqual(preview.status, 0); XCTAssertTrue(try WorkspaceFile.load(from: workspace).requests.isEmpty)
+        let applied = try await cli(["openapi-import", source.path, "--workspace", workspace.path, "--apply"]); XCTAssertEqual(applied.status, 0)
+        let imported = try WorkspaceFile.load(from: workspace), id = try XCTUnwrap(imported.apiDefinitions?.first?.id)
+        let refreshed = try await cli(["openapi-refresh", id.uuidString, "--workspace", workspace.path, "--apply"]); XCTAssertEqual(refreshed.status, 0)
+        XCTAssertEqual(try WorkspaceFile.load(from: workspace).requests.first?.id, imported.requests.first?.id)
+        let sse = try await cli(["sse", "--endpoint", base + "/sse", "--workspace", workspace.path]); XCTAssertEqual(sse.status, 0); XCTAssertFalse(String(decoding: sse.output, as: UTF8.self).contains("first"))
+        let socket = try await cli(["ws", "--endpoint", base.replacingOccurrences(of: "http://", with: "ws://") + "/echo", "--send", "private-stream-payload", "--wait", "0.1", "--workspace", workspace.path]); XCTAssertEqual(socket.status, 0); XCTAssertFalse(String(decoding: socket.output, as: UTF8.self).contains("private-stream-payload"))
+    }
+
 }

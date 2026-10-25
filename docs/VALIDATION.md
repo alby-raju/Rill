@@ -1,6 +1,6 @@
 # Validation
 
-The latest development validation includes 243 passing local tests (before the additional CLI interruption case), native loopback protocol fixtures and a packaged CLI smoke check. See [M8](milestones/M8.md), [M9](milestones/M9.md) and [release gates](RELEASE.md). The original ten XCTest cases passed on the local Apple Silicon Mac using the installed Xcode toolchain. The [M0 reliability slice](milestones/M0.md) extends these with storage, redaction and streaming-budget regressions:
+The latest development validation includes 245 passing local tests, including real CLI interruption/listener cleanup, native loopback protocol fixtures and a packaged CLI smoke check. See [M8](milestones/M8.md), [M9](milestones/M9.md) and [release gates](RELEASE.md). The original ten XCTest cases passed on the local Apple Silicon Mac using the installed Xcode toolchain. The [M0 reliability slice](milestones/M0.md) extends these with storage, redaction and streaming-budget regressions:
 
 - Seven core cases: URL/query preparation, variables and Unicode, unresolved variables, disabled fields and CRLF header rejection, allowed schemes/embedded credentials, auth/body/timeout, atomic workspace round trip and duplicate identity rejection.
 - Three loopback integration cases: real HTTP response and assertions, oversized Content-Length rejection, and cancellation of an in-flight request.
