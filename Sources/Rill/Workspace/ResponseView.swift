@@ -1,6 +1,5 @@
 import SwiftUI
 import RillCore
-import UniformTypeIdentifiers
 
 struct ResponseView: View {
     @EnvironmentObject private var store: WorkbenchStore
@@ -111,104 +110,5 @@ struct ResponseView: View {
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do { try exchange.body.write(to: url, options: .atomic) }
         catch { let alert = NSAlert(error: error); alert.runModal() }
-    }
-}
-struct EnvironmentEditor: View {
-    @EnvironmentObject var store: WorkbenchStore
-    @SwiftUI.Environment(\.dismiss) var dismiss
-    @ViewState<UUID?> private var selected: UUID?
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack { VStack(alignment: .leading, spacing: 4) { Text("Environments").font(.title2.weight(.semibold)); Text("One request. Every stage of your API.").foregroundStyle(.secondary) }; Spacer(); Button("Done") { store.persist(); dismiss() }.keyboardShortcut(.defaultAction) }
-            HSplitView {
-                VStack {
-                    List(selection: $selected) { ForEach(store.workspace.environments) { Text($0.name).tag($0.id) } }
-                    Button("New environment", systemImage: "plus") { let environment = RillCore.Environment(name: "New environment"); store.workspace.environments.append(environment); selected = environment.id; store.persist() }
-                }.frame(minWidth: 180, maxWidth: 220)
-                if let index = store.workspace.environments.firstIndex(where: { $0.id == selected }) {
-                    VStack(alignment: .leading) {
-                        TextField("Environment name", text: $store.workspace.environments[index].name).font(.title3).textFieldStyle(RillTextFieldStyle()).padding(16)
-                        Picker("Inherits from", selection: $store.workspace.environments[index].parentID) {
-                            Text("None").tag(nil as UUID?)
-                            ForEach(EnvironmentResolver.validParents(for: store.workspace.environments[index].id, in: store.workspace.environments)) { parent in Text(parent.name).tag(Optional(parent.id)) }
-                        }.padding(.horizontal, 16)
-                        FieldEditor(fields: $store.workspace.environments[index].variables, noun: "variable")
-                        Text("Use {{name}} in URLs, headers, body or auth. Environment values are stored in plain text; keep tokens in the request’s Auth tab.").font(.caption).foregroundStyle(.secondary).padding(.horizontal, 16)
-                        Button("Delete environment", role: .destructive) { if let selected { WorkspaceOperations.deleteEnvironment(selected, in: &store.workspace) }; selected = nil; store.persist() }.padding(16)
-                    }
-                } else { ContentUnavailableView("Choose an environment", systemImage: "square.stack.3d.up", description: Text("Create Local, Staging or Production variable sets.")) }
-            }
-        }.padding(24).frame(width: 800, height: 500)
-            .onAppear { selected = store.workspace.selectedEnvironmentID ?? store.workspace.environments.first?.id }
-            .onDisappear { store.persist() }
-    }
-}
-struct HistoryView: View {
-    @ViewState<String?> private var comparison: String?
-    @ViewState<Bool> private var comparing = false
-    @ViewState<Task<Void, Never>?> private var comparisonTask: Task<Void, Never>? = nil
-    @EnvironmentObject var store: WorkbenchStore
-    @SwiftUI.Environment(\.dismiss) var dismiss
-    var body: some View {
-        VStack(spacing: 16) {
-            HStack { Text("Response history").font(.title2.weight(.semibold)); Spacer(); Button("Clear") { store.clearHistory() }; Button("Done") { dismiss() }.keyboardShortcut(.defaultAction) }
-            HStack {
-                Text(store.historyStatus).font(.caption).foregroundStyle(.secondary)
-                Spacer()
-                if let selected = store.workspace.history.first(where: { $0.id == store.inspectedHistoryID }) {
-                    Menu(comparing ? "Comparing…" : "Compare JSON with…") {
-                        ForEach(store.workspace.history.filter { $0.id != selected.id }) { other in
-                            Button(other.requestName + " · " + other.date.formatted(date: .omitted, time: .standard)) {
-                                comparing = true
-                                comparisonTask?.cancel()
-                                comparisonTask = Task {
-                                    let worker = Task.detached { try ResponseComparator.compare(selected, other).text }
-                                    do {
-                                        let result = try await withTaskCancellationHandler { try await worker.value } onCancel: { worker.cancel() }
-                                        if !Task.isCancelled { comparison = result }
-                                    } catch { if !Task.isCancelled { comparison = error.localizedDescription } }
-                                    comparing = false
-                                }
-                            }
-                        }
-                    }.disabled(comparing)
-                }
-            }
-            HSplitView {
-                List(selection: $store.inspectedHistoryID) {
-                    ForEach(store.workspace.history) { exchange in
-                        VStack(alignment: .leading) {
-                            Text("\(exchange.status) · \(exchange.requestName)")
-                            Text(exchange.date, style: .time).font(.caption).foregroundStyle(.secondary)
-                        }.tag(exchange.id).padding(.vertical, 5)
-                    }
-                }.frame(minWidth: 200, idealWidth: 250)
-                ResponseView(exchange: store.workspace.history.first { $0.id == store.inspectedHistoryID }, running: false).frame(minWidth: 500)
-            }
-        }.padding(24).frame(width: 1000, height: 600)
-        .onDisappear { comparisonTask?.cancel() }
-        .sheet(isPresented: Binding(get: { comparison != nil }, set: { if !$0 { comparison = nil } })) {
-            VStack {
-                HStack { Text("Semantic JSON comparison").font(.title2); Spacer(); Button("Done") { comparison = nil }.keyboardShortcut(.defaultAction) }
-                ScrollView([.vertical, .horizontal]) { Text(comparison ?? "").font(.system(.body, design: .monospaced)).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading) }
-            }.padding(24).frame(width: 750, height: 550)
-        }
-    }
-}
-struct RequestSearch: View {
-    @EnvironmentObject var store: WorkbenchStore
-    @SwiftUI.Environment(\.dismiss) var dismiss
-    @ViewState<String> private var query = ""
-    @FocusState private var focused: Bool
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack { Image(systemName: "magnifyingglass"); TextField("Find requests, collections, environments or history", text: $query).textFieldStyle(.plain).focused($focused); Button("Done") { dismiss() } }
-            Divider()
-            List(store.searchResults(query)) { result in
-                Button { dismiss(); Task { @MainActor in await Task.yield(); store.activateSearch(result) } } label: {
-                    HStack { Text(result.kind.rawValue.capitalized).font(.caption).foregroundStyle(.secondary).frame(width: 90); VStack(alignment: .leading) { Text(result.title); Text(result.detail).font(.caption).foregroundStyle(.secondary).lineLimit(1) }; Spacer() }
-                }.buttonStyle(.plain).padding(.vertical, 6)
-            }
-        }.padding(24).frame(width: 720, height: 400).onAppear { focused = true }
     }
 }
