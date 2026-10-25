@@ -18,6 +18,10 @@ zsh scripts/package.sh
 
 The bundle is written to `dist/Rill.app`. It is ad-hoc signed for local development; distribution signing requires a Developer ID identity and notarytool profile; see [release instructions](docs/RELEASE.md).
 
+## Verify functionality yourself
+
+Use the [manual verification kit](verification/README.md) for loopback endpoints, a 19-request native workspace, import samples, upload files, OpenAPI/schema/proto materials and a blank acceptance checklist. Start it with `python3 verification/server.py`. Build a standalone ZIP with `python3 scripts/build-verification-kit.py`; no real credentials or user workspaces are included. Optional gRPC and TLS instructions are documented separately.
+
 ## Implemented
 
 - Native adaptive split-view workspace with collection CRUD, request ordering, global search and templates.

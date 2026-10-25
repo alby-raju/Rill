@@ -1,0 +1,451 @@
+{
+  "version": 1,
+  "collections": [
+    {
+      "id": "EE140EC0-6335-59E0-8BF9-859889ADCAF5",
+      "name": "Kit — Smoke"
+    },
+    {
+      "id": "D796CAE0-B917-5D2F-825F-64079D68B7C7",
+      "name": "Kit — Workflow"
+    },
+    {
+      "id": "6C2FA02D-BED2-5A54-B2B4-13CB87458547",
+      "name": "Kit — Retry"
+    },
+    {
+      "id": "8F561B02-25A5-5A46-A880-0B062478104C",
+      "name": "Kit — Expected failures"
+    }
+  ],
+  "requests": [
+    {
+      "id": "04E7900C-40B0-5428-8930-1C1A58B648A2",
+      "collectionID": "EE140EC0-6335-59E0-8BF9-859889ADCAF5",
+      "name": "Health",
+      "method": "GET",
+      "url": "{{base_url}}/health",
+      "headers": [],
+      "parameters": [],
+      "body": "",
+      "bodyMode": "None",
+      "contentType": "application/json",
+      "auth": "None",
+      "username": "",
+      "credential": "",
+      "timeout": 5,
+      "expectedStatus": "200",
+      "bodyContains": "verification kit"
+    },
+    {
+      "id": "971D2F2B-B671-58EC-B011-296CC7716E15",
+      "collectionID": "EE140EC0-6335-59E0-8BF9-859889ADCAF5",
+      "name": "JSON inspection",
+      "method": "GET",
+      "url": "{{base_url}}/json",
+      "headers": [],
+      "parameters": [],
+      "body": "",
+      "bodyMode": "None",
+      "contentType": "application/json",
+      "auth": "None",
+      "username": "",
+      "credential": "",
+      "timeout": 5,
+      "expectedStatus": "200",
+      "bodyContains": "",
+      "assertions": [
+        {
+          "id": "A9E7F20E-DACC-5649-A896-254EE5B2AA42",
+          "enabled": true,
+          "kind": "jsonEquals",
+          "selector": "$.items[0].price",
+          "expected": "12.5"
+        }
+      ]
+    },
+    {
+      "id": "69D5F70E-1622-5232-AE3E-C8A522720D9E",
+      "collectionID": "EE140EC0-6335-59E0-8BF9-859889ADCAF5",
+      "name": "Repeated query and Unicode",
+      "method": "GET",
+      "url": "{{base_url}}/echo?tag=one&tag=two&empty=&name=caf%C3%A9",
+      "headers": [],
+      "parameters": [],
+      "body": "",
+      "bodyMode": "None",
+      "contentType": "application/json",
+      "auth": "None",
+      "username": "",
+      "credential": "",
+      "timeout": 5,
+      "expectedStatus": "200",
+      "bodyContains": ""
+    },
+    {
+      "id": "FA8C745B-0217-5118-B27B-AEA60FA39917",
+      "collectionID": "EE140EC0-6335-59E0-8BF9-859889ADCAF5",
+      "name": "POST echo",
+      "method": "POST",
+      "url": "{{base_url}}/echo",
+      "headers": [],
+      "parameters": [],
+      "body": "{\"message\":\"Hello 👋\",\"count\":42}",
+      "bodyMode": "Raw text",
+      "contentType": "application/json",
+      "auth": "None",
+      "username": "",
+      "credential": "",
+      "timeout": 5,
+      "expectedStatus": "200",
+      "bodyContains": ""
+    },
+    {
+      "id": "609DA977-63B3-50CB-A3F9-B44B870054EA",
+      "collectionID": "EE140EC0-6335-59E0-8BF9-859889ADCAF5",
+      "name": "PUT echo",
+      "method": "PUT",
+      "url": "{{base_url}}/echo",
+      "headers": [],
+      "parameters": [],
+      "body": "{\"message\":\"Hello 👋\",\"count\":42}",
+      "bodyMode": "Raw text",
+      "contentType": "application/json",
+      "auth": "None",
+      "username": "",
+      "credential": "",
+      "timeout": 5,
+      "expectedStatus": "200",
+      "bodyContains": ""
+    },
+    {
+      "id": "8C3F1E2E-4D49-5F31-8D43-4EAC72228475",
+      "collectionID": "EE140EC0-6335-59E0-8BF9-859889ADCAF5",
+      "name": "PATCH echo",
+      "method": "PATCH",
+      "url": "{{base_url}}/echo",
+      "headers": [],
+      "parameters": [],
+      "body": "{\"message\":\"Hello 👋\",\"count\":42}",
+      "bodyMode": "Raw text",
+      "contentType": "application/json",
+      "auth": "None",
+      "username": "",
+      "credential": "",
+      "timeout": 5,
+      "expectedStatus": "200",
+      "bodyContains": ""
+    },
+    {
+      "id": "89270441-41BD-5005-A252-77E878AC2E10",
+      "collectionID": "EE140EC0-6335-59E0-8BF9-859889ADCAF5",
+      "name": "DELETE echo",
+      "method": "DELETE",
+      "url": "{{base_url}}/echo",
+      "headers": [],
+      "parameters": [],
+      "body": "",
+      "bodyMode": "None",
+      "contentType": "application/json",
+      "auth": "None",
+      "username": "",
+      "credential": "",
+      "timeout": 5,
+      "expectedStatus": "200",
+      "bodyContains": ""
+    },
+    {
+      "id": "6FC94E25-F64E-5171-A08C-38D4643D934D",
+      "collectionID": "EE140EC0-6335-59E0-8BF9-859889ADCAF5",
+      "name": "OPTIONS echo",
+      "method": "OPTIONS",
+      "url": "{{base_url}}/echo",
+      "headers": [],
+      "parameters": [],
+      "body": "",
+      "bodyMode": "None",
+      "contentType": "application/json",
+      "auth": "None",
+      "username": "",
+      "credential": "",
+      "timeout": 5,
+      "expectedStatus": "200",
+      "bodyContains": ""
+    },
+    {
+      "id": "FB41AC8F-9C0C-55FA-B81D-9ABA06841CA8",
+      "collectionID": "EE140EC0-6335-59E0-8BF9-859889ADCAF5",
+      "name": "HEAD echo",
+      "method": "HEAD",
+      "url": "{{base_url}}/echo",
+      "headers": [],
+      "parameters": [],
+      "body": "",
+      "bodyMode": "None",
+      "contentType": "application/json",
+      "auth": "None",
+      "username": "",
+      "credential": "",
+      "timeout": 5,
+      "expectedStatus": "200",
+      "bodyContains": ""
+    },
+    {
+      "id": "A9408E5A-2413-556A-AD4C-1980778BC933",
+      "collectionID": "EE140EC0-6335-59E0-8BF9-859889ADCAF5",
+      "name": "Bearer demo",
+      "method": "GET",
+      "url": "{{base_url}}/auth/bearer",
+      "headers": [
+        {
+          "id": "F1D1978B-4A91-511E-9CCE-8E88F743F16C",
+          "enabled": true,
+          "name": "Authorization",
+          "value": "Bearer rill-demo-token"
+        }
+      ],
+      "parameters": [],
+      "body": "",
+      "bodyMode": "None",
+      "contentType": "application/json",
+      "auth": "None",
+      "username": "",
+      "credential": "",
+      "timeout": 5,
+      "expectedStatus": "200",
+      "bodyContains": ""
+    },
+    {
+      "id": "89804930-6034-5CF2-8AA6-0E38698E53DD",
+      "collectionID": "EE140EC0-6335-59E0-8BF9-859889ADCAF5",
+      "name": "Basic demo",
+      "method": "GET",
+      "url": "{{base_url}}/auth/basic",
+      "headers": [
+        {
+          "id": "4C446556-8ED1-5F9D-9FBE-98C9E664E2CF",
+          "enabled": true,
+          "name": "Authorization",
+          "value": "Basic cmlsbDpkZW1vLXBhc3N3b3Jk"
+        }
+      ],
+      "parameters": [],
+      "body": "",
+      "bodyMode": "None",
+      "contentType": "application/json",
+      "auth": "None",
+      "username": "",
+      "credential": "",
+      "timeout": 5,
+      "expectedStatus": "200",
+      "bodyContains": ""
+    },
+    {
+      "id": "6DAE724B-1A7A-5E20-9692-BA0B3ED4FEF3",
+      "collectionID": "EE140EC0-6335-59E0-8BF9-859889ADCAF5",
+      "name": "API key demo",
+      "method": "GET",
+      "url": "{{base_url}}/auth/api-key",
+      "headers": [
+        {
+          "id": "184899E1-E215-50C8-8254-F8E83F0530EF",
+          "enabled": true,
+          "name": "X-API-Key",
+          "value": "rill-demo-key"
+        }
+      ],
+      "parameters": [],
+      "body": "",
+      "bodyMode": "None",
+      "contentType": "application/json",
+      "auth": "None",
+      "username": "",
+      "credential": "",
+      "timeout": 5,
+      "expectedStatus": "200",
+      "bodyContains": ""
+    },
+    {
+      "id": "ED072217-9C90-5E1E-9FAF-6B46BE10FB6D",
+      "collectionID": "D796CAE0-B917-5D2F-825F-64079D68B7C7",
+      "name": "Create synthetic session",
+      "method": "POST",
+      "url": "{{base_url}}/session",
+      "headers": [],
+      "parameters": [],
+      "body": "{}",
+      "bodyMode": "Raw text",
+      "contentType": "application/json",
+      "auth": "None",
+      "username": "",
+      "credential": "",
+      "timeout": 5,
+      "expectedStatus": "201",
+      "bodyContains": "",
+      "extractions": [
+        {
+          "id": "584A9B75-F982-573A-BC93-AE3868A4A3D2",
+          "enabled": true,
+          "kind": "json",
+          "selector": "$.token",
+          "variable": "sessionToken"
+        }
+      ]
+    },
+    {
+      "id": "BACFDAA6-214A-5BE1-A1CA-C4FEC031D8D3",
+      "collectionID": "D796CAE0-B917-5D2F-825F-64079D68B7C7",
+      "name": "Use extracted token",
+      "method": "GET",
+      "url": "{{base_url}}/profile",
+      "headers": [
+        {
+          "id": "709CA0C9-9BFE-5492-8B38-B6560F5ABCA8",
+          "enabled": true,
+          "name": "Authorization",
+          "value": "Bearer {{sessionToken}}"
+        }
+      ],
+      "parameters": [],
+      "body": "",
+      "bodyMode": "None",
+      "contentType": "application/json",
+      "auth": "None",
+      "username": "",
+      "credential": "",
+      "timeout": 5,
+      "expectedStatus": "200",
+      "bodyContains": ""
+    },
+    {
+      "id": "B143B677-FAC9-5F61-9221-2798CA0C8B6C",
+      "collectionID": "6C2FA02D-BED2-5A54-B2B4-13CB87458547",
+      "name": "Recover on retry",
+      "method": "GET",
+      "url": "{{base_url}}/flaky?key=collection",
+      "headers": [],
+      "parameters": [],
+      "body": "",
+      "bodyMode": "None",
+      "contentType": "application/json",
+      "auth": "None",
+      "username": "",
+      "credential": "",
+      "timeout": 5,
+      "expectedStatus": "200",
+      "bodyContains": ""
+    },
+    {
+      "id": "4021A2B9-58E9-50F7-801D-5F224C5C348E",
+      "collectionID": "8F561B02-25A5-5A46-A880-0B062478104C",
+      "name": "Intentional assertion failure",
+      "method": "GET",
+      "url": "{{base_url}}/json",
+      "headers": [],
+      "parameters": [],
+      "body": "",
+      "bodyMode": "None",
+      "contentType": "application/json",
+      "auth": "None",
+      "username": "",
+      "credential": "",
+      "timeout": 5,
+      "expectedStatus": "201",
+      "bodyContains": ""
+    },
+    {
+      "id": "9758B381-4449-54F2-901D-24D38F913E97",
+      "collectionID": "8F561B02-25A5-5A46-A880-0B062478104C",
+      "name": "Intentional timeout",
+      "method": "GET",
+      "url": "{{base_url}}/delay/3",
+      "headers": [],
+      "parameters": [],
+      "body": "",
+      "bodyMode": "None",
+      "contentType": "application/json",
+      "auth": "None",
+      "username": "",
+      "credential": "",
+      "timeout": 1,
+      "expectedStatus": "200",
+      "bodyContains": ""
+    },
+    {
+      "id": "5E18A117-B3AA-566D-8DD2-4C573771F92E",
+      "collectionID": "8F561B02-25A5-5A46-A880-0B062478104C",
+      "name": "Intentional unauthorized",
+      "method": "GET",
+      "url": "{{base_url}}/auth/bearer",
+      "headers": [],
+      "parameters": [],
+      "body": "",
+      "bodyMode": "None",
+      "contentType": "application/json",
+      "auth": "None",
+      "username": "",
+      "credential": "",
+      "timeout": 5,
+      "expectedStatus": "200",
+      "bodyContains": ""
+    },
+    {
+      "id": "AFDCD5D2-F33A-59E7-A6A8-DB6CB998544E",
+      "collectionID": "8F561B02-25A5-5A46-A880-0B062478104C",
+      "name": "Intentional response limit",
+      "method": "GET",
+      "url": "{{base_url}}/bytes/17825792",
+      "headers": [],
+      "parameters": [],
+      "body": "",
+      "bodyMode": "None",
+      "contentType": "application/json",
+      "auth": "None",
+      "username": "",
+      "credential": "",
+      "timeout": 5,
+      "expectedStatus": "200",
+      "bodyContains": ""
+    },
+    {
+      "id": "04E7900C-40B0-5428-8930-1C1A58B648A2",
+      "collectionID": "EE140EC0-6335-59E0-8BF9-859889ADCAF5",
+      "name": "Health",
+      "method": "GET",
+      "url": "{{base_url}}/health",
+      "headers": [],
+      "parameters": [],
+      "body": "",
+      "bodyMode": "None",
+      "contentType": "application/json",
+      "auth": "None",
+      "username": "",
+      "credential": "",
+      "timeout": 5,
+      "expectedStatus": "200",
+      "bodyContains": "verification kit"
+    }
+  ],
+  "environments": [
+    {
+      "id": "F611B1D2-5FBF-5B7F-BE14-F15D2867A750",
+      "name": "Verification local",
+      "variables": [
+        {
+          "id": "793A9ECC-9A73-56AA-BCB3-00C73A0672F1",
+          "enabled": true,
+          "name": "base_url",
+          "value": "http://127.0.0.1:18990"
+        },
+        {
+          "id": "E0289358-CDA2-5B97-888E-6A8D3F0B65C1",
+          "enabled": true,
+          "name": "greeting",
+          "value": "Hello from Rill"
+        }
+      ]
+    }
+  ],
+  "selectedEnvironmentID": "F611B1D2-5FBF-5B7F-BE14-F15D2867A750",
+  "history": []
+}

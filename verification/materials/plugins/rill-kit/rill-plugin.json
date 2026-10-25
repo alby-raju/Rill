@@ -1,0 +1,18 @@
+{
+  "apiVersion": 1,
+  "id": "rill-kit",
+  "name": "Rill verification data services",
+  "version": "1.0.0",
+  "services": [
+    {
+      "id": "health",
+      "kind": "requestTemplate",
+      "file": "health.json"
+    },
+    {
+      "id": "mocks",
+      "kind": "mockRoutes",
+      "file": "routes.json"
+    }
+  ]
+}

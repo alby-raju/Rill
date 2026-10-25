@@ -1,0 +1,32 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "resources": [
+    {
+      "_id": "wrk_kit",
+      "_type": "workspace",
+      "name": "Rill kit Insomnia"
+    },
+    {
+      "_id": "env_kit",
+      "_type": "environment",
+      "parentId": "wrk_kit",
+      "name": "Base",
+      "data": {
+        "base_url": "http://127.0.0.1:18990"
+      }
+    },
+    {
+      "_id": "req_kit",
+      "_type": "request",
+      "parentId": "wrk_kit",
+      "name": "Health",
+      "method": "GET",
+      "url": "http://127.0.0.1:18990/health",
+      "headers": [],
+      "parameters": [],
+      "body": {},
+      "authentication": {}
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "info": {
+    "name": "Rill kit Postman import",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/health"
+      }
+    },
+    {
+      "name": "Echo JSON",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/echo",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"hello\":\"Rill\"}"
+        }
+      }
+    },
+    {
+      "name": "Query",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/echo?tag=one&tag=two"
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:18990"
+    }
+  ]
+}
