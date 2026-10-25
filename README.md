@@ -16,7 +16,7 @@ Open `Package.swift` in Xcode to edit and run the app. For a local app bundle:
 zsh scripts/package.sh
 ```
 
-The bundle is written to `dist/Rill.app`. It is ad-hoc signed for local development; distribution signing and notarization are not configured.
+The bundle is written to `dist/Rill.app`. It is ad-hoc signed for local development; distribution signing requires a Developer ID identity and notarytool profile; see [release instructions](docs/RELEASE.md).
 
 ## Implemented
 
@@ -44,6 +44,8 @@ The bundle is written to `dist/Rill.app`. It is ad-hoc signed for local developm
 - System/light/dark appearance and keyboard shortcuts: Cmd+N, Cmd+Enter, Cmd+K, Cmd+Shift+E, Cmd+period.
 
 Network requests start through explicit actions such as Send, runners, definition loads, introspection, live connections, probes or OAuth acquisition. Endpoint-change introspection requires a saved opt-in. A fresh workspace has no preconfigured remote endpoint.
+
+- Native CLI, explicit portable Git checkout, token-protected read-only sharing, reviewed data-only extensions and searchable offline help. See [CLI guide](docs/CLI.md).
 
 ## Data
 

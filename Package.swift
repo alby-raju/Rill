@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "Rill", platforms: [.macOS(.v15)],
-    products: [.executable(name: "Rill", targets: ["Rill"])],
+    products: [.executable(name: "Rill", targets: ["Rill"]), .executable(name: "RillCLI", targets: ["RillCLI"])],
     dependencies: [
         .package(url: "https://github.com/jpsim/Yams.git", exact: "6.2.2"),
         .package(url: "https://github.com/weichsel/ZIPFoundation.git", exact: "0.9.20"),
@@ -15,7 +15,8 @@ let package = Package(
     ],
     targets: [
         .target(name: "RillCore", dependencies: [.product(name: "Yams", package: "Yams"), .product(name: "ZIPFoundation", package: "ZIPFoundation"), .product(name: "GRPCCore", package: "grpc-swift-2"), .product(name: "GRPCNIOTransportHTTP2TransportServices", package: "grpc-swift-nio-transport"), .product(name: "SwiftProtobuf", package: "swift-protobuf"), .product(name: "Kafka", package: "swift-kafka-client"), .product(name: "Logging", package: "swift-log")]),
-        .executableTarget(name: "Rill", dependencies: ["RillCore"], linkerSettings: [.unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path/../Frameworks"])]),
+        .executableTarget(name: "Rill", dependencies: ["RillCore"], resources: [.copy("Resources/Help.json"), .copy("Resources/Rill.icns")], linkerSettings: [.unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path/../Frameworks"])]),
+        .executableTarget(name: "RillCLI", dependencies: ["RillCore"], linkerSettings: [.unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path/../Frameworks"])]),
         .target(name: "RillBrokerTestSupport", path: "Tests/BrokerSupport", publicHeadersPath: "include"),
         .testTarget(name: "RillCoreTests", dependencies: ["RillCore", "RillBrokerTestSupport", .product(name: "Kafka", package: "swift-kafka-client"), .product(name: "ZIPFoundation", package: "ZIPFoundation"), .product(name: "SwiftProtobuf", package: "swift-protobuf"), .product(name: "GRPCCore", package: "grpc-swift-2"), .product(name: "GRPCNIOTransportHTTP2TransportServices", package: "grpc-swift-nio-transport")])
     ]

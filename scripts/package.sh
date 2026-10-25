@@ -8,8 +8,11 @@ mkdir -p "$RILL_ROOT/dist"
 RILL_OUTPUT="$RILL_ROOT/dist/Rill.app"
 RILL_STAGE="$(mktemp -d "$RILL_ROOT/dist/.rill-package.XXXXXX")"
 RILL_APP="$RILL_STAGE/Rill.app"
-mkdir -p "$RILL_APP/Contents/MacOS" "$RILL_APP/Contents/Resources"
+mkdir -p "$RILL_APP/Contents/MacOS" "$RILL_APP/Contents/Resources" "$RILL_APP/Contents/Helpers"
 cp "$RILL_BIN/Rill" "$RILL_APP/Contents/MacOS/Rill"
+cp "$RILL_BIN/RillCLI" "$RILL_APP/Contents/Helpers/rill"
+codesign --force --sign - "$RILL_APP/Contents/Helpers/rill"
+cp "$RILL_ROOT/Sources/Rill/Resources/Rill.icns" "$RILL_APP/Contents/Resources/Rill.icns"
 cat > "$RILL_APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -18,8 +21,9 @@ cat > "$RILL_APP/Contents/Info.plist" <<'PLIST'
 <key>CFBundleIdentifier</key><string>app.rill.workbench</string>
 <key>CFBundleName</key><string>Rill</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>0.1.0</string>
-<key>CFBundleVersion</key><string>1</string>
+<key>CFBundleShortVersionString</key><string>0.2.0</string>
+<key>CFBundleVersion</key><string>2</string>
+<key>CFBundleIconFile</key><string>Rill.icns</string>
 <key>LSMinimumSystemVersion</key><string>15.0</string>
 <key>NSHighResolutionCapable</key><true/>
 <key>NSPrincipalClass</key><string>NSApplication</string>
@@ -40,12 +44,15 @@ codesign --force --sign - "$RILL_APP/Contents/Resources/protoc"
 codesign --verify --strict "$RILL_APP/Contents/Resources/protoc"
 cp "$RILL_ROOT/THIRD_PARTY_NOTICES.txt" "$RILL_APP/Contents/Resources/THIRD_PARTY_NOTICES.txt"
 mkdir -p "$RILL_APP/Contents/Frameworks"
-xcrun swift-stdlib-tool --copy --scan-executable "$RILL_APP/Contents/MacOS/Rill" --destination "$RILL_APP/Contents/Frameworks" --platform macosx
+xcrun swift-stdlib-tool --copy --scan-executable "$RILL_APP/Contents/MacOS/Rill" --scan-executable "$RILL_APP/Contents/Helpers/rill" --destination "$RILL_APP/Contents/Frameworks" --platform macosx
 for RILL_DYLIB in "$RILL_APP"/Contents/Frameworks/*.dylib(N); do
   codesign --force --sign - "$RILL_DYLIB"
   codesign --verify --strict "$RILL_DYLIB"
 done
 plutil -lint "$RILL_APP/Contents/Info.plist"
+[[ "$("$RILL_APP/Contents/Helpers/rill" --version)" == "0.2.0" ]]
+"$RILL_APP/Contents/Helpers/rill" --help >/dev/null
+codesign --verify --strict "$RILL_APP/Contents/Helpers/rill"
 codesign --force --sign - "$RILL_APP"
 codesign --verify --strict "$RILL_APP"
 python3 - "$RILL_APP" "$RILL_OUTPUT" "$RILL_STAGE" <<'PY_INSTALL'
