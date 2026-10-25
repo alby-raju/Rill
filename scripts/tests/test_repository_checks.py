@@ -4,6 +4,7 @@ import importlib.util
 import io
 import json
 import os
+import re
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -39,6 +40,11 @@ class RepositoryChecks(unittest.TestCase):
 
     def test_release_requires_new_versioned_tag_main_and_successful_checks(self):
         release = load("validate-release")
+        version = re.search(
+            r'"(\d+\.\d+\.\d+)"',
+            (SCRIPTS.parent / "Sources/RillCore/Support/RillVersion.swift").read_text(),
+        ).group(1)
+        tag = "v" + version + "-dev.1"
         names = [
             "Build and test on macOS",
             "Dependency vulnerability scan",
@@ -56,15 +62,15 @@ class RepositoryChecks(unittest.TestCase):
             "GITHUB_REPOSITORY": "owner/repo",
             "GITHUB_SHA": "abc",
         }
-        with patch.dict(os.environ, env), patch("sys.argv", ["validate-release", "v0.4.0-dev.1"]):
+        with patch.dict(os.environ, env), patch("sys.argv", ["validate-release", tag]):
             with (
                 patch.object(release, "api", side_effect=[[], [], checks]),
                 patch("sys.stdout", new=io.StringIO()),
             ):
                 release.main()
             for replies in [
-                [[{"ref": "refs/tags/v0.4.0-dev.1"}]],
-                [[], [{"tag_name": "v0.4.0-dev.1"}]],
+                [[{"ref": "refs/tags/" + tag}]],
+                [[], [{"tag_name": tag}]],
                 [[], [], {"check_runs": []}],
             ]:
                 with (
@@ -78,7 +84,7 @@ class RepositoryChecks(unittest.TestCase):
             ):
                 release.main()
             with (
-                patch("sys.argv", ["validate-release", "v9.0.0-dev.1"]),
+                patch("sys.argv", ["validate-release", "v999999.0.0-dev.1"]),
                 self.assertRaises(ValueError),
             ):
                 release.main()
