@@ -21,19 +21,28 @@ extension RillCLI {
             try args.json(collections + requests)
         case "run-request", "contract-check", "run-collection", "run-folder":
             let requests: [RequestDraft]
+            let runTitle: String
             if args.command == "run-request" || args.command == "contract-check" {
                 let request = try args.request(args.operand(), in: workspace)
-                if args.command == "contract-check", request.apiLink == nil { throw CLIError.usage("Select a contract-linked request.") }; requests = [request]
+                if args.command == "contract-check", request.apiLink == nil { throw CLIError.usage("Select a contract-linked request.") }; requests = [request]; runTitle = request.name
             } else {
                 let target = try args.operand(), matches = workspace.collections.filter { $0.id.uuidString == target || $0.name == target }
                 guard matches.count == 1 else { throw CLIError.usage("Collection is missing or ambiguous.") }
+                runTitle = matches[0].name
                 requests = try workspace.requests.filter { $0.collectionID == matches[0].id }.map { try args.transport($0, workspace: workspace) }
             }
             var config = RunConfiguration(); config.iterations = try args.integer("iterations", default: 1); config.retries = try args.integer("retries", default: 0); config.delayMilliseconds = try args.integer("delay", default: 0); config.retryDelayMilliseconds = try args.integer("retry-delay", default: 0); config.stopOnFailure = !args.flags.contains("continue-on-failure")
-            let report = try await CollectionRunner.run(requests: requests, environment: environment, configuration: config, profiles: workspace.authProfiles ?? [], secrets: resolver, tlsProfiles: workspace.tlsProfiles ?? [], definitions: workspace.apiDefinitions ?? [])
+            let progressLabels = Dictionary(requests.map { ($0.id, RunConsole.label($0.name, limit: 40)) }, uniquingKeysWith: { first, _ in first })
+            let progress: (@Sendable (RunProgress) async -> Void)? = args.liveProgress ? { @Sendable event in
+                // Append-only status survives scrollback and never mixes ANSI cursor controls with logs.
+                try? FileHandle.standardError.write(contentsOf: Data(("  Rill · attempt \(event.completed) · \(event.state.rawValue) · \(progressLabels[event.requestID] ?? "Request")\n").utf8))
+            } : nil
+            if args.liveProgress { try FileHandle.standardError.write(contentsOf: Data("Rill · running requests…\n".utf8)) }
+            let report = try await CollectionRunner.run(requests: requests, environment: environment, configuration: config, profiles: workspace.authProfiles ?? [], secrets: resolver, tlsProfiles: workspace.tlsProfiles ?? [], definitions: workspace.apiDefinitions ?? [], progress: progress)
             try await reports(report, arguments: args)
             if let output = args.value("output"), let body = report.outcomes.last?.retainedBody { try args.write(body, to: output) }
-            try args.json(["passed": report.passed, "cancelled": report.cancelled, "exhausted": report.exhausted])
+            if args.flags.contains("json") { try args.json(["passed": report.passed, "cancelled": report.cancelled, "exhausted": report.exhausted]) }
+            else { try args.text(RunConsole.render(report, requests: requests, title: runTitle, detail: args.flags.contains("detail"), color: args.color)) }
             if report.cancelled || Task.isCancelled { throw CancellationError() }
             if !report.passed {
                 let executed = report.outcomes.filter { $0.state != .notRun }
@@ -50,7 +59,9 @@ extension RillCLI {
             let request = try args.request(args.operand(), in: workspace)
             var config = LoadConfiguration(); config.count = try args.integer("count", default: 10); config.concurrency = try args.integer("concurrency", default: 1); config.rampMilliseconds = try args.integer("ramp", default: 0)
             let report = try await LoadRunner.run(request: request, environment: environment, configuration: config, profiles: workspace.authProfiles ?? [], secrets: resolver, tlsProfiles: workspace.tlsProfiles ?? [], definitions: workspace.apiDefinitions ?? [])
-            try args.json(report); if report.cancelled { throw CancellationError() }; if !report.passed { throw CLIError.assertion }
+            if args.flags.contains("json") { try args.json(report) }
+            else { try args.text(RunConsole.renderLoad(report, title: request.name, detail: args.flags.contains("detail"), color: args.color)) }
+            if report.cancelled { throw CancellationError() }; if !report.passed { throw CLIError.assertion }
         case "backup": try args.write(WorkspaceBackup.encode(workspace: workspace, editor: nil), to: args.required("output"))
         case "restore":
             let contents = try WorkspaceBackup.load(from: URL(fileURLWithPath: args.operand()))

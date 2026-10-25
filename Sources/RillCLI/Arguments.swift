@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 import RillCore
 
 enum CLIError: Error { case usage(String), assertion, runtime }
@@ -6,8 +7,8 @@ struct Arguments: Sendable {
     var command = "help", operands: [String] = [], values: [String: [String]] = [:], flags: Set<String> = []
     init(_ input: [String]) throws {
         guard input.count <= 512, input.reduce(0, { $0 + $1.utf8.count }) <= 2 * 1024 * 1024 else { throw CLIError.usage("Arguments exceed limits.") }
-        let boolean: Set<String> = ["quiet", "apply", "continue-on-failure", "allow-insecure", "allow-lan", "overwrite", "show-messages", "help", "version"]
-        let valued: Set<String> = ["workspace", "environment", "tls", "iterations", "delay", "retries", "retry-delay", "report", "report-format", "allure", "output", "format", "source", "endpoint", "query", "query-file", "variables", "header", "metadata", "timeout", "proto", "descriptor", "method", "data", "data-file", "count", "concurrency", "ramp", "port", "routes", "repo", "message", "token-file", "destination", "client-id", "client-secret-name", "scope", "save-secret", "plugins-dir", "trust-file", "plugin", "service", "wait", "send", "auth-profile", "proto-include"]
+        let boolean: Set<String> = ["quiet", "detail", "json", "apply", "continue-on-failure", "allow-insecure", "allow-lan", "overwrite", "show-messages", "help", "version"]
+        let valued: Set<String> = ["color", "workspace", "environment", "tls", "iterations", "delay", "retries", "retry-delay", "report", "report-format", "allure", "output", "format", "source", "endpoint", "query", "query-file", "variables", "header", "metadata", "timeout", "proto", "descriptor", "method", "data", "data-file", "count", "concurrency", "ramp", "port", "routes", "repo", "message", "token-file", "destination", "client-id", "client-secret-name", "scope", "save-secret", "plugins-dir", "trust-file", "plugin", "service", "wait", "send", "auth-profile", "proto-include"]
         var index = 0, foundCommand = false
         while index < input.count {
             let item = input[index]
@@ -23,6 +24,8 @@ struct Arguments: Sendable {
             else { operands.append(item) }
             index += 1
         }
+        if let color = value("color"), !["auto", "always", "never"].contains(color) { throw CLIError.usage("--color expects auto, always or never.") }
+        if flags.contains("json") && flags.contains("detail") { throw CLIError.usage("Choose --json or --detail.") }
         if let format = value("report-format"), !["json", "markdown", "junit"].contains(format) { throw CLIError.usage("Unknown report format.") }
         if flags.contains("help") { command = "help" }; if flags.contains("version") { command = "version" }
     }
@@ -35,6 +38,13 @@ struct Arguments: Sendable {
         try (values[name] ?? []).map { row in guard let colon = row.firstIndex(of: ":") else { throw CLIError.usage("Fields use name:value.") }; return Field(name: String(row[..<colon]).trimmingCharacters(in: .whitespaces), value: String(row[row.index(after: colon)...]).trimmingCharacters(in: .whitespaces)) }
     }
     var workspaceURL: URL { URL(fileURLWithPath: value("workspace") ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/Rill/workspace.json").path) }
+    var color: Bool {
+        if value("color") == "never" { return false }
+        if value("color") == "always" { return true }
+        let environment = ProcessInfo.processInfo.environment
+        return isatty(STDOUT_FILENO) == 1 && environment["NO_COLOR"] == nil && environment["TERM"] != "dumb"
+    }
+    var liveProgress: Bool { !quiet && !flags.contains("json") && isatty(STDERR_FILENO) == 1 && ProcessInfo.processInfo.environment["TERM"] != "dumb" }
     var quiet: Bool { flags.contains("quiet") }
     func text(_ value: String) throws { if !quiet { try FileHandle.standardOutput.write(contentsOf: Data((value + "\n").utf8)) } }
     func json<T: Encodable>(_ value: T) throws { let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys]; encoder.dateEncodingStrategy = .iso8601; let data = try encoder.encode(value); guard data.count <= 32 * 1024 * 1024 else { throw WorkflowError.limit }; if !quiet { try FileHandle.standardOutput.write(contentsOf: data + Data([10])) } }
@@ -101,6 +111,8 @@ Usage: rill COMMAND [input] [--workspace PATH] [options]
 
 Run options: --environment NAME_OR_ID --tls NAME_OR_ID --allow-insecure
   --iterations N --delay MS --retries N --retry-delay MS --continue-on-failure
+  --detail shows individual attempts/checks; --json retains machine-readable output.
+  --color auto|always|never (default auto; respects NO_COLOR).
   --report FILE --report-format json|markdown|junit --allure DIRECTORY
   --output FILE explicitly exports raw response data; it may contain secrets.
 Protocols: --header name:value (repeatable), --metadata name:value (gRPC), --timeout SECONDS

@@ -16,6 +16,8 @@ import XCTest
         let before = try Data(contentsOf: URL(fileURLWithPath: workspace))
         let duplicate = try await cli(["init", "--workspace", workspace]); XCTAssertEqual(duplicate.status, 2); XCTAssertEqual(try Data(contentsOf: URL(fileURLWithPath: workspace)), before)
         let invalid = try await cli(["--unknown"]); XCTAssertEqual(invalid.status, 2)
+        let badColor = try await cli(["--color", "rainbow"]); XCTAssertEqual(badColor.status, 2)
+        let conflicting = try await cli(["--json", "--detail"]); XCTAssertEqual(conflicting.status, 2)
         let quiet = try await cli(["list", "--workspace", workspace, "--quiet"]); XCTAssertEqual(quiet.status, 0); XCTAssertTrue(quiet.output.isEmpty)
     }
     func testSharedRunnerReportsRawOutputAndStableFailureExitCodes() async throws {
@@ -28,6 +30,18 @@ import XCTest
         XCTAssertEqual(result.status, 0, String(decoding: result.diagnostics, as: UTF8.self)); XCTAssertTrue(FileManager.default.fileExists(atPath: raw.path))
         XCTAssertFalse(String(decoding: result.output + result.diagnostics, as: UTF8.self).contains("seeded-cli-private"))
         XCTAssertFalse(try String(contentsOf: report, encoding: .utf8).contains("seeded-cli-private"))
+        let summary = String(decoding: result.output, as: UTF8.self)
+        XCTAssertTrue(summary.contains("RILL / RUN")); XCTAssertTrue(summary.contains("REQUEST RESULTS")); XCTAssertFalse(summary.contains("\u{1B}"))
+        let detailed = try await cli(["run-request", "fixture", "--workspace", file.path, "--detail", "--color", "never"])
+        XCTAssertEqual(detailed.status, 0); XCTAssertTrue(String(decoding: detailed.output, as: UTF8.self).contains("REQUEST DETAILS"))
+        let machine = try await cli(["run-request", "fixture", "--workspace", file.path, "--json"])
+        let object = try JSONSerialization.jsonObject(with: machine.output) as? [String: Bool]
+        XCTAssertEqual(object?["passed"], true)
+        let colored = try await cli(["run-request", "fixture", "--workspace", file.path, "--color", "always"])
+        XCTAssertTrue(String(decoding: colored.output, as: UTF8.self).contains("\u{1B}[32m"))
+        let silent = try await cli(["run-request", "fixture", "--workspace", file.path, "--detail", "--quiet"])
+        XCTAssertEqual(silent.status, 0); XCTAssertTrue(silent.output.isEmpty)
+
         workspace.requests[0].expectedStatus = "201"; try WorkspaceFile.save(workspace, to: file)
         let assertion = try await cli(["run-request", "fixture", "--workspace", file.path]); XCTAssertEqual(assertion.status, 4)
         workspace.requests[0].url = "http://127.0.0.1:1/unavailable"; try WorkspaceFile.save(workspace, to: file)
