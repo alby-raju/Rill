@@ -1,5 +1,7 @@
 # Release preparation
 
+Paid Developer ID signing and notarization are deferred at the owner’s request (2026-10-25). No membership purchase is needed for current development work. Keep the distribution instructions below for later; do not publish a notarized-release claim.
+
 Rill 0.2.0 is a development build targeting macOS 15 or later. Required CI builds/tests Apple Silicon with Xcode 26.2/26.3 and Intel with Xcode 26.3. This validates source/toolchains, not installed artifacts on all OS versions.
 
 Run `bash scripts/test.sh`, the roadmap audit and dependency notice check. `bash scripts/release-artifacts.sh` builds an ad-hoc signed app, bundled native CLI/protoc/includes/Swift runtime compatibility libraries/help/icon/licenses, compressed DMG, SHA-256 checksum and provenance with source commit and dirty-state marker. It does not notarize or publish. Artifacts are architecture-specific; do not label one architecture universal. Build separately on Intel and Apple Silicon.
