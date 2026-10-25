@@ -1,0 +1,12 @@
+{
+  "name": "Rill demo",
+  "quantity": 2,
+  "tags": [
+    "local",
+    "synthetic"
+  ],
+  "nested": {
+    "enabled": true
+  },
+  "unicode": "café 👋"
+}

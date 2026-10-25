@@ -29,7 +29,7 @@ import RillCore
     static var section: String {
         #if DEBUG
         if argument("--ui-snapshot") != nil {
-            switch argument("--ui-state") { case "body", "blank": return "Body"; case "auth": return "Auth"; case "workflow": return "Workflow"; default: break }
+            switch argument("--ui-state") { case "response-failed", "response-passed", "response-unchecked": return "Checks"; case "body", "blank": return "Body"; case "auth": return "Auth"; case "workflow": return "Workflow"; default: break }
         }
         #endif
         return "Parameters"
@@ -60,6 +60,24 @@ import RillCore
         #endif
     }
     #if DEBUG
+    static func response(for request: RequestDraft, state: String) -> Exchange {
+        // Exercise the real persisted response shape without exposing a production-only fixture API.
+        struct Fixture: Encodable {
+            let id = UUID(), date = Date()
+            let requestID: UUID
+            let requestName: String
+            let method: HTTPMethod
+            let url: String
+            let status = 200
+            let duration = 0.003
+            let headers = [Field(name: "Content-Type", value: "application/json")]
+            let body = Data(#"{"id":42,"name":"Rill demo","active":true,"items":[{"id":1,"price":12.5}],"unicode":"Hello 👋 café"}"#.utf8)
+            let checks: [CheckResult]
+        }
+        let checks = state == "response-unchecked" ? [] : [CheckResult(title: "Status equals \(state == "response-passed" ? 200 : 201)", passed: state == "response-passed")]
+        let fixture = Fixture(requestID: request.id, requestName: request.name, method: request.method, url: request.url, checks: checks)
+        return try! JSONDecoder().decode(Exchange.self, from: JSONEncoder().encode(fixture))
+    }
     private static func finish(_ status: Int32) -> Never {
         UserDefaults.standard.removePersistentDomain(forName: preferenceDomain)
         exit(status)

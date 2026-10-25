@@ -54,6 +54,8 @@ jobs:
         env:
           RILL_SNIPPET_FIXTURES: ${{ runner.temp }}/rill-client-fixtures
         run: bash scripts/test.sh
+      - name: Verify manual acceptance kit
+        run: python3 verification/verify.py --cli "$(swift build --show-bin-path)/RillCLI"
       - name: Upload synthetic generated programs
         if: matrix.runner == 'macos-15' && matrix.xcode == '26.2'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

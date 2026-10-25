@@ -1,0 +1,16 @@
+[
+  {
+    "op": "uuid",
+    "name": "requestId"
+  },
+  {
+    "op": "header",
+    "name": "X-Request-ID",
+    "value": "{{requestId}}"
+  },
+  {
+    "op": "set",
+    "name": "kitRun",
+    "value": "manual"
+  }
+]

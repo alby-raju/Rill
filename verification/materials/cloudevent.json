@@ -1,0 +1,12 @@
+{
+  "specversion": "1.0",
+  "id": "rill-kit-event-001",
+  "source": "urn:rill:verification",
+  "type": "dev.rill.order.created",
+  "time": "2026-10-25T00:00:00Z",
+  "datacontenttype": "application/json",
+  "data": {
+    "orderId": 42,
+    "total": 12.5
+  }
+}

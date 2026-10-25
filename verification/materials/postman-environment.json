@@ -1,0 +1,12 @@
+{
+  "name": "Rill kit local",
+  "values": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:18990",
+      "enabled": true,
+      "type": "default"
+    }
+  ],
+  "_postman_variable_scope": "environment"
+}

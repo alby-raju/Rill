@@ -1,0 +1,17 @@
+{
+  "id": "04E7900C-40B0-5428-8930-1C1A58B648A2",
+  "name": "Health",
+  "method": "GET",
+  "url": "{{base_url}}/health",
+  "headers": [],
+  "parameters": [],
+  "body": "",
+  "bodyMode": "None",
+  "contentType": "application/json",
+  "auth": "None",
+  "username": "",
+  "credential": "",
+  "timeout": 5,
+  "expectedStatus": "200",
+  "bodyContains": "verification kit"
+}

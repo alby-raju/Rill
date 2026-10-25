@@ -1,0 +1,17 @@
+[
+  {
+    "method": "GET",
+    "path": "/demo",
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": "{\"mocked\":true}"
+  },
+  {
+    "method": "POST",
+    "path": "/orders",
+    "status": 201,
+    "body": "{\"id\":42}"
+  }
+]

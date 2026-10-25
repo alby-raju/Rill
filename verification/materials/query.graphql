@@ -1,0 +1,1 @@
+query Echo($recipient: String!) { hello(recipient: $recipient) }
