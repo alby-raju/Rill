@@ -5,6 +5,8 @@ private let accent = RillPalette.accent
 struct WorkbenchView: View {
     @EnvironmentObject private var store: WorkbenchStore
     @SwiftUI.Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @ViewState private var launchIntroductionFinished = false
+    private var showingLaunch: Bool { store.loading || !launchIntroductionFinished }
     @AppStorage("requestLayout") private var requestLayout = "automatic"
     var body: some View {
         NavigationSplitView {
@@ -38,8 +40,13 @@ struct WorkbenchView: View {
         .buttonStyle(RillButtonStyle())
         .textFieldStyle(RillTextFieldStyle())
         .disabled(store.loading || store.importing || store.closing)
-        .overlay { if store.loading { LaunchView(status: store.startupStatus).transition(.opacity) } }
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: store.loading)
+        .overlay { if showingLaunch { LaunchView(status: store.loading ? store.startupStatus : "Ready to explore.", loading: store.loading).transition(.opacity) } }
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: showingLaunch)
+        .task {
+            guard !launchIntroductionFinished else { return }
+            do { try await Task.sleep(for: .milliseconds(350)); launchIntroductionFinished = true }
+            catch { /* A closed window does not need to finish its introduction. */ }
+        }
         .tint(accent)
         .sheet(isPresented: $store.showForeignScripts) { ForeignScriptReviewView().environmentObject(store) }
         .sheet(isPresented: $store.showCommandImport) { CommandImportView().environmentObject(store) }

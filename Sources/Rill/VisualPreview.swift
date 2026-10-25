@@ -6,7 +6,7 @@ import RillCore
     static func makeStore() -> WorkbenchStore {
         #if DEBUG
         if let state = argument("--ui-state"), argument("--ui-snapshot") != nil {
-            let store = WorkbenchStore(preview: state == "blank" ? "empty" : state)
+            let store = WorkbenchStore(preview: ["blank", "intro"].contains(state) ? "empty" : state)
             if state == "blank" {
                 store.newRequest()
                 precondition(store.selected?.bodyMode == RequestBodyMode.none, "Blank requests must explicitly start without a body")
@@ -34,12 +34,13 @@ import RillCore
         #if DEBUG
         guard let path = argument("--ui-snapshot"), argument("--ui-state") != nil else { return }
         do {
-            try await Task.sleep(for: .milliseconds(800))
+            let introduction = argument("--ui-state") == "intro"
+            try await Task.sleep(for: .milliseconds(introduction ? 50 : 800))
             guard let window = NSApplication.shared.windows.first(where: { $0.contentView != nil && $0.isVisible }), let view = window.contentView else { exit(1) }
             let compact = argument("--ui-width").flatMap(Double.init) ?? 1440
             window.setContentSize(NSSize(width: max(1050, compact), height: 920))
             view.layoutSubtreeIfNeeded()
-            try await Task.sleep(for: .milliseconds(300))
+            try await Task.sleep(for: .milliseconds(introduction ? 30 : 300))
             guard let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { exit(1) }
             view.cacheDisplay(in: view.bounds, to: bitmap)
             guard let data = bitmap.representation(using: .png, properties: [:]) else { exit(1) }

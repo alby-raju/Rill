@@ -2,6 +2,7 @@ import SwiftUI
 
 struct LaunchView: View {
     var status: String
+    var loading = true
     @SwiftUI.Environment(\.accessibilityReduceMotion) private var reduceMotion
     var body: some View {
         VStack(spacing: 0) {
@@ -11,13 +12,14 @@ struct LaunchView: View {
             Text("rill").font(.system(size: 38, weight: .bold, design: .rounded)).padding(.top, 20)
             Text("Your API workspace").font(.system(size: 15)).foregroundStyle(.secondary).padding(.top, 6)
             HStack(spacing: 10) {
-                if !reduceMotion { ProgressView().controlSize(.small) }
+                if loading && !reduceMotion { ProgressView().controlSize(.small) }
+                else if !loading { Image(systemName: "checkmark.circle.fill").foregroundStyle(RillPalette.accent) }
                 Text(status).font(.system(size: 12)).foregroundStyle(.secondary)
             }.padding(.top, 35).accessibilityElement(children: .combine)
             Spacer()
             Label("Local workspace · Ready when you are", systemImage: "lock.shield").font(.caption).foregroundStyle(.secondary).padding(.bottom, 28)
         }.frame(maxWidth: .infinity, maxHeight: .infinity).background(RillPalette.canvas)
-            .accessibilityLabel("Opening Rill").accessibilityValue(status)
+            .accessibilityLabel(loading ? "Opening Rill" : "Rill is ready").accessibilityValue(status)
     }
 }
 
@@ -62,6 +64,6 @@ struct WelcomeView: View {
                 Text(title).font(.system(size: 13, weight: .semibold))
                 Text(detail).font(.system(size: 12)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true).frame(maxWidth: .infinity, alignment: .leading)
             }.padding(10).frame(maxWidth: .infinity, minHeight: 100, alignment: .topLeading)
-        }.buttonStyle(RillButtonStyle()).accessibilityHint(detail)
+        }.buttonStyle(RillButtonStyle()).accessibilityLabel(title).accessibilityHint(detail)
     }
 }
