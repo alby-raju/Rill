@@ -18,3 +18,11 @@ Include the affected version/commit, platform, impact and a minimal synthetic re
 - Native parsers and libraries have bounded entry points, but an in-process parser is not an OS sandbox or a promise of a hard memory/time ceiling for every dependency allocation.
 
 For exact supported behavior see [features and limits](docs/FEATURES.md). Dependency review records are dated; absence of an advisory match is not proof of safety. Developer ID signing/notarization remain deferred for development builds.
+
+## Automated checks and maintenance
+
+GitHub secret scanning and push protection are enabled, with private vulnerability reporting and Dependabot alerts/security updates. Weekly Dependabot PRs cover Swift, GitHub Actions and Python development requirements; updates receive normal review and CI, with refreshed dependency notices when needed.
+
+The Security workflow runs on PRs, main pushes and weekly: CodeQL analyzes Swift (a real release build) and Python. `python3 scripts/security-audit.py` queries OSV for every locked Swift commit and pinned Python development tool, fails on advisory matches and service errors, and prints affected identities without uploading workspace data. Only public dependency revisions/names are sent. Commit matching depends on OSV coverage; vendored native code and dynamically installed client-validation SDKs still need their upstream advisory review. No advisory suppression or automatic merge is configured.
+
+Review findings in the Security tab and workflow logs. Confirm impact, update pins and notices, test the fix, and publish a new prerelease when appropriate. Scanner success is not a security certification. Current branch protection retains the required build aggregate, one review and the owner's administrator bypass; scans are checked independently before release.

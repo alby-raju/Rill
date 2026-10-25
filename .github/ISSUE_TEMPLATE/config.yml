@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability privately
+    url: https://github.com/alby-raju/Rill/security/advisories/new
+    about: Do not post credentials or vulnerability details in public issues.
+  - name: Questions and ideas
+    url: https://github.com/alby-raju/Rill/discussions
+    about: Ask usage questions and discuss ideas before proposing large changes.
