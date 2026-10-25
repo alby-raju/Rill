@@ -108,7 +108,13 @@ import UniformTypeIdentifiers
                 request.url = "https://api.example.test/v1/customers"; request.bodyMode = .text
                 request.body = #"{"name":"Alex Morgan","email":"alex@example.test"}"#
                 request.auth = preview == "auth" ? .bearer : .none
+                if preview.hasPrefix("response-") {
+                    request.name = preview == "response-failed" ? "Intentional assertion failure" : "Inspect a response"; request.method = .GET; request.bodyMode = RequestBodyMode.none; request.body = ""; request.expectedStatus = preview == "response-failed" ? "201" : preview == "response-passed" ? "200" : ""
+                }
                 workspace.requests = [request]; try? editor.open(request.id); selection = request.id
+                if preview.hasPrefix("response-") {
+                    response = RillPreview.response(for: request, state: preview)
+                }
             }
             persistenceHealth = .saved; loading = preview == "loading"
             return
@@ -301,6 +307,26 @@ import UniformTypeIdentifiers
             }
         }
         attempt { try editor.close(id, in: workspace, force: force); selection = editor.activeID }
+    }
+    func closeTabs(_ scope: TabCloseScope, relativeTo anchor: UUID? = nil) {
+        guard canEdit else { return }
+        let targets = editor.tabsToClose(scope, relativeTo: anchor)
+        guard !targets.isEmpty else { return }
+        let dirty = targets.filter { editor.isDirty($0, in: workspace) }
+        if !dirty.isEmpty {
+            let alert = NSAlert(); alert.messageText = "Save changes before closing \(targets.count) tabs?"
+            alert.informativeText = "\(dirty.count) tab(s) have unsaved changes. Cancel keeps every tab open. Saved requests remain in their collections."
+            alert.addButton(withTitle: "Cancel"); alert.addButton(withTitle: "Discard Changes"); alert.addButton(withTitle: "Save All")
+            switch alert.runModal() {
+            case .alertSecondButtonReturn:
+                attempt { try editor.closeTabs(targets, in: workspace, discardChanges: true); selection = editor.activeID }
+            case .alertThirdButtonReturn:
+                Task { if await saveDrafts(Set(dirty)) { attempt { try editor.closeTabs(targets, in: workspace); selection = editor.activeID } } }
+            default: break
+            }
+            return
+        }
+        attempt { try editor.closeTabs(targets, in: workspace); selection = editor.activeID }
     }
     func reopenTab() { attempt { try editor.reopen(in: workspace); selection = editor.activeID } }
     func saveSelected() { if let selection, canEdit { Task { _ = await saveDrafts([selection]) } } }

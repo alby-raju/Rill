@@ -15,7 +15,7 @@ struct ResponseView: View {
                 Text("RESPONSE").font(.system(size: 10, weight: .semibold, design: .monospaced)).foregroundStyle(.secondary)
                 Spacer()
                 if let exchange {
-                    Label("\(exchange.status) \(HTTPURLResponse.localizedString(forStatusCode: exchange.status).capitalized)", systemImage: "circle.fill").foregroundStyle(exchange.status < 400 ? Color.green : Color.orange)
+                    Label("HTTP \(exchange.status)", systemImage: "circle.fill").foregroundStyle(exchange.status < 400 ? Color.green : Color.orange)
                     Text(String(format: "%.0f ms", exchange.duration * 1000))
                     Text(ByteCountFormatter.string(fromByteCount: Int64(exchange.body.count), countStyle: .file))
                 }
@@ -24,11 +24,17 @@ struct ResponseView: View {
             if running {
                 VStack(spacing: 12) { ProgressView().controlSize(.small); Text("Following the request…").font(.callout).foregroundStyle(.secondary) }.frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let exchange {
-                HStack {
-                    Picker("Response section", selection: $section) { Text("Body").tag("Body"); Text("Headers (\(exchange.headers.count))").tag("Headers"); Text("Checks (\(exchange.checks.count))").tag("Checks"); Text("Request").tag("Request"); Text("Timeline").tag("Timeline") }.pickerStyle(.segmented).frame(maxWidth: 550)
-                    Spacer()
-                    if section == "Body" { Toggle("Pretty JSON", isOn: $pretty).toggleStyle(.checkbox); Button { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(exchange.previewIsTruncated ? exchange.text : pretty ? exchange.prettyText : exchange.text, forType: .string) } label: { Image(systemName: "doc.on.doc") }.help("Copy response body"); Button { export(exchange) } label: { Image(systemName: "square.and.arrow.up") }.help("Export response") }
-                }.font(.caption).padding(.horizontal, 20).padding(.vertical, 10)
+                validationBanner(exchange)
+                RillTabs(titles: ["Body", "Headers", "Checks", "Request", "Timeline"], selection: $section)
+                    .padding(.horizontal, 15).accessibilityLabel("Response section")
+                if section == "Body" {
+                    HStack {
+                        Toggle("Pretty JSON", isOn: $pretty).toggleStyle(.checkbox)
+                        Spacer()
+                        Button { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(exchange.previewIsTruncated ? exchange.text : pretty ? exchange.prettyText : exchange.text, forType: .string) } label: { Label("Copy", systemImage: "doc.on.doc") }.help("Copy response body")
+                        Button { export(exchange) } label: { Label("Export", systemImage: "square.and.arrow.up") }.help("Export response")
+                    }.font(.caption).padding(.horizontal, 20).padding(.vertical, 8)
+                }
                 if section == "Body" {
                     if exchange.previewIsTruncated {
                         Text("Preview limited to \(ByteCountFormatter.string(fromByteCount: Int64(exchange.previewByteLimit), countStyle: .file)). Export or copy retained bytes to inspect more.")
@@ -72,6 +78,26 @@ struct ResponseView: View {
             }
         }
     }
+    private func validationBanner(_ exchange: Exchange) -> some View {
+        let failed = exchange.checks.filter { !$0.passed }.count
+        let color: Color = failed > 0 ? .red : exchange.checks.isEmpty ? .secondary : .green
+        return HStack(alignment: .top, spacing: 12) {
+            Image(systemName: failed > 0 ? "xmark.octagon.fill" : exchange.checks.isEmpty ? "info.circle" : "checkmark.seal.fill")
+                .foregroundStyle(color).padding(.top, 2)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(failed > 0 ? "\(failed) of \(exchange.checks.count) checks failed" : exchange.checks.isEmpty ? "No checks configured" : "All \(exchange.checks.count) checks passed")
+                    .font(.callout.weight(.semibold)).foregroundStyle(color)
+                Text(failed > 0 ? "HTTP \(exchange.status) was received, but the response did not satisfy the configured checks." : exchange.checks.isEmpty ? "The HTTP status describes the response. Add checks to validate the result." : "The response satisfied every configured check.")
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }.frame(maxWidth: .infinity, alignment: .leading)
+            if !exchange.checks.isEmpty {
+                Button("Review checks") { section = "Checks" }.font(.caption).help("Show individual response check results")
+            }
+        }.padding(12).background(color.opacity(0.07), in: RoundedRectangle(cornerRadius: 8))
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(color.opacity(0.2), lineWidth: 1))
+            .padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 5)
+    }
+
     private func exportPrepared(_ summary: PreparedRequestSummary) {
         let panel = NSSavePanel(); panel.nameFieldStringValue = "prepared-request.json"
         guard panel.runModal() == .OK, let url = panel.url else { return }

@@ -20,9 +20,14 @@ struct ResponseBodyPreview: View {
                 else { ContentUnavailableView("Image preview unavailable", systemImage: "photo", description: Text("Only complete PNG/JPEG/GIF payloads within preview and pixel limits are decoded. Export retained bytes to inspect.")) }
             } else {
                 if ResponseInspection.kind(exchange) == .html { Text("HTML is shown as source. Scripts and remote resources are never loaded.").font(.caption).foregroundStyle(.secondary).padding(.horizontal, 20) }
-                ScrollView([.vertical, .horizontal]) {
-                    Text(ResponseInspection.kind(exchange) == .binary ? ResponseInspection.hex(exchange.body) : exchange.previewText(pretty: pretty))
-                        .font(.system(size: fontSize, design: .monospaced)).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .topLeading).padding(20)
+                GeometryReader { geometry in
+                    ScrollView([.vertical, .horizontal]) {
+                        Text(ResponseInspection.kind(exchange) == .binary ? ResponseInspection.hex(exchange.body) : exchange.previewText(pretty: pretty))
+                            .font(.system(size: fontSize, design: .monospaced)).textSelection(.enabled)
+                            .fixedSize(horizontal: true, vertical: true)
+                            .frame(minWidth: max(0, geometry.size.width - 40), minHeight: max(0, geometry.size.height - 40), alignment: .topLeading)
+                            .padding(20)
+                    }
                 }
                 if ResponseInspection.kind(exchange) == .binary { Text("Hex preview: first 4 KiB. Export preserves retained bytes.").font(.caption).foregroundStyle(.secondary).padding(.horizontal, 20) }
             }

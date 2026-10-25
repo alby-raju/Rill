@@ -1,5 +1,7 @@
 import Foundation
 
+public enum TabCloseScope: Sendable { case all, left, right }
+
 public struct EditorSessionState: Codable, Equatable, Sendable {
     public var version = 1
     public var checkpointID = UUID()
@@ -39,6 +41,28 @@ public struct EditorSessionState: Codable, Equatable, Sendable {
         closedTabs.removeAll { $0 == id }; closedTabs.append(id)
         closedTabs = Array(closedTabs.suffix(20))
         if activeID == id { activeID = openTabs.isEmpty ? nil : openTabs[min(index, openTabs.count - 1)] }
+    }
+    public func tabsToClose(_ scope: TabCloseScope, relativeTo anchor: UUID? = nil) -> [UUID] {
+        switch scope {
+        case .all: return openTabs
+        case .left:
+            guard let anchor, let index = openTabs.firstIndex(of: anchor) else { return [] }
+            return Array(openTabs[..<index])
+        case .right:
+            guard let anchor, let index = openTabs.firstIndex(of: anchor) else { return [] }
+            return Array(openTabs.dropFirst(index + 1))
+        }
+    }
+    /// Explicit bulk commands include pinned tabs. Validate all drafts before mutating any tab.
+    public mutating func closeTabs(_ ids: [UUID], in workspace: Workspace, discardChanges: Bool = false) throws {
+        let targets = Set(ids).intersection(openTabs)
+        if !discardChanges && targets.contains(where: { isDirty($0, in: workspace) }) { throw EditingError.unsavedChanges }
+        var updated = self
+        for id in openTabs where targets.contains(id) {
+            if discardChanges { updated.discard(id) }
+            try updated.close(id, in: workspace, force: true)
+        }
+        self = updated
     }
     public mutating func reopen(in workspace: Workspace) throws {
         while let id = closedTabs.popLast() {

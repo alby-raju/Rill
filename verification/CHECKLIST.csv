@@ -1,6 +1,6 @@
 journey,area,action,expected,result,rill_version,macos_cpu,notes_evidence
 A01,Workspace,Import native kit,4 collections / 19 requests; prior data preserved,,,,
-A01,Workspace,"Rename, duplicate, move, reorder, tabs/pins and restart",Saved identities/settings/order/layout survive,,,,
+A01,Workspace,"Rename, duplicate, move, reorder, tabs/pins and restart; Close All/Left/Right with dirty tabs","Saved identities/settings/order/layout survive; Cancel preserves every tab, saved requests never deleted",,,,
 A02,Environments,Select Verification local; override base_url in child environment,Correct inherited/overridden value; no unresolved URL,,,,
 A02,Environments,Missing/cyclic variable and named-secret failure,Clear failure before send; no secret leakage,,,,
 A03,UX,"Launch, empty state, light/dark, compact/wide, keyboard-only",Full layout; visible focus; no clipped essential actions,,,,

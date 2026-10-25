@@ -149,6 +149,13 @@ struct WorkbenchView: View {
                             .contextMenu {
                                 Button(store.editor.pinnedTabs.contains(id) ? "Unpin" : "Pin") { store.togglePin(id) }
                                 Button("Close") { store.closeTab(id, force: true) }
+                                Divider()
+                                Button("Close Tabs to the Left") { store.closeTabs(.left, relativeTo: id) }
+                                    .disabled(!store.canEdit || store.editor.tabsToClose(.left, relativeTo: id).isEmpty)
+                                Button("Close Tabs to the Right") { store.closeTabs(.right, relativeTo: id) }
+                                    .disabled(!store.canEdit || store.editor.tabsToClose(.right, relativeTo: id).isEmpty)
+                                Button("Close All Tabs") { store.closeTabs(.all) }.disabled(!store.canEdit)
+                                    .help("Includes pinned tabs; unsaved changes require Save All, Discard Changes or Cancel")
                             }
                     }
                 }
@@ -206,8 +213,8 @@ struct RequestEditor: View {
                     }
                 } else {
                     VSplitView {
-                        composition.frame(minHeight: 180, idealHeight: geometry.size.height * 0.58).background(SplitAutosave(name: "rill.request.vertical", vertical: false))
-                        ResponseView(exchange: store.response, running: store.running).frame(minHeight: 180)
+                        composition.frame(minHeight: min(140, geometry.size.height * 0.35), idealHeight: geometry.size.height * (store.response == nil ? 0.58 : 0.4)).background(SplitAutosave(name: "rill.request.vertical", vertical: false))
+                        ResponseView(exchange: store.response, running: store.running).frame(minHeight: min(store.response == nil ? 180 : 340, geometry.size.height * 0.65))
                     }
                 }
             }
