@@ -1,0 +1,31 @@
+title: ''
+body:
+  - type: markdown
+    attributes:
+      value: "Ask usage questions here. Search existing answers and read the feature limits first. Use Issues for reproducible bugs and the private security report for vulnerabilities. Share synthetic data only."
+  - type: input
+    id: version
+    attributes:
+      label: Rill version, macOS version and CPU
+      placeholder: 0.4.0, macOS 15, Apple Silicon
+    validations:
+      required: true
+  - type: textarea
+    id: goal
+    attributes:
+      label: What are you trying to do?
+      description: Describe the workflow, protocol or import format and the outcome you need.
+    validations:
+      required: true
+  - type: textarea
+    id: attempted
+    attributes:
+      label: What have you tried?
+      description: Include relevant documentation or a verification-kit case. Redact credentials and personal data.
+    validations:
+      required: true
+  - type: textarea
+    id: example
+    attributes:
+      label: Minimal synthetic example or redacted screenshot
+      description: Never attach a personal workspace, real tokens, private keys or raw process samples.

@@ -65,3 +65,7 @@ Protocol work needs independent real-service evidence in addition to synthetic f
 ## License
 
 Contributions are made under the project's [MIT License](LICENSE). Submit only material you have the right to contribute. Third-party code/assets require their own compatible license and retained attribution.
+
+## Community
+
+Read the [conduct policy](docs/CODE_OF_CONDUCT.md) before participating. Use [Discussions](https://github.com/alby-raju/Rill/discussions) for questions and early proposals; use focused issues and pull requests for agreed work. See [support](SUPPORT.md) for reporting routes and privacy expectations.
