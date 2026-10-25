@@ -13,10 +13,14 @@ import RillCore
     private static let preferenceDomain = "app.rill.visual-preview." + UUID().uuidString
     static let preferences: UserDefaults = isRendering ? UserDefaults(suiteName: preferenceDomain)! : .standard
 
+    #if DEBUG
+    private static weak var previewStore: WorkbenchStore?
+    #endif
     static func makeStore() -> WorkbenchStore {
         #if DEBUG
         if let state = argument("--ui-state"), argument("--ui-snapshot") != nil {
             let store = WorkbenchStore(preview: ["blank", "intro"].contains(state) ? "empty" : state)
+            previewStore = store
             if state == "blank" {
                 store.newRequest()
                 precondition(store.selected?.bodyMode == RequestBodyMode.none, "Blank requests must explicitly start without a body")
@@ -51,6 +55,34 @@ import RillCore
             window.setContentSize(NSSize(width: max(1050, compact), height: 920))
             view.layoutSubtreeIfNeeded()
             try await Task.sleep(for: .milliseconds(introduction ? 30 : 300))
+            if argument("--ui-state") == "tabs-close", let store = previewStore {
+                let start = ProcessInfo.processInfo.systemUptime
+                store.closeTabs(.all)
+                let model = ProcessInfo.processInfo.systemUptime - start
+                await Task.yield()
+                view.layoutSubtreeIfNeeded()
+                let layout = ProcessInfo.processInfo.systemUptime - start
+                try await Task.sleep(for: .milliseconds(100))
+                precondition(store.editor.openTabs.isEmpty && store.selection == nil, "Bulk close must remain closed after UI updates")
+                print(String(format: "Bulk close: model %.3f ms; model + layout %.3f ms; 100 tabs", model * 1000, layout * 1000))
+            }
+            if argument("--ui-state") == "tabs-menu-close", let store = previewStore {
+                func findMenu(_ root: NSView) -> RequestTabMenu.MenuView? {
+                    if let menu = root as? RequestTabMenu.MenuView, !menu.visibleRect.isEmpty { return menu }
+                    return root.subviews.lazy.compactMap { findMenu($0) }.first
+                }
+                guard let menuView = findMenu(view) else { preconditionFailure("Tab menu overlay missing") }
+                let driver = MenuDiagnosticDriver(store: store, menuView: menuView)
+                let timer = Timer(timeInterval: 0.05, target: driver, selector: #selector(MenuDiagnosticDriver.step), userInfo: nil, repeats: true)
+                driver.timer = timer
+                RunLoop.main.add(timer, forMode: .eventTracking)
+                menuView.openDiagnosticMenu()
+                timer.invalidate()
+                precondition(driver.ticks == 30, "Menu diagnostic must exercise every live update")
+                try await Task.sleep(for: .milliseconds(100))
+                precondition(store.editor.openTabs.isEmpty && store.selection == nil, "Menu Close All must close every tab")
+                print("Stable tab menu: 30 live state updates, one menu build, Close All action passed (100 tabs)")
+            }
             guard let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { finish(1) }
             view.cacheDisplay(in: view.bounds, to: bitmap)
             guard let data = bitmap.representation(using: .png, properties: [:]) else { finish(1) }
@@ -60,6 +92,24 @@ import RillCore
         #endif
     }
     #if DEBUG
+    @MainActor private final class MenuDiagnosticDriver: NSObject {
+        let store: WorkbenchStore
+        let menuView: RequestTabMenu.MenuView
+        var timer: Timer?
+        var ticks = 0
+        init(store: WorkbenchStore, menuView: RequestTabMenu.MenuView) { self.store = store; self.menuView = menuView }
+        @objc func step() {
+            ticks += 1
+            store.search = ticks.isMultiple(of: 2) ? "Request" : ""
+            if ticks == 30 {
+                timer?.invalidate(); timer = nil
+                guard let menu = menuView.diagnosticMenu else { preconditionFailure("Menu dismissed before diagnostic action") }
+                precondition(menu.numberOfItems == 6 && menuView.diagnosticBuildCount == 1, "Live state updates must not rebuild the active menu")
+                menu.performActionForItem(at: 5)
+                menu.cancelTracking()
+            }
+        }
+    }
     static func response(for request: RequestDraft, state: String) -> Exchange {
         // Exercise the real persisted response shape without exposing a production-only fixture API.
         struct Fixture: Encodable {
