@@ -12,7 +12,7 @@ import RillCore
             catch CLIError.usage(let text) { try? FileHandle.standardError.write(contentsOf: Data((text + "\n").utf8)); return 2 }
             catch { if Task.isCancelled { return 130 }; try? FileHandle.standardError.write(contentsOf: Data(("Operation failed (" + DiagnosticFailure.classify(error).rawValue + "). Check inputs, credentials and endpoint; runtime content omitted.\n").utf8)); return 3 }
         }
-        let interrupt = DispatchSource.makeSignalSource(signal: SIGINT, queue: .global()), terminate = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .global())
+        let interrupt = DispatchSource.makeSignalSource(signal: SIGINT, queue: .main), terminate = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)
         interrupt.setEventHandler { task.cancel() }; terminate.setEventHandler { task.cancel() }; interrupt.resume(); terminate.resume()
         let status = await task.value; interrupt.cancel(); terminate.cancel(); Darwin.exit(status)
     }
