@@ -1,0 +1,16 @@
+name: Feature request
+description: Propose a concrete workflow improvement.
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What workflow is difficult or missing?
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: What outcome would help?
+      description: Include an example, relevant protocol/format and any expected limits.
+    validations:
+      required: true

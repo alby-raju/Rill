@@ -21,8 +21,8 @@ cat > "$RILL_APP/Contents/Info.plist" <<'PLIST'
 <key>CFBundleIdentifier</key><string>app.rill.workbench</string>
 <key>CFBundleName</key><string>Rill</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>0.3.3</string>
-<key>CFBundleVersion</key><string>6</string>
+<key>CFBundleShortVersionString</key><string>0.4.0</string>
+<key>CFBundleVersion</key><string>7</string>
 <key>CFBundleIconFile</key><string>Rill.icns</string>
 <key>LSMinimumSystemVersion</key><string>15.0</string>
 <key>NSHighResolutionCapable</key><true/>
@@ -42,6 +42,7 @@ for RILL_PROTO in "$RILL_ROOT"/.build/checkouts/swift-protobuf/Sources/protobuf/
 done
 codesign --force --sign - "$RILL_APP/Contents/Resources/protoc"
 codesign --verify --strict "$RILL_APP/Contents/Resources/protoc"
+cp "$RILL_ROOT/LICENSE" "$RILL_APP/Contents/Resources/LICENSE"
 cp "$RILL_ROOT/THIRD_PARTY_NOTICES.txt" "$RILL_APP/Contents/Resources/THIRD_PARTY_NOTICES.txt"
 mkdir -p "$RILL_APP/Contents/Frameworks"
 xcrun swift-stdlib-tool --copy --scan-executable "$RILL_APP/Contents/MacOS/Rill" --scan-executable "$RILL_APP/Contents/Helpers/rill" --destination "$RILL_APP/Contents/Frameworks" --platform macosx
@@ -50,19 +51,25 @@ for RILL_DYLIB in "$RILL_APP"/Contents/Frameworks/*.dylib(N); do
   codesign --verify --strict "$RILL_DYLIB"
 done
 plutil -lint "$RILL_APP/Contents/Info.plist"
-[[ "$("$RILL_APP/Contents/Helpers/rill" --version)" == "0.3.3" ]]
+[[ "$("$RILL_APP/Contents/Helpers/rill" --version)" == "0.4.0" ]]
 "$RILL_APP/Contents/Helpers/rill" --help >/dev/null
 codesign --verify --strict "$RILL_APP/Contents/Helpers/rill"
 codesign --force --sign - "$RILL_APP"
 codesign --verify --strict "$RILL_APP"
 python3 - "$RILL_APP" "$RILL_OUTPUT" "$RILL_STAGE" <<'PY_INSTALL'
-import plistlib, shutil, sys
+import plistlib
+import shutil
+import sys
 from pathlib import Path
+
 source, target, stage = map(Path, sys.argv[1:])
-if target.is_symlink(): raise SystemExit('Refusing to replace a symlink at the generated app output.')
+if target.is_symlink():
+    raise SystemExit("Refusing to replace a symlink at the generated app output.")
 if target.exists():
-    with (target / 'Contents/Info.plist').open('rb') as stream: info = plistlib.load(stream)
-    if info.get('CFBundleIdentifier') != 'app.rill.workbench': raise SystemExit('Existing output is not a generated Rill app.')
+    with (target / "Contents/Info.plist").open("rb") as stream:
+        info = plistlib.load(stream)
+    if info.get("CFBundleIdentifier") != "app.rill.workbench":
+        raise SystemExit("Existing output is not a generated Rill app.")
     shutil.rmtree(target)
 shutil.move(source, target)
 stage.rmdir()

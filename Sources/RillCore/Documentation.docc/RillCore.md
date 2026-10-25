@@ -10,7 +10,7 @@ Use ``WorkspaceSession`` for credential-aware open/save operations and ``Workspa
 
 ## Native sessions
 
-Native live sessions own bounded queues, deadlines and cancellation. Consult the protocol boundaries in docs/milestones/M6.md and M7.md before assuming unsupported protocol features. Foreign scripts never execute as native hooks.
+Native live sessions own bounded queues, deadlines and cancellation. Consult the protocol boundaries in docs/FEATURES.md before assuming unsupported protocol features. Foreign scripts never execute as native hooks.
 
 ## Collaboration
 

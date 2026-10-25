@@ -28,10 +28,13 @@ xcrun notarytool submit "$RILL_DMG" --keychain-profile "$RILL_NOTARY_PROFILE" --
 xcrun stapler staple "$RILL_DMG"
 xcrun stapler validate "$RILL_DMG"
 spctl --assess --type open --context context:primary-signature --verbose "$RILL_DMG"
-shasum -a 256 "$RILL_DMG" > "$RILL_DMG.sha256"
+shasum -a 256 "$RILL_DMG" >"$RILL_DMG.sha256"
 python3 - "$RILL_STAGE" <<'PY_CLEAN'
-import shutil, sys
+import shutil
+import sys
 from pathlib import Path
-p=Path(sys.argv[1]); assert p.name.startswith('.rill-signed.') and p.parent.name == 'dist'
+
+p = Path(sys.argv[1])
+assert p.name.startswith(".rill-signed.") and p.parent.name == "dist"
 shutil.rmtree(p)
 PY_CLEAN
