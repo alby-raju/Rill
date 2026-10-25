@@ -36,6 +36,12 @@ jobs:
         run: python3 scripts/ci-plan.py
       - run: python3 scripts/check-docs.py
       - run: python3 -m unittest discover -s scripts/tests -v
+      - name: Check Python automation formatting
+        run: |
+          python3 -m venv "$RUNNER_TEMP/python-quality"
+          "$RUNNER_TEMP/python-quality/bin/pip" install -r requirements-dev.txt
+          "$RUNNER_TEMP/python-quality/bin/ruff" format --check scripts verification
+          "$RUNNER_TEMP/python-quality/bin/ruff" check scripts verification
   verify:
     name: Swift / ${{ matrix.runner }} / Xcode ${{ matrix.xcode }}
     needs: plan
@@ -116,7 +122,7 @@ jobs:
     name: Compile and execute generated clients
     needs: [plan, verify]
     if: needs.plan.outputs.native == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -126,9 +132,17 @@ jobs:
         with:
           name: generated-client-fixtures
           path: fixtures
-      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
-        with:
-          dotnet-version: '10.0.x'
+      - name: Select preinstalled .NET 10 SDK
+        run: |
+          dotnet --list-sdks
+          RILL_CLIENT_DOTNET_SDK="$(dotnet --list-sdks | awk '$1 ~ /^10[.]0[.][0-9]+$/ {print $1}' | sort -V | tail -n 1)"
+          if [ -z "$RILL_CLIENT_DOTNET_SDK" ]; then
+            echo 'The runner must provide a stable .NET 10 SDK; no rolling download fallback is used.' >&2
+            exit 1
+          fi
+          echo "RILL_CLIENT_DOTNET_SDK=$RILL_CLIENT_DOTNET_SDK" >> "$GITHUB_ENV"
+          echo "DOTNET_CLI_TELEMETRY_OPTOUT=1" >> "$GITHUB_ENV"
+          echo "DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1" >> "$GITHUB_ENV"
       - name: Install isolated test SDKs
         run: |
           python3 -m venv "$RUNNER_TEMP/client-python"

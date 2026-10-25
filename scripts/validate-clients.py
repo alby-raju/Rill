@@ -12,6 +12,7 @@ import json
 import os
 import pathlib
 import queue
+import re
 import shutil
 import subprocess
 import tempfile
@@ -132,6 +133,15 @@ def command_for(target, source, folder):
                 / "debug/rill-client-fixture"
             )
         ]
+    sdk = os.environ.get("RILL_CLIENT_DOTNET_SDK")
+    if sdk:
+        if not re.fullmatch(r"10\.0\.[0-9]+", sdk):
+            raise ValueError("Expected a stable installed .NET 10 SDK version")
+        (folder / "global.json").write_text(
+            json.dumps(
+                {"sdk": {"version": sdk, "rollForward": "disable", "allowPrerelease": False}}
+            )
+        )
     (folder / "Fixture.csproj").write_text(
         '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>'
     )
