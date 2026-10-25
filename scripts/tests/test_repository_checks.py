@@ -20,6 +20,23 @@ def load(name):
 
 
 class RepositoryChecks(unittest.TestCase):
+    def test_only_explicit_documentation_changes_skip_native_builds(self):
+        plan = load("ci-plan")
+        self.assertTrue(
+            plan.docs_only(["README.md", "docs/FEATURES.md", "docs/images/welcome.png"])
+        )
+        for paths in [
+            [],
+            [""],
+            ["Sources/Rill/App/RillApp.swift"],
+            ["README.md", "Package.resolved"],
+            ["docs/helper.py"],
+            [".github/workflows/swift.yml"],
+            ["LICENSE"],
+            ["Sources/old.swift", "docs/new.md"],
+        ]:
+            self.assertFalse(plan.docs_only(paths))
+
     def test_vulnerability_scan_rejects_matches_and_incomplete_service_results(self):
         audit = load("security-audit")
         count = len(json.loads((audit.ROOT / "Package.resolved").read_text())["pins"]) + 1
