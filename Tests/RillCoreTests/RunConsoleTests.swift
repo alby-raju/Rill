@@ -20,6 +20,8 @@ final class RunConsoleTests: XCTestCase {
         var failure = attempt(request, .failed, status: nil); failure.failure = "timeout"
         let report = RunReport(outcomes: [failure], requestedSteps: 1)
         let text = RunConsole.render(report, requests: [request], title: "test\r\n\u{1B}]8;;bad\u{7}")
+        XCTAssertLessThanOrEqual(RunConsole.label("a" + String(repeating: "\u{301}", count: 10_000)).unicodeScalars.count, 513)
+        XCTAssertEqual(RunConsole.label("test", limit: 0), "…")
         XCTAssertTrue(text.contains("Request timed out")); XCTAssertTrue(text.contains("no responses received")); XCTAssertFalse(text.contains("\u{1B}")); XCTAssertFalse(text.contains("\u{202E}"))
         failure.failure = "secret-runtime-error"
         XCTAssertFalse(RunConsole.render(RunReport(outcomes: [failure], requestedSteps: 1), requests: [request], title: "test").contains("secret-runtime-error"))

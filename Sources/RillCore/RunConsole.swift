@@ -3,10 +3,12 @@ import Foundation
 /// Human reports contain metadata and numeric results only; never dump URLs, payloads or runtime errors.
 public enum RunConsole {
     public static func label(_ text: String, limit: Int = 64) -> String {
-        let safe = String(String.UnicodeScalarView(text.unicodeScalars.filter {
+        let width = max(1, min(limit, 128))
+        let truncated = !text.unicodeScalars.dropFirst(512).isEmpty
+        let safe = String(String.UnicodeScalarView(text.unicodeScalars.prefix(512).filter {
             !CharacterSet.controlCharacters.contains($0) && !CharacterSet(charactersIn: "\u{202A}\u{202B}\u{202C}\u{202D}\u{202E}\u{2066}\u{2067}\u{2068}\u{2069}").contains($0)
         }))
-        return safe.count > limit ? String(safe.prefix(limit - 1)) + "…" : safe
+        return safe.count > width ? String(safe.prefix(width - 1)) + "…" : safe + (truncated ? "…" : "")
     }
     private static func number(_ value: Double) -> String { String(format: "%.1f", locale: Locale(identifier: "en_US_POSIX"), value) }
     private static func time(_ seconds: Double) -> String { number(seconds * 1000) + " ms" }
