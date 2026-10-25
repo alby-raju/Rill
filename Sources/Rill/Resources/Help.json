@@ -62,6 +62,6 @@
   {
     "id": "release",
     "title": "Version and release status",
-    "body": "Rill 0.2.0 is a development milestone, not a signed-off parity release. Native runtimes, compatibility libraries, compiler and notices are bundled. Developer ID signing, notarization, Gatekeeper, actual fresh-Mac installs, real-provider acceptance and the 122-capability sign-off remain release gates. Ad-hoc local signatures do not establish a public distribution identity. See repository milestone documents for exact supported subsets and evidence."
+    "body": "Rill 0.3.0 is a development milestone, not a signed-off parity release. Native runtimes, compatibility libraries, compiler and notices are bundled. Paid Developer ID signing and notarization are deferred. Gatekeeper, actual fresh-Mac installs, real-provider acceptance and the 122-capability sign-off remain future release gates. Ad-hoc local signatures do not establish a public distribution identity. See repository milestone documents for exact supported subsets and evidence."
   }
 ]

@@ -1,0 +1,15 @@
+# Workbench experience refresh — 0.3.0 / build 3
+
+Addresses the owner-supplied empty-workbench, body, authentication and workflow screenshots after M8/M9 implementation. The detail root now fills the available window in every state; a single welcome surface replaces the intrinsic-height empty state that left blank space above and below the workbench. Welcome actions create/import requests or open actual API, stream, gRPC and workspace tools.
+
+Opening a workspace displays a full-window branded loading surface driven by real workspace/tab/draft restoration phases. No fake percentage or forced minimum delay is added. Reduced motion suppresses the spinner and transition animation. Loading failures continue to preserve the original files and expose the existing recovery errors.
+
+Shared native button, text-field, selector, panel, notice and tab components establish consistent spacing, light/dark contrast, hover/pressed/disabled states and field focus outlines. Selectors retain native Menu/Picker keyboard and selection behavior. Authentication becomes compact, grouped auth and connection-security panels; body tools get compact selectors and a framed editor; workflow sections include explanatory empty states and clear add actions. All existing auth/TLS choices, including missing/insecure profiles, are retained. The response Send control executes the same store action as the URL bar. Empty URL Send controls are disabled. New blank requests explicitly select no body; old requests retain their exact body-mode semantics and can still explicitly send empty text.
+
+The request/response split remains user-resizable with persisted side-by-side/stacked/automatic preferences. Long forms scroll inside their own panel rather than stretching the window. Existing shortcuts, editor completion/find/zoom/undo/wrap, request tabs, persistence and transport logic remain.
+
+## Visual evidence
+
+Run `bash scripts/render-ui-previews.sh` locally with a WindowServer. Debug-only preview arguments create synthetic workspace/editor state with an isolated temporary storage location and omit normal startup/persistence/checkpoint tasks. Release builds ignore these arguments. The AppKit capture renders this app's own content view; it does not capture the user's desktop or actual workspace. The script produces empty/welcome light and dark, body, auth, compact workflow and loading PNGs under ignored dist/ui-review. The blank-request render invokes the actual New Request action and asserts explicit no-body mode before capture. Native renders were inspected at 1440 and 1050 point window widths. This is layout evidence, not a claim of completed VoiceOver or exhaustive interaction acceptance.
+
+Roadmap coverage: BASE-04, WORK-01/02, EDIT-01–05, UX-01–03 and REL-01. Existing manual acceptance requirements and deferred paid signing remain in effect.

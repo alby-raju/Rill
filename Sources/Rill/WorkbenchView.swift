@@ -1,9 +1,10 @@
 import SwiftUI
 import RillCore
 
-private let accent = Color(red: 0.16, green: 0.62, blue: 0.53)
+private let accent = RillPalette.accent
 struct WorkbenchView: View {
     @EnvironmentObject private var store: WorkbenchStore
+    @SwiftUI.Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("requestLayout") private var requestLayout = "automatic"
     var body: some View {
         NavigationSplitView {
@@ -12,14 +13,13 @@ struct WorkbenchView: View {
         } detail: {
             VStack(spacing: 0) {
                 topbar
-                tabbar
+                if !store.editor.openTabs.isEmpty { tabbar }
                 Divider()
                 if let request = store.selected {
                     RequestEditor(request: Binding(get: { store.editor.request(request.id, in: store.workspace) ?? request }, set: { store.update($0) }))
                         .id(request.id)
                 } else {
-                    ContentUnavailableView("A clear path to your API", systemImage: "point.3.connected.trianglepath.dotted", description: Text("Create a request to start exploring."))
-                    Button("New request") { store.newRequest() }.buttonStyle(.borderedProminent).padding(.bottom, 80)
+                    WelcomeView()
                 }
                 Divider()
                 HStack(spacing: 8) {
@@ -31,10 +31,15 @@ struct WorkbenchView: View {
                     Text("·").foregroundStyle(.tertiary)
                     Text("⌘ K  Find request")
                 }.font(.caption).foregroundStyle(.secondary).padding(.horizontal, 20).padding(.vertical, 9)
-            }.background(Color(nsColor: .textBackgroundColor))
+            }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .background(RillPalette.canvas)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .buttonStyle(RillButtonStyle())
+        .textFieldStyle(RillTextFieldStyle())
         .disabled(store.loading || store.importing || store.closing)
-        .overlay { if store.loading { ProgressView("Opening workspace…").padding(24).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12)) } }
+        .overlay { if store.loading { LaunchView(status: store.startupStatus).transition(.opacity) } }
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: store.loading)
         .tint(accent)
         .sheet(isPresented: $store.showForeignScripts) { ForeignScriptReviewView().environmentObject(store) }
         .sheet(isPresented: $store.showCommandImport) { CommandImportView().environmentObject(store) }
@@ -60,10 +65,10 @@ struct WorkbenchView: View {
                 Text("rill").font(.system(size: 30, weight: .bold, design: .rounded))
                 Spacer()
                 Text("API STUDIO").font(.system(size: 9, weight: .bold, design: .monospaced)).foregroundStyle(.secondary)
-            }.padding(.horizontal, 18).padding(.top, 30).padding(.bottom, 24)
+            }.padding(.horizontal, 18).padding(.top, 18).padding(.bottom, 22)
             HStack { Image(systemName: "magnifyingglass"); TextField("Find a request", text: $store.search).textFieldStyle(.plain) }
                 .font(.callout).padding(9).background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8)).padding(.horizontal, 14)
-            HStack { Text("COLLECTIONS").font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary); Spacer(); Button { store.newCollection() } label: { Image(systemName: "folder.badge.plus") }.buttonStyle(.plain).help("New collection").accessibilityLabel("New collection") }
+            HStack { Text("COLLECTIONS").font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary); Spacer(); Button { store.newCollection() } label: { Image(systemName: "folder.badge.plus") }.buttonStyle(RillButtonStyle(emphasis: .quiet)).help("New collection").accessibilityLabel("New collection").buttonStyle(RillButtonStyle(emphasis: .quiet)) }
                 .padding(.horizontal, 20).padding(.top, 25).padding(.bottom, 8)
             List(selection: $store.selection) {
                 ForEach(store.workspace.collections) { collection in
@@ -79,7 +84,8 @@ struct WorkbenchView: View {
                     }
                 }
                 if !filtered(nil).isEmpty { Section("Unfiled") { ForEach(filtered(nil)) { request in requestRow(request) } } }
-            }.listStyle(.sidebar)
+            }.listStyle(.sidebar).scrollContentBackground(.hidden)
+                .overlay { if store.workspace.requests.isEmpty && store.workspace.collections.isEmpty { VStack(spacing: 9) { Image(systemName: "folder").font(.title2); Text("Your collections live here").font(.system(size: 12, weight: .medium)); Text("Create a collection to organize requests.").font(.system(size: 11)).multilineTextAlignment(.center) }.foregroundStyle(.secondary).padding(24).frame(maxHeight: .infinity, alignment: .top).padding(.top, 22).allowsHitTesting(false) } }
             Menu {
                 Button("Blank request") { store.newRequest() }
                 ForEach(RequestTemplate.allCases, id: \.self) { template in Button(template.rawValue) { store.newRequest(template: template) } }
@@ -129,7 +135,7 @@ struct WorkbenchView: View {
                                 }
                             }.buttonStyle(.plain)
                             if !store.editor.pinnedTabs.contains(id) {
-                                Button { store.closeTab(id) } label: { Image(systemName: "xmark").font(.system(size: 9)) }.buttonStyle(.plain).help("Close tab").accessibilityLabel("Close request tab")
+                                Button { store.closeTab(id) } label: { Image(systemName: "xmark").font(.system(size: 9)) }.buttonStyle(RillButtonStyle(emphasis: .quiet)).help("Close tab").accessibilityLabel("Close request tab")
                             }
                         }.font(.caption).padding(.horizontal, 12).padding(.vertical, 10)
                             .background(store.selection == id ? accent.opacity(0.13) : Color.clear, in: RoundedRectangle(cornerRadius: 6))
@@ -147,14 +153,14 @@ struct WorkbenchView: View {
             Image(systemName: "square.split.2x2").foregroundStyle(.secondary)
             Text("Workbench").font(.callout.weight(.medium))
             Spacer()
-            Picker("Environment", selection: Binding(get: { store.workspace.selectedEnvironmentID }, set: { store.workspace.selectedEnvironmentID = $0; store.persist() })) {
+            RillSelect(title: "Environment", value: store.environment?.name ?? "No environment", selection: Binding(get: { store.workspace.selectedEnvironmentID }, set: { store.workspace.selectedEnvironmentID = $0; store.persist() })) {
                 Text("No environment").tag(nil as UUID?)
                 ForEach(store.workspace.environments) { Text($0.name).tag(Optional($0.id)) }
-            }.labelsHidden().frame(width: 180)
+            }.frame(width: 190)
             Menu {
                 Picker("Request layout", selection: $requestLayout) { Text("Automatic").tag("automatic"); Text("Side by side").tag("horizontal"); Text("Stacked").tag("vertical") }
-            } label: { Image(systemName: "rectangle.split.2x1") }.menuStyle(.borderlessButton).frame(width: 28)
-            Button { store.showPalette = true } label: { Image(systemName: "command") }.buttonStyle(.plain).help("Find request (⌘K)").accessibilityLabel("Find request")
+            } label: { Image(systemName: "rectangle.split.2x1") }.menuStyle(.borderlessButton).frame(width: 28).help("Arrange request and response panels").accessibilityLabel("Request and response layout")
+            Button { store.showPalette = true } label: { Image(systemName: "command") }.buttonStyle(RillButtonStyle(emphasis: .quiet)).help("Find request (⌘K)").accessibilityLabel("Find request")
         }.padding(.horizontal, 24).padding(.vertical, 15)
     }
 }
@@ -165,7 +171,8 @@ func methodColor(_ method: HTTPMethod) -> Color {
 struct RequestEditor: View {
     @EnvironmentObject private var store: WorkbenchStore
     @Binding var request: RequestDraft
-    @ViewState<String> private var section = "Parameters"
+    @FocusState private var urlFocused: Bool
+    @ViewState<String> private var section = RillPreview.section
     @AppStorage("requestLayout") private var requestLayout = "automatic"
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -175,15 +182,15 @@ struct RequestEditor: View {
                     TextField("Request name", text: $request.name).textFieldStyle(.plain).font(.system(size: 23, weight: .semibold))
                 }
                 Spacer()
-                Button("Save") { store.saveSelected() }.disabled(!store.editor.isDirty(request.id, in: store.workspace))
-                Picker("Collection", selection: $request.collectionID) { Text("Unfiled").tag(nil as UUID?); ForEach(store.workspace.collections) { Text($0.name).tag(Optional($0.id)) } }.labelsHidden().frame(maxWidth: 180)
+                Button { store.saveSelected() } label: { Label("Save", systemImage: "checkmark") }.buttonStyle(RillButtonStyle()).disabled(!store.editor.isDirty(request.id, in: store.workspace))
+                RillSelect(title: "Collection", value: store.workspace.collections.first(where: { $0.id == request.collectionID })?.name ?? "Unfiled", selection: $request.collectionID) { Text("Unfiled").tag(nil as UUID?); ForEach(store.workspace.collections) { Text($0.name).tag(Optional($0.id)) } }.frame(width: 180)
             }.padding(.horizontal, 24).padding(.top, 24).padding(.bottom, 20)
             HStack(spacing: 10) {
-                Picker("Method", selection: $request.method) { ForEach(HTTPMethod.allCases, id: \.self) { Text($0.rawValue).tag($0) } }.labelsHidden().frame(width: 100).tint(methodColor(request.method))
-                TextField("https://api.example.com/v1/resources", text: $request.url).textFieldStyle(.plain).font(.system(size: 13, design: .monospaced)).onSubmit { store.send() }
-                if store.running { Button { store.cancel() } label: { Label("Cancel", systemImage: "stop.fill") }.buttonStyle(.bordered) }
-                else { Button { store.send() } label: { Label("Send", systemImage: "arrow.up.right").fontWeight(.semibold).padding(.horizontal, 10).padding(.vertical, 3) }.buttonStyle(.borderedProminent).keyboardShortcut(.return, modifiers: .command) }
-            }.padding(10).background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10)).overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(.quaternary)).padding(.horizontal, 24).padding(.bottom, 22)
+                RillSelect(title: "HTTP method", value: request.method.rawValue, selection: $request.method) { ForEach(HTTPMethod.allCases, id: \.self) { Text($0.rawValue).tag($0) } }.frame(width: 100).foregroundStyle(methodColor(request.method))
+                TextField("https://api.example.com/v1/resources", text: $request.url).textFieldStyle(.plain).font(.system(size: 13, design: .monospaced)).onSubmit { store.send() }.focused($urlFocused).accessibilityLabel("Request URL")
+                if store.running { Button { store.cancel() } label: { Label("Cancel", systemImage: "stop.fill") }.buttonStyle(RillButtonStyle()) }
+                else { Button { store.send() } label: { Label("Send", systemImage: "arrow.up.right").fontWeight(.semibold).padding(.horizontal, 10).padding(.vertical, 3) }.buttonStyle(RillButtonStyle(emphasis: .primary)).keyboardShortcut(.return, modifiers: .command).disabled(request.url.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !store.canEdit).help(request.url.isEmpty ? "Enter a URL to send this request" : "Send request (⌘↵)") }
+            }.padding(10).background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10)).overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(urlFocused ? accent : RillPalette.line, lineWidth: urlFocused ? 1.5 : 1)).padding(.horizontal, 24).padding(.bottom, 16)
             GeometryReader { geometry in
                 if requestLayout == "horizontal" || (requestLayout == "automatic" && geometry.size.width >= 1050) {
                     HSplitView {
@@ -202,12 +209,7 @@ struct RequestEditor: View {
     }
     private var composition: some View {
                 VStack(alignment: .leading, spacing: 0) {
-                    HStack(spacing: 22) {
-                        ForEach(["Parameters", "Headers", "Body", "GraphQL", "Auth", "Checks", "Workflow"], id: \.self) { title in
-                            Button { section = title } label: { VStack(spacing: 10) { Text(title).font(.system(size: 12, weight: section == title ? .semibold : .regular)).foregroundStyle(section == title ? .primary : .secondary); Rectangle().fill(section == title ? accent : .clear).frame(height: 2) }.fixedSize(horizontal: true, vertical: false) }.buttonStyle(.plain)
-                        }
-                        Spacer()
-                    }.padding(.horizontal, 24)
+                    RillTabs(titles: ["Parameters", "Headers", "Body", "GraphQL", "Auth", "Checks", "Workflow"], selection: $section).padding(.horizontal, 14).padding(.bottom, 4)
                     Divider()
                     Group {
                         switch section {
@@ -219,13 +221,16 @@ struct RequestEditor: View {
                         case "GraphQL": GraphQLComposer(request: $request)
                         case "Workflow": WorkflowEditor(request: $request)
                         default:
-                            Form {
-                                TextField("Expected HTTP status", text: $request.expectedStatus, prompt: Text("e.g. 200"))
-                                TextField("Response body contains", text: $request.bodyContains)
-                                HStack { Text("Timeout (seconds)"); TextField("Timeout", value: $request.timeout, format: .number).frame(width: 70); Text("1–300").foregroundStyle(.secondary) }
-                                Text("Checks run after each response. Leave a field empty to skip it.").font(.caption).foregroundStyle(.secondary)
-                            }.padding(20)
+                            ScrollView {
+                                RillSection(title: "Response checks", subtitle: "Validate the result each time you send this request.", icon: "checkmark.seal") {
+                                    TextField("Expected status · e.g. 200", text: $request.expectedStatus)
+                                    TextField("Response body contains", text: $request.bodyContains)
+                                    HStack { Text("Timeout"); Spacer(); TextField("Seconds", value: $request.timeout, format: .number).frame(width: 90); Text("seconds · 1–300").font(.caption).foregroundStyle(.secondary) }
+                                    RillNotice(text: "Leave a check empty to skip it. For JSON and header rules, open Workflow.")
+                                }.padding(20).frame(maxWidth: 740, alignment: .leading)
+                            }
                         }
+
                     }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 }
     }
@@ -253,11 +258,11 @@ struct FieldEditor: View {
                         Menu {
                             ForEach(InputSuggestions.variables(in: store.environment), id: \.self) { value in Button(value) { field.value = value } }
                         } label: { Image(systemName: "curlybraces") }.menuStyle(.borderlessButton).frame(width: 18).help("Environment variables")
-                        Button { fields.removeAll { $0.id == field.id } } label: { Image(systemName: "minus.circle") }.buttonStyle(.plain).foregroundStyle(.secondary).help("Remove \(noun)").accessibilityLabel("Remove \(noun)")
-                    }.textFieldStyle(.roundedBorder).font(.system(size: 12, design: .monospaced))
+                        Button { fields.removeAll { $0.id == field.id } } label: { Image(systemName: "minus.circle") }.buttonStyle(RillButtonStyle(emphasis: .quiet)).foregroundStyle(.secondary).help("Remove \(noun)").accessibilityLabel("Remove \(noun)")
+                    }.textFieldStyle(RillTextFieldStyle()).font(.system(size: 12, design: .monospaced))
                 }
-                Button { fields.append(Field()) } label: { Label("Add \(noun)", systemImage: "plus") }.buttonStyle(.borderless).frame(maxWidth: .infinity, alignment: .leading).padding(.top, 6)
-                if fields.isEmpty { Text("Add only what this request needs.").foregroundStyle(.tertiary).font(.caption).frame(maxWidth: .infinity, alignment: .leading).padding(.top, 5) }
+                Button { fields.append(Field()) } label: { Label("Add \(noun)", systemImage: "plus") }.buttonStyle(RillButtonStyle()).frame(maxWidth: .infinity, alignment: .leading).padding(.top, 6)
+                if fields.isEmpty { RillNotice(text: "No \(noun)s yet. Add a key and value, or use {{variables}} from your environment.", icon: "list.bullet.rectangle").padding(.top, 12) }
             }.padding(20)
         }
     }
