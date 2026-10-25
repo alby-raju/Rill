@@ -6,15 +6,24 @@ struct BodyComposer: View {
     @Binding var request: RequestDraft
     private var mode: Binding<RequestBodyMode> { Binding(get: { request.bodyMode ?? .text }, set: { request.bodyMode = $0 }) }
     var body: some View {
-        VStack(spacing: 8) {
-            Picker("Body", selection: mode) {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack { Text("Payload").font(.system(size: 13, weight: .semibold)); Spacer(); RillSelect(title: "Body type", value: mode.wrappedValue.rawValue, selection: mode) {
                 ForEach(RequestBodyMode.allCases, id: \.self) { Text($0.rawValue).tag($0) }
-            }.pickerStyle(.menu)
-            if request.method == .GET || request.method == .HEAD {
-                Text("GET and HEAD require no body with this transport. Choose None to retain inactive body settings.").font(.caption).foregroundStyle(.secondary)
+            }.frame(width: 180) }
+            if (request.method == .GET || request.method == .HEAD) && request.bodyMode != RequestBodyMode.none {
+                RillNotice(text: "\(request.method.rawValue) sends no body. Your payload settings are kept for other methods.")
             }
             switch request.bodyMode {
-            case .none?: Text("No request body. Other body settings are retained.").foregroundStyle(.secondary)
+            case .none?:
+                HStack(alignment: .top, spacing: 14) {
+                    Image(systemName: "doc").font(.system(size: 24)).foregroundStyle(RillPalette.accent)
+                    VStack(alignment: .leading, spacing: 7) {
+                        Text("No payload needed").font(.system(size: 14, weight: .semibold))
+                        Text("Headers and parameters are still sent. Choose a payload type above to add a body.").font(.system(size: 12)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    }
+                }.padding(18).frame(maxWidth: .infinity, alignment: .leading)
+                    .background(RillPalette.accent.opacity(0.05), in: RoundedRectangle(cornerRadius: 9))
+                Spacer(minLength: 0)
             case .binary?:
                 HStack {
                     Button("Select file…") {
@@ -31,9 +40,9 @@ struct BodyComposer: View {
             case .form?: FieldEditor(fields: Binding(get: { request.formFields ?? [] }, set: { request.formFields = $0 }), noun: "form field")
             default:
                 HStack {
-                    Picker("Content type", selection: $request.contentType) {
+                    RillSelect(title: "Content type", value: request.contentType == "application/json" ? "JSON" : request.contentType == "application/xml" ? "XML" : request.contentType == "text/plain" ? "Text" : "Raw form", selection: $request.contentType) {
                         Text("JSON").tag("application/json"); Text("Text").tag("text/plain"); Text("XML").tag("application/xml"); Text("Raw form").tag("application/x-www-form-urlencoded")
-                    }.frame(width: 220)
+                    }.frame(width: 155)
                     Spacer()
                     Button("Format JSON") {
                         do { request.body = try JSONTextFormatter.pretty(request.body) }
@@ -42,11 +51,10 @@ struct BodyComposer: View {
                 }
                 CodeEditor(text: $request.body, contentType: request.contentType, completions: InputSuggestions.variables(in: store.environment)).id(request.id)
                 if request.bodyMode == nil && request.body.isEmpty {
-                    Text("Legacy empty bodies send no payload. Select Raw text explicitly to send empty text.").font(.caption).foregroundStyle(.secondary)
-                    Button("Use explicit empty text") { request.bodyMode = .text }
+                    HStack { Text("No payload will be sent.").font(.caption).foregroundStyle(.secondary); Spacer(); Button("Send empty text instead") { request.bodyMode = .text }.buttonStyle(RillButtonStyle(emphasis: .quiet)) }
                 }
             }
-        }.padding(16)
+        }.padding(18).textFieldStyle(RillTextFieldStyle()).buttonStyle(RillButtonStyle())
     }
 }
 

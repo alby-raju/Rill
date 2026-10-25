@@ -46,7 +46,7 @@ struct RunnerView: View {
                 }
             }.disabled(running)
             HStack {
-                Button(running ? "Running…" : "Run selected targets") { start() }.buttonStyle(.borderedProminent).disabled(running || requests.isEmpty)
+                Button(running ? "Running…" : "Run selected targets") { start() }.buttonStyle(RillButtonStyle(emphasis: .primary)).disabled(running || requests.isEmpty)
                 if running { Button("Cancel") { task?.cancel() }; ProgressView().controlSize(.small); Text("\(completed) completed attempts") }
                 Spacer()
                 if report != nil || matrix != nil {

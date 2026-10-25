@@ -12,18 +12,22 @@ struct CodeEditor: View {
     @ViewState<String> private var query = ""
     @ViewState<Int> private var searchStep = 0
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 0) {
             HStack(spacing: 10) {
-                TextField("Find in body", text: $query).textFieldStyle(.roundedBorder).frame(maxWidth: 180).onSubmit { searchStep += 1 }
-                Button { searchStep += 1 } label: { Image(systemName: "chevron.down") }.help("Find next")
+                TextField("Find in body", text: $query).textFieldStyle(RillTextFieldStyle()).frame(maxWidth: 220).onSubmit { searchStep += 1 }
+                Button { searchStep += 1 } label: { Image(systemName: "chevron.down") }.help("Find next").accessibilityLabel("Find next match")
                 Spacer()
                 Toggle("Wrap", isOn: $wrap).toggleStyle(.checkbox)
-                Button("A−") { fontSize = max(10, fontSize - 1) }
-                Button("A+") { fontSize = min(26, fontSize + 1) }
-            }.font(.caption)
+                Button("A−") { fontSize = max(10, fontSize - 1) }.help("Decrease editor text size").accessibilityLabel("Decrease editor text size")
+                Button("A+") { fontSize = min(26, fontSize + 1) }.help("Increase editor text size").accessibilityLabel("Increase editor text size")
+            }.font(.caption).padding(10).background(RillPalette.surface)
+            Divider()
             NativeCodeEditor(text: $text, contentType: contentType, fontSize: fontSize, wrap: wrap, query: query, searchStep: searchStep, completions: completions)
                 .accessibilityLabel(label)
-        }
+        }.background(RillPalette.canvas, in: RoundedRectangle(cornerRadius: 9))
+            .clipShape(RoundedRectangle(cornerRadius: 9))
+            .overlay(RoundedRectangle(cornerRadius: 9).strokeBorder(RillPalette.line))
+            .buttonStyle(RillButtonStyle(emphasis: .quiet))
     }
 }
 
@@ -172,6 +176,7 @@ struct SplitAutosave: NSViewRepresentable {
         required init?(coder: NSCoder) { nil }
         override func viewDidMoveToWindow() { super.viewDidMoveToWindow(); attach() }
         func attach() {
+            guard !RillPreview.isRendering else { return }
             var ancestor = superview
             while let current = ancestor {
                 if let split = current as? NSSplitView, split.isVertical == vertical {

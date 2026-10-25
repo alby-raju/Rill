@@ -5,13 +5,14 @@ typealias ViewState<Value> = SwiftUI.State<Value>
 
 @main struct RillApp: App {
     @NSApplicationDelegateAdaptor(RillAppDelegate.self) private var delegate
-    @StateObject private var store = WorkbenchStore()
+    @StateObject private var store = RillPreview.makeStore()
     @AppStorage("appearance") private var appearance = "system"
     var body: some Scene {
         WindowGroup {
-            WorkbenchView().environmentObject(store)
+            WorkbenchView().environmentObject(store).defaultAppStorage(RillPreview.preferences)
                 .onAppear { delegate.store = store; if let url = Bundle.module.url(forResource: "Rill", withExtension: "icns") { NSApplication.shared.applicationIconImage = NSImage(contentsOf: url) } }
-                .preferredColorScheme(appearance == "dark" ? .dark : appearance == "light" ? .light : nil)
+                .preferredColorScheme(RillPreview.scheme ?? (appearance == "dark" ? .dark : appearance == "light" ? .light : nil))
+                .task { await RillPreview.captureIfRequested() }
                 .frame(minWidth: 1050, minHeight: 700)
         }
         .windowStyle(.hiddenTitleBar)

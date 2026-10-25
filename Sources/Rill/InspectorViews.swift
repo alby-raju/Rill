@@ -3,6 +3,7 @@ import RillCore
 import UniformTypeIdentifiers
 
 struct ResponseView: View {
+    @EnvironmentObject private var store: WorkbenchStore
     var exchange: Exchange?
     var running: Bool
     @ViewState<String> private var section = "Body"
@@ -64,9 +65,9 @@ struct ResponseView: View {
             } else {
                 VStack(spacing: 12) {
                     Image(systemName: "arrow.up.right.circle").font(.system(size: 34, weight: .ultraLight)).foregroundStyle(.tertiary)
-                    Text("See what comes back.").font(.system(size: 18, weight: .medium))
-                    Text("Send a request to inspect its response, headers and checks.").font(.callout).foregroundStyle(.secondary)
-                    Text("⌘ ↵").font(.system(size: 12, design: .monospaced)).foregroundStyle(.tertiary).padding(.top, 3)
+                    Text("Ready for a response").font(.system(size: 18, weight: .medium))
+                    Text("Send your request to explore the body, headers and checks here.").font(.callout).foregroundStyle(.secondary)
+                    Button { store.send() } label: { Label("Send request  ⌘↵", systemImage: "arrow.up.right") }.buttonStyle(RillButtonStyle()).disabled(store.selected?.url.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false || !store.canEdit).padding(.top, 3)
                 }.frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
@@ -100,7 +101,7 @@ struct EnvironmentEditor: View {
                 }.frame(minWidth: 180, maxWidth: 220)
                 if let index = store.workspace.environments.firstIndex(where: { $0.id == selected }) {
                     VStack(alignment: .leading) {
-                        TextField("Environment name", text: $store.workspace.environments[index].name).font(.title3).textFieldStyle(.roundedBorder).padding(16)
+                        TextField("Environment name", text: $store.workspace.environments[index].name).font(.title3).textFieldStyle(RillTextFieldStyle()).padding(16)
                         Picker("Inherits from", selection: $store.workspace.environments[index].parentID) {
                             Text("None").tag(nil as UUID?)
                             ForEach(EnvironmentResolver.validParents(for: store.workspace.environments[index].id, in: store.workspace.environments)) { parent in Text(parent.name).tag(Optional(parent.id)) }

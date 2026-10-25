@@ -13,32 +13,33 @@ struct WorkflowEditor: View {
                 }
                 Text(request.apiLink?.operationKey ?? "").font(.caption).foregroundStyle(.secondary)
             }
-            Picker("Workflow", selection: $stage) { Text("Rules and extraction").tag("Rules"); Text("Pre-request").tag("Pre"); Text("Post-response").tag("Post") }.pickerStyle(.segmented)
+            RillTabs(titles: ["Rules & extraction", "Pre-request", "Post-response"], selection: Binding(get: { stage == "Rules" ? "Rules & extraction" : stage == "Pre" ? "Pre-request" : "Post-response" }, set: { stage = $0 == "Rules & extraction" ? "Rules" : $0 == "Pre-request" ? "Pre" : "Post" }))
             if stage == "Rules" {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Assertions").font(.headline)
+                        HStack { Label("Assertions", systemImage: "checkmark.seal").font(.system(size: 14, weight: .semibold)); Spacer(); Text("\((request.assertions ?? []).count) rules").font(.caption).foregroundStyle(.secondary); Button("Add assertion", systemImage: "plus") { if request.assertions == nil { request.assertions = [] }; request.assertions?.append(ResponseAssertion()) }.disabled((request.assertions?.count ?? 0) >= 128) }
+                        if (request.assertions ?? []).isEmpty { RillNotice(text: "Make the expected result explicit. Add a status, header or JSON assertion to catch unexpected responses.", icon: "checkmark.circle") }
                         ForEach(Array((request.assertions ?? []).enumerated()), id: \.element.id) { index, _ in
                             HStack {
                                 Toggle("Enabled", isOn: assertion(index, \.enabled)).labelsHidden()
-                                Picker("Kind", selection: assertion(index, \.kind)) { ForEach(AssertionKind.allCases, id: \.self) { Text($0.rawValue).tag($0) } }.frame(width: 150)
+                                RillSelect(title: "Assertion kind", value: assertion(index, \.kind).wrappedValue.rawValue, selection: assertion(index, \.kind)) { ForEach(AssertionKind.allCases, id: \.self) { Text($0.rawValue).tag($0) } }.frame(width: 150)
                                 TextField("Header or JSON path", text: assertion(index, \.selector))
                                 TextField("Expected (JSON for jsonEquals)", text: assertion(index, \.expected))
                                 Button("Remove") { request.assertions?.remove(at: index) }
                             }
                         }
-                        Button("Add assertion") { if request.assertions == nil { request.assertions = [] }; request.assertions?.append(ResponseAssertion()) }.disabled((request.assertions?.count ?? 0) >= 128)
-                        Divider(); Text("Extraction into run-local variables").font(.headline)
+                        Divider().padding(.vertical, 8)
+                        HStack { Label("Capture variables", systemImage: "arrow.down.doc").font(.system(size: 14, weight: .semibold)); Spacer(); Button("Add extraction", systemImage: "plus") { if request.extractions == nil { request.extractions = [] }; request.extractions?.append(ResponseExtraction()) }.disabled((request.extractions?.count ?? 0) >= 128) }
+                        if (request.extractions ?? []).isEmpty { RillNotice(text: "Capture a response value and reuse it in the next request of a run.", icon: "arrow.triangle.branch") }
                         ForEach(Array((request.extractions ?? []).enumerated()), id: \.element.id) { index, _ in
                             HStack {
                                 Toggle("Enabled", isOn: extraction(index, \.enabled)).labelsHidden()
-                                Picker("Kind", selection: extraction(index, \.kind)) { ForEach(ExtractionKind.allCases, id: \.self) { Text($0.rawValue).tag($0) } }.frame(width: 100)
+                                RillSelect(title: "Extraction kind", value: extraction(index, \.kind).wrappedValue.rawValue, selection: extraction(index, \.kind)) { ForEach(ExtractionKind.allCases, id: \.self) { Text($0.rawValue).tag($0) } }.frame(width: 100)
                                 TextField("Header or JSON path", text: extraction(index, \.selector))
                                 TextField("Variable name", text: extraction(index, \.variable))
                                 Button("Remove") { request.extractions?.remove(at: index) }
                             }
                         }
-                        Button("Add extraction") { if request.extractions == nil { request.extractions = [] }; request.extractions?.append(ResponseExtraction()) }.disabled((request.extractions?.count ?? 0) >= 128)
                         Text("JSON paths support $.field[0] or JSON Pointer /field/0. Missing/invalid values fail. Variables propagate only after a successful step; saved environments stay unchanged.").font(.caption).foregroundStyle(.secondary)
                     }
                 }
@@ -48,7 +49,7 @@ struct WorkflowEditor: View {
                 CodeEditor(text: Binding(get: { currentHook.source }, set: { var hook = currentHook; hook.source = $0; setHook(hook) }), contentType: "application/json", completions: [])
                 Text(#"Example: [{"op":"uuid","name":"nonce"},{"op":"header","name":"X-Nonce","value":"{{nonce}}"}]"#).font(.caption).textSelection(.enabled)
             }
-        }.padding(18)
+        }.padding(18).buttonStyle(RillButtonStyle()).textFieldStyle(RillTextFieldStyle())
     }
     private var currentHook: RequestHook { (stage == "Pre" ? request.preHook : request.postHook) ?? RequestHook() }
     private func setHook(_ hook: RequestHook) { if stage == "Pre" { request.preHook = hook } else { request.postHook = hook } }

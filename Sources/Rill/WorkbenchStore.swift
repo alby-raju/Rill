@@ -70,6 +70,7 @@ import UniformTypeIdentifiers
     @Published var showPalette = false
     @Published var persistenceAvailable = true
     @Published var persistenceHealth: PersistenceHealth = .loading
+    @Published var startupStatus = "Opening your workspace…"
     @Published var loading = true
     @Published var importing = false
     @Published var closing = false
@@ -90,20 +91,38 @@ import UniformTypeIdentifiers
     private let persistence: WorkspaceSession
     private let editorPersistence: EditorSessionPersistence
     private let directory: URL
+    private let visualPreview: Bool
 
-    init() {
-        directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Rill")
+    init(preview: String? = nil) {
+        visualPreview = preview != nil
+        directory = preview != nil ? FileManager.default.temporaryDirectory.appendingPathComponent("Rill-Preview-" + UUID().uuidString) : FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Rill")
         historyArchive = ExchangeHistory(url: directory.appendingPathComponent("exchange-history.json"))
         if let data = UserDefaults.standard.data(forKey: "responseSettings"), let settings = try? JSONDecoder().decode(ResponseSettings.self, from: data), (try? settings.validate()) != nil { responseSettings = settings }
         persistence = WorkspaceSession(url: directory.appendingPathComponent("workspace.json"))
         editorPersistence = EditorSessionPersistence(url: directory.appendingPathComponent("editor-session.json"))
+        #if DEBUG
+        if let preview {
+            workspace = Workspace()
+            if preview != "empty" && preview != "loading" {
+                var request = RequestDraft(); request.name = "Create a customer"; request.method = .POST
+                request.url = "https://api.example.test/v1/customers"; request.bodyMode = .text
+                request.body = #"{"name":"Alex Morgan","email":"alex@example.test"}"#
+                request.auth = preview == "auth" ? .bearer : .none
+                workspace.requests = [request]; try? editor.open(request.id); selection = request.id
+            }
+            persistenceHealth = .saved; loading = preview == "loading"
+            return
+        }
+        #endif
         Task {
             defer { loading = false }
             do {
                 workspace = try await persistence.open()
+                startupStatus = "Restoring your workspace…"
                 persistenceHealth = .saved
                 if responseSettings.recordSnapshots { await loadDurableHistory() }
                 do {
+                    startupStatus = "Restoring tabs and draft recovery…"
                     editor = try await editorPersistence.open(in: workspace)
                     if editor.drafts.contains(where: { editor.isDirty($0.id, in: workspace) }) {
                         let alert = NSAlert()
@@ -166,6 +185,9 @@ import UniformTypeIdentifiers
         attempt { try editor.update(request, savedIn: workspace) }
     }
     func persist() {
+        #if DEBUG
+        if visualPreview { persistenceHealth = .saved; hasUnsavedChanges = false; return }
+        #endif
         guard !loading, persistenceAvailable, hasUnsavedChanges else { return }
         saveTask?.cancel()
         let generation = UUID(); saveGeneration = generation
@@ -221,7 +243,8 @@ import UniformTypeIdentifiers
     func newRequest(in collection: UUID? = nil, template: RequestTemplate? = nil) {
         guard canEdit else { return }
         let id = collection ?? focusedCollectionID ?? workspace.collections.first?.id
-        let request = template?.make(in: id) ?? RequestDraft(collectionID: id)
+        var request = template?.make(in: id) ?? RequestDraft(collectionID: id)
+        if template == nil { request.bodyMode = RequestBodyMode.none }
         workspace.requests.append(request); selection = request.id
     }
     func newCollection() {
