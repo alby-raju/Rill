@@ -116,6 +116,14 @@ import UniformTypeIdentifiers
                     response = RillPreview.response(for: request, state: preview)
                 }
             }
+            if ["tabs-close", "tabs-menu-close"].contains(preview) {
+                workspace = Workspace(); editor = EditorSessionState()
+                for index in 1...100 {
+                    var request = RequestDraft(); request.name = "Request \(index)"; request.url = "http://127.0.0.1:18990/json"; request.bodyMode = RequestBodyMode.none
+                    workspace.requests.append(request); try! editor.open(request.id)
+                }
+                selection = editor.activeID
+            }
             persistenceHealth = .saved; loading = preview == "loading"
             return
         }

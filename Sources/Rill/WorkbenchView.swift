@@ -146,17 +146,17 @@ struct WorkbenchView: View {
                             }
                         }.font(.caption).padding(.horizontal, 12).padding(.vertical, 10)
                             .background(store.selection == id ? accent.opacity(0.13) : Color.clear, in: RoundedRectangle(cornerRadius: 6))
-                            .contextMenu {
-                                Button(store.editor.pinnedTabs.contains(id) ? "Unpin" : "Pin") { store.togglePin(id) }
-                                Button("Close") { store.closeTab(id, force: true) }
-                                Divider()
-                                Button("Close Tabs to the Left") { store.closeTabs(.left, relativeTo: id) }
-                                    .disabled(!store.canEdit || store.editor.tabsToClose(.left, relativeTo: id).isEmpty)
-                                Button("Close Tabs to the Right") { store.closeTabs(.right, relativeTo: id) }
-                                    .disabled(!store.canEdit || store.editor.tabsToClose(.right, relativeTo: id).isEmpty)
-                                Button("Close All Tabs") { store.closeTabs(.all) }.disabled(!store.canEdit)
-                                    .help("Includes pinned tabs; unsaved changes require Save All, Discard Changes or Cancel")
-                            }
+                            .overlay(RequestTabMenu(pinned: store.editor.pinnedTabs.contains(id), canEdit: store.canEdit,
+                                                    hasLeft: store.editor.openTabs.first != id, hasRight: store.editor.openTabs.last != id) { action in
+                                guard store.editor.openTabs.contains(id) else { return }
+                                switch action {
+                                case .pin: store.togglePin(id)
+                                case .close: store.closeTab(id, force: true)
+                                case .left: store.closeTabs(.left, relativeTo: id)
+                                case .right: store.closeTabs(.right, relativeTo: id)
+                                case .all: store.closeTabs(.all)
+                                }
+                            })
                     }
                 }
             }.padding(.horizontal, 16).padding(.bottom, 6)
