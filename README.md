@@ -2,7 +2,7 @@
 
 A new native macOS API workbench, written from scratch in Swift and SwiftUI. Rill takes its name from a small stream: a quiet workspace for following requests and responses.
 
-Requires macOS 14+ and Swift 6+. No Java, JavaFX, account or hosted workspace. Independently selected YAML/archive dependencies are pinned; see THIRD_PARTY_NOTICES.txt.
+Requires macOS 15+ and Swift 6.2.3+. No Java, JavaFX, account or hosted workspace. Independently selected YAML/archive dependencies are pinned; see THIRD_PARTY_NOTICES.txt.
 
 ## Run
 
@@ -39,6 +39,7 @@ The bundle is written to `dist/Rill.app`. It is ad-hoc signed for local developm
 - Reviewed HAR/Postman/HTTPie Desktop/Insomnia/Bruno imports and portable exports, plus nine frozen-request client generators.
 - Shared collection/matrix/load runners, assertions/extraction, finite JSON hooks and redacted JSON/Markdown/JUnit/Allure reports.
 - Bounded OpenAPI/Swagger generation/refresh, explicit JSON Schema subset, linked contracts, editable loopback mocks and explicit security probes.
+- Native gRPC descriptor/source/reflection tools and four call modes; MQTT3/5, AMQP existing-queue and native Kafka inspection/publish workbenches with structured CloudEvents. See [protocol boundaries](docs/milestones/M7.md).
 - GraphQL query/variables, explicit or opt-in introspection, offline schemas and prefix completion; native WebSocket, SSE and graphql-transport-ws subscription sessions. See [supported boundaries](docs/milestones/M6.md).
 - System/light/dark appearance and keyboard shortcuts: Cmd+N, Cmd+Enter, Cmd+K, Cmd+Shift+E, Cmd+period.
 

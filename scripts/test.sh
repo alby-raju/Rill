@@ -3,6 +3,10 @@
 set -euo pipefail
 RILL_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$RILL_ROOT"
+# Build the selected official compiler for source-loading tests; no host protoc lookup.
+swift build --product protoc
+export RILL_TEST_PROTOC_PATH="$(swift build --show-bin-path)/protoc"
+export RILL_TEST_PROTO_INCLUDE="$RILL_ROOT/.build/checkouts/swift-protobuf/Sources/protobuf/protobuf/src"
 RILL_FIXTURE_LOG="$(mktemp -t rill-fixture)"
 python3 scripts/http-fixture.py > "$RILL_FIXTURE_LOG" 2>&1 &
 RILL_FIXTURE_PID=$!
@@ -13,12 +17,20 @@ RILL_TLS_PID=$!
 RILL_LIVE_LOG="$(mktemp -t rill-live-log)"
 python3 scripts/live-fixture.py > "$RILL_LIVE_LOG" 2>&1 &
 RILL_LIVE_PID=$!
+RILL_MQTT_LOG="$(mktemp -t rill-mqtt-log)"
+python3 scripts/mqtt_fixture.py > "$RILL_MQTT_LOG" 2>&1 &
+RILL_MQTT_PID=$!
+RILL_AMQP_LOG="$(mktemp -t rill-amqp-log)"
+python3 scripts/amqp_fixture.py > "$RILL_AMQP_LOG" 2>&1 &
+RILL_AMQP_PID=$!
 cleanup() {
   RILL_EXIT_STATUS=$?
   trap - EXIT
   kill "$RILL_FIXTURE_PID" 2>/dev/null || true
   kill "$RILL_TLS_PID" 2>/dev/null || true
   kill "$RILL_LIVE_PID" 2>/dev/null || true
+  kill "$RILL_MQTT_PID" 2>/dev/null || true
+  kill "$RILL_AMQP_PID" 2>/dev/null || true
   python3 - "$RILL_TLS_DIRECTORY" <<'PY_CLEANUP'
 import shutil
 import sys
@@ -28,12 +40,44 @@ PY_CLEANUP
     cat "$RILL_FIXTURE_LOG"
     cat "$RILL_TLS_LOG"
     cat "$RILL_LIVE_LOG"
+    cat "$RILL_MQTT_LOG"
+    cat "$RILL_AMQP_LOG"
   fi
   exit "$RILL_EXIT_STATUS"
 }
 trap cleanup EXIT
+export RILL_TEST_AMQP_URL=amqp://127.0.0.1:18757
+export RILL_TEST_MQTT_URL=mqtt://127.0.0.1:18756
 export RILL_TEST_LIVE_URL=http://127.0.0.1:18755
 export RILL_TEST_BASE_URL=http://127.0.0.1:18749
+python3 - "$RILL_AMQP_PID" <<'PY_AMQP'
+import os, socket, sys, time
+pid = int(sys.argv[1])
+for attempt in range(100):
+    os.kill(pid, 0)
+    try:
+        with socket.create_connection(('127.0.0.1', 18757), timeout=0.5) as connection:
+            connection.sendall(b'AMQP\0\0\x09\x01')
+            if connection.recv(1) == b'\x01':
+                time.sleep(0.1); os.kill(pid, 0); break
+    except OSError: pass
+    time.sleep(0.1)
+else: raise SystemExit('AMQP fixture failed to start.')
+PY_AMQP
+python3 - "$RILL_MQTT_PID" <<'PY_MQTT'
+import os, socket, sys, time
+pid = int(sys.argv[1])
+for attempt in range(100):
+    os.kill(pid, 0)
+    try:
+        with socket.create_connection(('127.0.0.1', 18756), timeout=0.5) as connection:
+            connection.sendall(bytes.fromhex('100e00044d5154540402001e00027264'))
+            if connection.recv(4) == bytes.fromhex('20020000'):
+                time.sleep(0.1); os.kill(pid, 0); break
+    except OSError: pass
+    time.sleep(0.1)
+else: raise SystemExit('MQTT fixture failed to start.')
+PY_MQTT
 # Verify the live fixture owns its endpoint before tests can use it.
 python3 - "$RILL_LIVE_PID" <<'PY_LIVE'
 import http.client, os, sys, time

@@ -7,6 +7,7 @@ import struct
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from socketserver import TCPServer
+from mqtt_fixture import session as mqtt_session
 
 class Server(ThreadingHTTPServer):
     daemon_threads = True
@@ -51,6 +52,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Sec-WebSocket-Accept", base64.b64encode(hashlib.sha1((key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11").encode()).digest()).decode())
         if self.path.startswith("/subscription"):
             self.send_header("Sec-WebSocket-Protocol", "graphql-transport-ws")
+        if self.path.startswith("/mqtt"):
+            self.send_header("Sec-WebSocket-Protocol", "mqtt")
         self.end_headers(); self.connection.settimeout(5)
         try: self.websocket()
         except (OSError, ValueError, EOFError): pass
@@ -65,7 +68,35 @@ class Handler(BaseHTTPRequestHandler):
         data = self.rfile.read(length)
         if len(data) != length: raise EOFError()
         return data
+    def mqtt_websocket(self):
+        buffer = bytearray()
+        def read(count):
+            while len(buffer) < count:
+                fragmented = bytearray(); initial = None
+                while True:
+                    first, second = self.exact(2); opcode = first & 15; length = second & 127
+                    if not second & 128 or first & 112: raise ValueError("Invalid frame")
+                    if length == 126: length = struct.unpack('!H', self.exact(2))[0]
+                    elif length == 127: length = struct.unpack('!Q', self.exact(8))[0]
+                    if length > 1024 * 1024 + 65536: raise ValueError("Oversize")
+                    mask = self.exact(4); body = bytes(value ^ mask[index % 4] for index, value in enumerate(self.exact(length)))
+                    if opcode == 8: raise EOFError()
+                    if opcode == 9: self.frame(10, body); continue
+                    if opcode == 10: continue
+                    if opcode == 2 and initial is None: initial = opcode
+                    elif opcode != 0 or initial is None: raise ValueError("Binary required")
+                    fragmented.extend(body)
+                    if len(fragmented) > 1024 * 1024 + 65536: raise ValueError("Oversize")
+                    if first & 128: break
+                buffer.extend(fragmented)
+            result = bytes(buffer[:count]); del buffer[:count]; return result
+        def write(body):
+            split = max(1, len(body)//2)
+            self.frame(2, body[:split], final=False); self.frame(0, body[split:])
+        mqtt_session(read, write)
     def websocket(self):
+        if self.path.startswith("/mqtt"):
+            self.mqtt_websocket(); return
         subscription = self.path.startswith("/subscription")
         if not subscription:
             self.frame(1, b"frag", final=False); self.frame(0, b"mented")

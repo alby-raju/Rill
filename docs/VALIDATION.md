@@ -11,7 +11,7 @@ The same full-suite command used by GitHub Actions starts the fixture, waits for
 bash scripts/test.sh
 ```
 
-CI uses macOS 15 Apple Silicon and Intel with Xcode 16.4, plus Apple Silicon/Xcode 26.3. The workflow has read-only repository permissions and needs no repository secrets.
+CI uses macOS 15 Apple Silicon with Xcode 26.2/26.3 and Intel with Xcode 26.3 (Swift 6.2.3+). The workflow has read-only repository permissions and needs no repository secrets.
 
 To run the fixture manually instead, start it in one terminal:
 

@@ -22,13 +22,13 @@ jobs:
       matrix:
         include:
           - runner: macos-15
-            xcode: '16.4'
+            xcode: '26.2'
           - runner: macos-15-intel
-            xcode: '16.4'
+            xcode: '26.3'
           - runner: macos-15
             xcode: '26.3'
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 15
+    timeout-minutes: 30
     env:
       DEVELOPER_DIR: /Applications/Xcode_${{ matrix.xcode }}.app/Contents/Developer
     steps:
@@ -45,6 +45,8 @@ jobs:
         run: python3 scripts/audit-roadmap.py
       - name: Build release executable
         run: swift build --configuration release
+      - name: Verify pinned dependency notices
+        run: python3 scripts/collect-dependency-notices.py --check
       - name: Package and verify app bundle
         run: zsh scripts/package.sh
       - name: Run unit and loopback integration tests
@@ -52,7 +54,7 @@ jobs:
           RILL_SNIPPET_FIXTURES: ${{ runner.temp }}/rill-client-fixtures
         run: bash scripts/test.sh
       - name: Upload synthetic generated programs
-        if: matrix.runner == 'macos-15' && matrix.xcode == '16.4'
+        if: matrix.runner == 'macos-15' && matrix.xcode == '26.2'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: generated-client-fixtures
