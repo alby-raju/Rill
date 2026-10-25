@@ -1,0 +1,67 @@
+[
+  {
+    "id": "start",
+    "title": "Workspace and saving",
+    "body": "Rill is a local-first macOS API workbench. Cmd+N creates a request; Cmd+T opens a new tab; Cmd+S saves it. Drafts checkpoint separately after two seconds. Closing a dirty tab offers Save, Discard or Cancel. Cmd+Shift+T reopens a closed tab. Collections contain saved requests; Option+Up/Down changes their order. Cmd+K finds requests. No account or hosted workspace is required."
+  },
+  {
+    "id": "http",
+    "title": "HTTP, credentials and TLS",
+    "body": "Use the method/URL bar, query fields and Headers/Auth/Body tabs. Cmd+Return sends; Cmd+period cancels. Bodies support raw text, forms, binary files and multipart. File uploads use bounded private snapshots and reject changed files. Credentials entered in Auth use Keychain; named secrets use {{secret:name}}. Headers, bodies, URLs and environment values stay plain text as entered. Environments can inherit and expand {{name}}. Missing/cyclic values fail before traffic. Select custom trust/client identities in TLS Profiles; insecure profiles need an explicit confirmation for each action."
+  },
+  {
+    "id": "response",
+    "title": "Responses and history",
+    "body": "Responses show bounded JSON/XML/text/binary/image previews; HTML is source, never executed. Original bytes can be exported explicitly. Prepared-request inspection masks sensitive values. Session history is temporary by default; Settings can enable bounded redacted durable snapshots and opt-in bodies. Semantic JSON comparison preserves exact numbers and UTF-8 keys. Missing/truncated bodies cannot claim a complete comparison."
+  },
+  {
+    "id": "recovery",
+    "title": "Recovery, imports and backups",
+    "body": "File commands create credential-omitting backups and retain a pre-restore copy. Credentials are not restored from backups. Import Rill, Postman, HTTPie Desktop, HAR, Insomnia or Bruno through preview before Apply. IDs are regenerated; scripts remain disabled review material. Foreign formats support documented subsets and reject unsupported representations. Exported entered values can contain secrets; review files before sharing."
+  },
+  {
+    "id": "runner",
+    "title": "Assertions, hooks, runners and reports",
+    "body": "Request Workflow configures status/header/body/JSON assertions and extraction. Native hooks are finite versioned JSON operations, disabled until explicitly enabled; they are not JavaScript and cannot call host/file/network/process APIs. Pre-hooks run before variable substitution; successful extraction/post-hook changes remain local to the workflow. Collection Runner supports iterations, bounded retries/delays, branches and stop/continue. Matrix runs isolate environments. Load runs bound concurrency and record end-to-end latency percentiles. Portable JSON/Markdown/JUnit/Allure reports omit payloads and runtime values. Empty, cancelled and exhausted runs cannot pass."
+  },
+  {
+    "id": "api",
+    "title": "Definitions, contracts, mocks and inspection",
+    "body": "API Definitions / Contracts / Mocks loads bounded OpenAPI 3.x or Swagger 2 JSON/YAML/local refs. Refresh previews drift and preserves local edits and IDs. Unknown schema assertions do not silently pass. The Schema tab supports an explicit JSON Schema subset. Linked contracts validate the same prepared request and response used by sends/runners. Mocks bind loopback only and use editable routes. Passive inspection sends no traffic; active probes require an explicit target and are limited to GET/HEAD and small sequential samples. These checks are indicators, not a security certification."
+  },
+  {
+    "id": "graphql",
+    "title": "GraphQL and live streams",
+    "body": "The GraphQL tab owns a JSON POST body, query, exact JSON-object variables and optional operation name. Introspection is explicit, or opted into endpoint changes while the editor is visible; imports disable automatic introspection. Saved schema JSON reloads offline and supplies name-prefix completion (Ctrl+Space/Escape), not type-aware language analysis. Live Protocols opens explicit WebSocket, SSE or graphql-transport-ws sessions with the selected request auth/TLS. Binary WebSocket sends use base64. SSE retry is metadata; no automatic reconnect/replay occurs. Closing/disconnecting stops owned work. Timelines cap at 1,000 events/8 MiB and stay transient."
+  },
+  {
+    "id": "grpc",
+    "title": "gRPC",
+    "body": "Load .proto files/import folders using the bundled compiler, or load descriptor sets offline. Reflection tries v1 then v1alpha when unimplemented. Select a service/method/call mode, edit Protobuf JSON and metadata, then Start. Client/bidirectional streams offer Send and Finish sending; Cancel and method changes close the call. grpc/http means explicit plaintext; grpcs/https verifies system TLS. This workbench does not yet use custom TLS profiles. Metadata -bin values use base64. Messages cap at 1 MiB with editable deadlines and bounded queues/timelines. Extensions, legacy groups and Editions require separate support."
+  },
+  {
+    "id": "brokers",
+    "title": "MQTT, AMQP, Kafka and CloudEvents",
+    "body": "MQTT supports 3.1.1/5 over TCP/TLS or ws/wss with mqtt subprotocol. Subscribe filters and concrete publish topics are separate. QoS 0 confirms a write; 1/2 wait for acknowledgements. Clean sessions do not reconnect/replay automatically. AMQP 0-9-1 consumes existing queues with acknowledgement and publishes via default exchange with mandatory routing/confirms; consuming can remove messages. Rill never creates topology. Kafka uses the native client, system-root verified TLS and optional SASL/PLAIN. It manually inspects latest offsets without committing or balancing a group; native reconnection may continue within the five-minute session. Publish waits for acknowledgement. CloudEvents parses JSON data and attaches structured content-type on MQTT5/AMQP/Kafka. Messages/settings remain transient."
+  },
+  {
+    "id": "integrations",
+    "title": "Git, sharing and local extensions",
+    "body": "Workspace Integrations explicitly exports a portable workspace to a separate Git directory. Runtime history/Keychain values are omitted, but entered bodies/headers/environment values remain; review workspace.json before Commit. No remote operations run. Sharing requires a strong token, defaults to loopback, removes values/bodies/profiles/schemas/hooks/history, and retains labels and URL hosts/paths. LAN mode warns that HTTP and token traffic are plaintext. Pull creates a new validated file with fresh IDs and never overwrites. Extension API v1 loads data-only template/mock-route manifests; explicit hash-based trust is required and edits invalidate it. No JARs, dylibs or scripts are loaded."
+  },
+  {
+    "id": "cli",
+    "title": "Native CLI",
+    "body": "The packaged CLI is Contents/Helpers/rill; development uses swift run RillCLI. Run --help for the complete command/flag matrix. The app and CLI share workspace, workflow, protocol and report engines. Default execution output is status/counts; --output explicitly writes raw data and --show-messages explicitly prints stream content. --quiet suppresses normal output. Exit codes are 0 success, 2 configuration, 3 runtime, 4 failed checks and 130 cancellation. Ctrl+C closes owned work. Import/restore mutations require --apply; existing output files require --overwrite. Insecure saved TLS needs --allow-insecure per invocation."
+  },
+  {
+    "id": "accessibility",
+    "title": "Keyboard, appearance and accessibility",
+    "body": "Use system/light/dark appearance in Settings. Native controls support Tab/Shift+Tab and standard menu navigation. Cmd+K opens request search; Escape closes sheets and cancels pickers. Code editors have labels, native find/undo, wrapping and scalable text. Ctrl+Space opens prefix completion. Native controls and no custom motion are used for reduced-motion compatibility. VoiceOver reading order, focus restoration and contrast still require installed-app acceptance for the exact release artifact."
+  },
+  {
+    "id": "release",
+    "title": "Version and release status",
+    "body": "Rill 0.2.0 is a development milestone, not a signed-off parity release. Native runtimes, compatibility libraries, compiler and notices are bundled. Developer ID signing, notarization, Gatekeeper, actual fresh-Mac installs, real-provider acceptance and the 122-capability sign-off remain release gates. Ad-hoc local signatures do not establish a public distribution identity. See repository milestone documents for exact supported subsets and evidence."
+  }
+]

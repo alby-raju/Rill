@@ -144,6 +144,9 @@ public enum WorkspaceFile {
         return data
     }
 
+    public static func writeNew(_ data: Data, to url: URL) throws { guard data.count <= ResourceLimits.workspaceBytes else { throw WorkspaceError.tooLarge }; try createNew(data, at: url) }
+    public static func create(_ workspace: Workspace, at url: URL) throws { try createNew(encode(workspace), at: url) }
+
     public static func save(_ workspace: Workspace, to url: URL) throws {
         let data = try encode(workspace)
         try atomicWrite(data, to: url)

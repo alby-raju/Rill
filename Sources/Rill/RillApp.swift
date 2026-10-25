@@ -10,7 +10,7 @@ typealias ViewState<Value> = SwiftUI.State<Value>
     var body: some Scene {
         WindowGroup {
             WorkbenchView().environmentObject(store)
-                .onAppear { delegate.store = store }
+                .onAppear { delegate.store = store; if let url = Bundle.module.url(forResource: "Rill", withExtension: "icns") { NSApplication.shared.applicationIconImage = NSImage(contentsOf: url) } }
                 .preferredColorScheme(appearance == "dark" ? .dark : appearance == "light" ? .light : nil)
                 .frame(minWidth: 1050, minHeight: 700)
         }
@@ -38,6 +38,7 @@ typealias ViewState<Value> = SwiftUI.State<Value>
                 Button("Create Backup…") { store.createBackup() }
                 Button("Restore Backup…") { store.restoreBackup() }
             }
+            CommandGroup(replacing: .help) { Button("Rill Offline Help") { store.showHelp = true }.keyboardShortcut("?", modifiers: .command) }
             CommandGroup(replacing: .saveItem) { Button("Save Request") { store.saveSelected() }.keyboardShortcut("s") }
             CommandMenu("Request") {
                 Button("Review Imported Scripts…") { store.showForeignScripts = true }.disabled(store.selected?.foreignScripts?.isEmpty != false)
@@ -47,6 +48,7 @@ typealias ViewState<Value> = SwiftUI.State<Value>
                 Button("Move Request Earlier") { store.reorderSelected(-1) }.keyboardShortcut(.upArrow, modifiers: .option)
                 Button("Move Request Later") { store.reorderSelected(1) }.keyboardShortcut(.downArrow, modifiers: .option)
                 Divider()
+                Button("Git / Sharing / Local Extensions…") { store.showWorkspaceTools = true }
                 Button("gRPC…") { store.showGRPC = true }
                 Button("MQTT / Kafka / AMQP Brokers…") { store.showBrokers = true }
                 Button("WebSocket / SSE / Subscriptions…") { store.showLiveStreams = true }.disabled(store.selected == nil)

@@ -5,6 +5,8 @@ RILL_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$RILL_ROOT"
 # Build the selected official compiler for source-loading tests; no host protoc lookup.
 swift build --product protoc
+swift build --product RillCLI
+export RILL_TEST_CLI_PATH="$(swift build --show-bin-path)/RillCLI"
 export RILL_TEST_PROTOC_PATH="$(swift build --show-bin-path)/protoc"
 export RILL_TEST_PROTO_INCLUDE="$RILL_ROOT/.build/checkouts/swift-protobuf/Sources/protobuf/protobuf/src"
 RILL_FIXTURE_LOG="$(mktemp -t rill-fixture)"

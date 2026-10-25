@@ -56,6 +56,7 @@ public enum CommandWords {
     public static func quote(_ value: String) -> String { "'" + value.replacingOccurrences(of: "'", with: "'\"'\"'") + "'" }
 }
 public struct CommandImport: Sendable {
+    public init(request: RequestDraft, warnings: [String]) { self.request = request; self.warnings = warnings }
     public var request: RequestDraft
     public var warnings: [String]
 }

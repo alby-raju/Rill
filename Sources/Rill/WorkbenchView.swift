@@ -38,6 +38,8 @@ struct WorkbenchView: View {
         .tint(accent)
         .sheet(isPresented: $store.showForeignScripts) { ForeignScriptReviewView().environmentObject(store) }
         .sheet(isPresented: $store.showCommandImport) { CommandImportView().environmentObject(store) }
+        .sheet(isPresented: $store.showHelp) { OfflineHelpView() }
+        .sheet(isPresented: $store.showWorkspaceTools) { WorkspaceToolsView().environmentObject(store) }
         .sheet(isPresented: $store.showGRPC) { GRPCWorkbenchView().environmentObject(store) }
         .sheet(isPresented: $store.showBrokers) { BrokerWorkbenchView().environmentObject(store) }
         .sheet(isPresented: $store.showLiveStreams) { LiveStreamsView().environmentObject(store) }
@@ -61,7 +63,7 @@ struct WorkbenchView: View {
             }.padding(.horizontal, 18).padding(.top, 30).padding(.bottom, 24)
             HStack { Image(systemName: "magnifyingglass"); TextField("Find a request", text: $store.search).textFieldStyle(.plain) }
                 .font(.callout).padding(9).background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8)).padding(.horizontal, 14)
-            HStack { Text("COLLECTIONS").font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary); Spacer(); Button { store.newCollection() } label: { Image(systemName: "folder.badge.plus") }.buttonStyle(.plain).help("New collection") }
+            HStack { Text("COLLECTIONS").font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary); Spacer(); Button { store.newCollection() } label: { Image(systemName: "folder.badge.plus") }.buttonStyle(.plain).help("New collection").accessibilityLabel("New collection") }
                 .padding(.horizontal, 20).padding(.top, 25).padding(.bottom, 8)
             List(selection: $store.selection) {
                 ForEach(store.workspace.collections) { collection in
@@ -127,7 +129,7 @@ struct WorkbenchView: View {
                                 }
                             }.buttonStyle(.plain)
                             if !store.editor.pinnedTabs.contains(id) {
-                                Button { store.closeTab(id) } label: { Image(systemName: "xmark").font(.system(size: 9)) }.buttonStyle(.plain).help("Close tab")
+                                Button { store.closeTab(id) } label: { Image(systemName: "xmark").font(.system(size: 9)) }.buttonStyle(.plain).help("Close tab").accessibilityLabel("Close request tab")
                             }
                         }.font(.caption).padding(.horizontal, 12).padding(.vertical, 10)
                             .background(store.selection == id ? accent.opacity(0.13) : Color.clear, in: RoundedRectangle(cornerRadius: 6))
@@ -152,7 +154,7 @@ struct WorkbenchView: View {
             Menu {
                 Picker("Request layout", selection: $requestLayout) { Text("Automatic").tag("automatic"); Text("Side by side").tag("horizontal"); Text("Stacked").tag("vertical") }
             } label: { Image(systemName: "rectangle.split.2x1") }.menuStyle(.borderlessButton).frame(width: 28)
-            Button { store.showPalette = true } label: { Image(systemName: "command") }.buttonStyle(.plain).help("Find request (⌘K)")
+            Button { store.showPalette = true } label: { Image(systemName: "command") }.buttonStyle(.plain).help("Find request (⌘K)").accessibilityLabel("Find request")
         }.padding(.horizontal, 24).padding(.vertical, 15)
     }
 }
@@ -251,7 +253,7 @@ struct FieldEditor: View {
                         Menu {
                             ForEach(InputSuggestions.variables(in: store.environment), id: \.self) { value in Button(value) { field.value = value } }
                         } label: { Image(systemName: "curlybraces") }.menuStyle(.borderlessButton).frame(width: 18).help("Environment variables")
-                        Button { fields.removeAll { $0.id == field.id } } label: { Image(systemName: "minus.circle") }.buttonStyle(.plain).foregroundStyle(.secondary).help("Remove \(noun)")
+                        Button { fields.removeAll { $0.id == field.id } } label: { Image(systemName: "minus.circle") }.buttonStyle(.plain).foregroundStyle(.secondary).help("Remove \(noun)").accessibilityLabel("Remove \(noun)")
                     }.textFieldStyle(.roundedBorder).font(.system(size: 12, design: .monospaced))
                 }
                 Button { fields.append(Field()) } label: { Label("Add \(noun)", systemImage: "plus") }.buttonStyle(.borderless).frame(maxWidth: .infinity, alignment: .leading).padding(.top, 6)

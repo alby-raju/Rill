@@ -2,13 +2,14 @@ import Foundation
 
 public enum ProtobufCompiler {
     public static func bundledExecutable() throws -> URL {
-        let candidates = [Bundle.main.resourceURL?.appendingPathComponent("protoc"), Bundle.main.executableURL?.deletingLastPathComponent().appendingPathComponent("protoc")].compactMap { $0 }
+        let candidates = [Bundle.main.resourceURL?.appendingPathComponent("protoc"), Bundle.main.executableURL?.deletingLastPathComponent().appendingPathComponent("protoc"), Bundle.main.executableURL?.deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Resources/protoc")].compactMap { $0 }
         guard let url = candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0.path) }) else { throw ProtobufError.compilerUnavailable }
         return url
     }
     public static func compile(_ source: URL, importRoots: [URL] = [], compiler: URL? = nil, wellKnownRoot: URL? = nil) async throws -> ProtobufSchema {
         let executable = try compiler ?? bundledExecutable()
-        let bundledIncludes = wellKnownRoot ?? Bundle.main.resourceURL?.appendingPathComponent("protobuf-includes")
+        let includeCandidates = [Bundle.main.resourceURL?.appendingPathComponent("protobuf-includes"), Bundle.main.executableURL?.deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Resources/protobuf-includes")].compactMap { $0 }
+        let bundledIncludes = wellKnownRoot ?? includeCandidates.first { FileManager.default.fileExists(atPath: $0.path) }
         let root = source.deletingLastPathComponent().resolvingSymlinksInPath()
         var roots = [root] + importRoots.map { $0.resolvingSymlinksInPath() }
         if let bundledIncludes, FileManager.default.fileExists(atPath: bundledIncludes.path) { roots.append(bundledIncludes.resolvingSymlinksInPath()) }

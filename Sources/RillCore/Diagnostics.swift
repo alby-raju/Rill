@@ -52,7 +52,7 @@ public struct SupportDiagnostics: Codable, Sendable {
     public let previewLimitBytes: Int
 
     public init(workspace: Workspace, persistence: PersistenceHealth, lastFailure: DiagnosticFailure?) {
-        applicationVersion = "0.1.0"
+        applicationVersion = RillVersion.number
         schemaVersion = 1
         generatedAt = Date()
         let version = ProcessInfo.processInfo.operatingSystemVersion
