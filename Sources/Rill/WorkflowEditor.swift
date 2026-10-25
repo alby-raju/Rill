@@ -17,7 +17,7 @@ struct WorkflowEditor: View {
             if stage == "Rules" {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 12) {
-                        HStack { Label("Assertions", systemImage: "checkmark.seal").font(.system(size: 14, weight: .semibold)); Spacer(); Text("\((request.assertions ?? []).count) rules").font(.caption).foregroundStyle(.secondary) }
+                        HStack { Label("Assertions", systemImage: "checkmark.seal").font(.system(size: 14, weight: .semibold)); Spacer(); Text("\((request.assertions ?? []).count) rules").font(.caption).foregroundStyle(.secondary); Button("Add assertion", systemImage: "plus") { if request.assertions == nil { request.assertions = [] }; request.assertions?.append(ResponseAssertion()) }.disabled((request.assertions?.count ?? 0) >= 128) }
                         if (request.assertions ?? []).isEmpty { RillNotice(text: "Make the expected result explicit. Add a status, header or JSON assertion to catch unexpected responses.", icon: "checkmark.circle") }
                         ForEach(Array((request.assertions ?? []).enumerated()), id: \.element.id) { index, _ in
                             HStack {
@@ -28,8 +28,8 @@ struct WorkflowEditor: View {
                                 Button("Remove") { request.assertions?.remove(at: index) }
                             }
                         }
-                        Button("Add assertion", systemImage: "plus") { if request.assertions == nil { request.assertions = [] }; request.assertions?.append(ResponseAssertion()) }.disabled((request.assertions?.count ?? 0) >= 128)
-                        Divider().padding(.vertical, 8); Label("Capture variables", systemImage: "arrow.down.doc").font(.system(size: 14, weight: .semibold))
+                        Divider().padding(.vertical, 8)
+                        HStack { Label("Capture variables", systemImage: "arrow.down.doc").font(.system(size: 14, weight: .semibold)); Spacer(); Button("Add extraction", systemImage: "plus") { if request.extractions == nil { request.extractions = [] }; request.extractions?.append(ResponseExtraction()) }.disabled((request.extractions?.count ?? 0) >= 128) }
                         if (request.extractions ?? []).isEmpty { RillNotice(text: "Capture a response value and reuse it in the next request of a run.", icon: "arrow.triangle.branch") }
                         ForEach(Array((request.extractions ?? []).enumerated()), id: \.element.id) { index, _ in
                             HStack {
@@ -40,7 +40,6 @@ struct WorkflowEditor: View {
                                 Button("Remove") { request.extractions?.remove(at: index) }
                             }
                         }
-                        Button("Add extraction", systemImage: "plus") { if request.extractions == nil { request.extractions = [] }; request.extractions?.append(ResponseExtraction()) }.disabled((request.extractions?.count ?? 0) >= 128)
                         Text("JSON paths support $.field[0] or JSON Pointer /field/0. Missing/invalid values fail. Variables propagate only after a successful step; saved environments stay unchanged.").font(.caption).foregroundStyle(.secondary)
                     }
                 }

@@ -3,6 +3,16 @@ import RillCore
 
 /// Debug-only, synthetic visual QA. Release builds never interpret preview arguments.
 @MainActor enum RillPreview {
+    static var isRendering: Bool {
+        #if DEBUG
+        return argument("--ui-state") != nil && argument("--ui-snapshot") != nil
+        #else
+        return false
+        #endif
+    }
+    private static let preferenceDomain = "app.rill.visual-preview." + UUID().uuidString
+    static let preferences: UserDefaults = isRendering ? UserDefaults(suiteName: preferenceDomain)! : .standard
+
     static func makeStore() -> WorkbenchStore {
         #if DEBUG
         if let state = argument("--ui-state"), argument("--ui-snapshot") != nil {
@@ -36,20 +46,24 @@ import RillCore
         do {
             let introduction = argument("--ui-state") == "intro"
             try await Task.sleep(for: .milliseconds(introduction ? 50 : 800))
-            guard let window = NSApplication.shared.windows.first(where: { $0.contentView != nil && $0.isVisible }), let view = window.contentView else { exit(1) }
+            guard let window = NSApplication.shared.windows.first(where: { $0.contentView != nil && $0.isVisible }), let view = window.contentView else { finish(1) }
             let compact = argument("--ui-width").flatMap(Double.init) ?? 1440
             window.setContentSize(NSSize(width: max(1050, compact), height: 920))
             view.layoutSubtreeIfNeeded()
             try await Task.sleep(for: .milliseconds(introduction ? 30 : 300))
-            guard let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { exit(1) }
+            guard let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { finish(1) }
             view.cacheDisplay(in: view.bounds, to: bitmap)
-            guard let data = bitmap.representation(using: .png, properties: [:]) else { exit(1) }
+            guard let data = bitmap.representation(using: .png, properties: [:]) else { finish(1) }
             try data.write(to: URL(fileURLWithPath: path), options: .atomic)
-            exit(0)
-        } catch { exit(1) }
+            finish(0)
+        } catch { finish(1) }
         #endif
     }
     #if DEBUG
+    private static func finish(_ status: Int32) -> Never {
+        UserDefaults.standard.removePersistentDomain(forName: preferenceDomain)
+        exit(status)
+    }
     private static func argument(_ name: String) -> String? {
         let args = CommandLine.arguments
         guard let index = args.firstIndex(of: name), args.indices.contains(index + 1) else { return nil }

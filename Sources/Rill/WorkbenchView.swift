@@ -206,8 +206,8 @@ struct RequestEditor: View {
                     }
                 } else {
                     VSplitView {
-                        composition.frame(minHeight: 180, idealHeight: 250).background(SplitAutosave(name: "rill.request.vertical", vertical: false))
-                        ResponseView(exchange: store.response, running: store.running).frame(minHeight: 220)
+                        composition.frame(minHeight: 180, idealHeight: geometry.size.height * 0.58).background(SplitAutosave(name: "rill.request.vertical", vertical: false))
+                        ResponseView(exchange: store.response, running: store.running).frame(minHeight: 180)
                     }
                 }
             }

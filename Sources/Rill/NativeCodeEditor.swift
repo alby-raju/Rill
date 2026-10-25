@@ -176,6 +176,7 @@ struct SplitAutosave: NSViewRepresentable {
         required init?(coder: NSCoder) { nil }
         override func viewDidMoveToWindow() { super.viewDidMoveToWindow(); attach() }
         func attach() {
+            guard !RillPreview.isRendering else { return }
             var ancestor = superview
             while let current = ancestor {
                 if let split = current as? NSSplitView, split.isVertical == vertical {
