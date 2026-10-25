@@ -2,9 +2,12 @@
 # Build only upstream targets before CodeQL init. Never build/cache first-party
 # targets here: the subsequent traced build must compile all Rill Swift source.
 set -euo pipefail
-swift package resolve
+# CodeQL tracing runs through Rosetta. Match its host and pin the target so
+# SwiftPM does not discard this preparation for a different architecture.
+RILL_SWIFT=(/usr/bin/arch -x86_64 /usr/bin/swift)
+"${RILL_SWIFT[@]}" package resolve
 for RILL_UPSTREAM_TARGET in Yams ZIPFoundation GRPCNIOTransportHTTP2TransportServices SwiftProtobuf Kafka Logging; do
-  swift build --configuration debug --target "$RILL_UPSTREAM_TARGET"
+  "${RILL_SWIFT[@]}" build --configuration debug --arch arm64 --target "$RILL_UPSTREAM_TARGET"
 done
 # Fail rather than silently analyzing a reused first-party module if this script
 # is accidentally changed to build the root products in future.
