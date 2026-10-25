@@ -5,12 +5,24 @@ public struct Field: Codable, Identifiable, Equatable, Sendable {
     public var enabled = true
     public var name: String
     public var value: String
-    public init(name: String = "", value: String = "") { self.name = name; self.value = value }
+    public init(name: String = "", value: String = "") {
+        self.name = name
+        self.value = value
+    }
 }
-public enum HTTPMethod: String, Codable, CaseIterable, Sendable { case GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS }
-public enum AuthKind: String, Codable, CaseIterable, Sendable { case none = "None", bearer = "Bearer token", basic = "Basic", apiKey = "API key" }
-public enum APIKeyLocation: String, Codable, CaseIterable, Sendable { case header = "Header", query = "Query" }
-public enum RequestBodyMode: String, Codable, CaseIterable, Sendable { case none = "None", text = "Raw text", form = "Form fields", multipart = "Multipart", binary = "Binary file" }
+public enum HTTPMethod: String, Codable, CaseIterable, Sendable {
+    case GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS
+}
+public enum AuthKind: String, Codable, CaseIterable, Sendable {
+    case none = "None", bearer = "Bearer token", basic = "Basic", apiKey = "API key"
+}
+public enum APIKeyLocation: String, Codable, CaseIterable, Sendable {
+    case header = "Header", query = "Query"
+}
+public enum RequestBodyMode: String, Codable, CaseIterable, Sendable {
+    case none = "None", text = "Raw text", form = "Form fields", multipart = "Multipart", binary =
+        "Binary file"
+}
 public struct PreparedRequestSummary: Codable, Equatable, Sendable {
     public var method: String
     public var url: String
@@ -18,18 +30,29 @@ public struct PreparedRequestSummary: Codable, Equatable, Sendable {
     public var bodyBytes: Int?
     public var tlsPolicy: String?
     public func write(to url: URL) throws {
-        let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         try WorkspaceFile.atomicWrite(encoder.encode(self), to: url)
     }
     public init(_ request: URLRequest) {
         method = request.httpMethod ?? "GET"
-        var components = request.url.flatMap { URLComponents(url: $0, resolvingAgainstBaseURL: false) }
-        if let items = components?.queryItems { components?.queryItems = items.map { URLQueryItem(name: $0.name, value: "[redacted]") } }
+        var components = request.url.flatMap {
+            URLComponents(url: $0, resolvingAgainstBaseURL: false)
+        }
+        if let items = components?.queryItems {
+            components?.queryItems = items.map { URLQueryItem(name: $0.name, value: "[redacted]") }
+        }
         components?.fragment = nil
         url = components?.url?.absoluteString ?? "Unavailable"
         let visible: Set<String> = ["accept", "content-type", "user-agent", "content-length"]
-        headers = (request.allHTTPHeaderFields ?? [:]).map { Field(name: $0.key, value: visible.contains($0.key.lowercased()) ? $0.value : "[redacted]") }.sorted { $0.name < $1.name }
-        bodyBytes = request.httpBody?.count ?? request.value(forHTTPHeaderField: "Content-Length").flatMap(Int.init)
+        headers = (request.allHTTPHeaderFields ?? [:]).map {
+            Field(
+                name: $0.key, value: visible.contains($0.key.lowercased()) ? $0.value : "[redacted]"
+            )
+        }.sorted { $0.name < $1.name }
+        bodyBytes =
+            request.httpBody?.count
+            ?? request.value(forHTTPHeaderField: "Content-Length").flatMap(Int.init)
     }
 }
 public struct RequestDraft: Codable, Identifiable, Equatable, Sendable {
@@ -81,13 +104,19 @@ public struct CheckResult: Codable, Identifiable, Equatable, Sendable {
     public var id = UUID()
     public var title: String
     public var passed: Bool
-    public init(title: String, passed: Bool) { self.title = title; self.passed = passed }
+    public init(title: String, passed: Bool) {
+        self.title = title
+        self.passed = passed
+    }
 }
 public struct ExecutionEvent: Codable, Identifiable, Equatable, Sendable {
     public var id = UUID()
     public var elapsed: Double
     public var title: String
-    public init(elapsed: Double, title: String) { self.elapsed = elapsed; self.title = title }
+    public init(elapsed: Double, title: String) {
+        self.elapsed = elapsed
+        self.title = title
+    }
 }
 public struct Exchange: Codable, Identifiable, Equatable, Sendable {
     public var id = UUID()
@@ -107,16 +136,27 @@ public struct Exchange: Codable, Identifiable, Equatable, Sendable {
     public var originalBodyBytes: Int?
     public var bodyWasTruncated: Bool?
     public var events: [ExecutionEvent]?
-    public var previewByteLimit: Int { min(max(previewLimit ?? ResourceLimits.previewBytes, 128), 8 * 1024 * 1024) }
-    public var text: String { String(data: body, encoding: .utf8) ?? "Binary response (\(body.count) bytes). Export to inspect." }
+    public var previewByteLimit: Int {
+        min(max(previewLimit ?? ResourceLimits.previewBytes, 128), 8 * 1024 * 1024)
+    }
+    public var text: String {
+        String(data: body, encoding: .utf8)
+            ?? "Binary response (\(body.count) bytes). Export to inspect."
+    }
     public var previewIsTruncated: Bool { body.count > previewByteLimit }
     public func previewText(pretty: Bool) -> String {
-        guard !previewIsTruncated else { return String(decoding: body.prefix(previewByteLimit), as: UTF8.self) }
+        guard !previewIsTruncated else {
+            return String(decoding: body.prefix(previewByteLimit), as: UTF8.self)
+        }
         return pretty ? prettyText : text
     }
     public var prettyText: String {
-        guard body.count <= previewByteLimit, bodyWasTruncated != true else { return previewText(pretty: false) }
-        guard let raw = String(data: body, encoding: .utf8), let formatted = try? JSONTextFormatter.pretty(raw) else { return text }
+        guard body.count <= previewByteLimit, bodyWasTruncated != true else {
+            return previewText(pretty: false)
+        }
+        guard let raw = String(data: body, encoding: .utf8),
+            let formatted = try? JSONTextFormatter.pretty(raw)
+        else { return text }
         return formatted
     }
 }
@@ -136,9 +176,12 @@ public struct Workspace: Codable, Equatable, Sendable {
     /// Session history and the internal storage token are not user edits.
     /// Credentials still count because they must be saved in the companion store.
     public func needsSave(comparedTo previous: Workspace) -> Bool {
-        var current = self, earlier = previous
-        current.history = []; earlier.history = []
-        current.storageRevision = nil; earlier.storageRevision = nil
+        var current = self
+        var earlier = previous
+        current.history = []
+        earlier.history = []
+        current.storageRevision = nil
+        earlier.storageRevision = nil
         return current != earlier
     }
     public static var starter: Workspace {

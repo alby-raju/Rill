@@ -1,31 +1,38 @@
-# Release preparation
+# Development builds and release preparation
 
-Paid Developer ID signing and notarization are deferred at the owner’s request (2026-10-25). No membership purchase is needed for current development work. Keep the distribution instructions below for later; do not publish a notarized-release claim.
+**0.4.0 is the MVP development version (build 7), targeting macOS 15+.** Packages are architecture-specific. CI validates Apple Silicon and Intel source/toolchains; that is not a fresh-installed-artifact result on every supported OS.
 
-Rill 0.3.3 is a development build targeting macOS 15 or later. Required CI builds/tests Apple Silicon with Xcode 26.2/26.3 and Intel with Xcode 26.3. This validates source/toolchains, not installed artifacts on all OS versions.
+Paid Developer ID signing/notarization are **deferred at the owner's request**. Do not describe an ad-hoc development package as a notarized public release. No membership purchase is needed to build/test locally, and no release tag or public release is published automatically.
 
-Run `bash scripts/test.sh`, the roadmap audit and dependency notice check. `bash scripts/release-artifacts.sh` builds an ad-hoc signed app, bundled native CLI/protoc/includes/Swift runtime compatibility libraries/help/icon/licenses, compressed DMG, SHA-256 checksum and provenance with source commit and dirty-state marker. It does not notarize or publish. Artifacts are architecture-specific; do not label one architecture universal. Build separately on Intel and Apple Silicon.
+## Build and verify
 
-For distribution, obtain a Developer ID Application certificate in the signing machine's Keychain and store notarytool credentials in a Keychain profile. Set `RILL_SIGN_IDENTITY` and `RILL_NOTARY_PROFILE`, then run `bash scripts/sign-and-notarize.sh`. Credentials and certificates never enter the repository. The script signs nested code with hardened runtime, submits the app, staples and assesses it, then creates/signs/submits/staples the distribution DMG. Keep signing identity stable across upgrades and verify Keychain access on a real upgrade. Never use the development artifact script after signing: it rebuilds an ad-hoc app.
+```sh
+export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+bash scripts/test.sh
+python3 scripts/check-docs.py
+python3 scripts/collect-dependency-notices.py --check
+bash scripts/release-artifacts.sh
+```
 
-Before publishing, complete docs/roadmap/ACCEPTANCE.md on fresh Macs, including offline installed launch, real Keychain permissions, upgrade/recovery, VoiceOver/focus/contrast/reduced motion, real TLS/OAuth and independently operated broker/gRPC endpoints. Record artifact hashes, OS/CPU, results and any owner-approved deviations against each capability. A passing suite does not establish full Relay parity. No release tag or public release is created automatically.
+The packaging pipeline stages a clean `dist/Rill.app` with the app/CLI, official protobuf compiler/includes, first-party icon/offline help, MIT license, third-party notices/resources and required Swift runtime compatibility libraries. Nested code and the app receive verified ad-hoc signatures. It creates an architecture-specific compressed DMG, SHA-256 checksum and provenance record containing source revision/dirty state and dependency/notice hashes.
 
-## 0.3.3 development release notes
+Use only a clean expected revision for a reviewable artifact. Verify its version, signature, checksum, resources and bundled CLI. Build separately on Intel and Apple Silicon; do not label a single-architecture artifact universal. Keep generated output out of Git.
 
-Replaces live SwiftUI tab context-menu reconciliation with a native menu built once per opening. Tab commands execute after menu tracking ends, addressing owner-reported Close All stalls traced to repeated menu-item rebuilding. Includes an isolated 100-tab regression diagnostic with 30 live workspace updates while the menu remains open. Unsaved-draft/pin semantics are unchanged.
+## Future signed distribution
 
-## 0.3.2 development release notes
+When enabled by the owner, configure a Developer ID Application identity in the signing Mac's Keychain and an existing notarytool Keychain profile. Never commit passwords, private keys or signing material. Set `RILL_SIGN_IDENTITY` and `RILL_NOTARY_PROFILE`, then run `bash scripts/sign-and-notarize.sh` against the prepared app.
 
-Makes failed response checks visible independently from the received HTTP status, with a persistent validation banner and direct review action. Response text starts at the top left and response tabs/actions fit narrow panes. Adds Close All/Left/Right tab actions with atomic unsaved-draft handling. Adds a standalone manual verification kit with synthetic endpoints, imports/uploads/proto/schema samples and a blank acceptance checklist. Paid signing remains deferred.
+The signing script applies hardened-runtime signatures, submits/notarizes/staples/assesses the app and distribution DMG. That path needs real credentials and actual Gatekeeper acceptance before a signed-release claim. Do not run the development artifact script after distribution signing; it rebuilds an ad-hoc app. Keep the signing identity stable across upgrades and verify Keychain access on an actual upgrade.
 
-## 0.3.1 development release notes
+## Before a public release claim
 
-Adds native terminal run summaries, per-attempt/check detail, final-failure guidance, retry recovery, response statistics and performance percentiles. TTY progress and automatic colors respect quiet/redirected output. **Automation migration:** run and performance commands now default to human output; add `--json` to retain their previous JSON shapes. See [CLI usage](CLI.md) and [validation](milestones/CLI-experience.md).
+Record exact commit/hash, OS/CPU, service versions and results for:
 
-## 0.3.0 development release notes
+- Fresh installed offline app/CLI/compiler/resource use and upgrade/recovery behavior.
+- Actual Keychain permission/lock/denial and TLS/OAuth provider behavior.
+- Keyboard-only navigation, VoiceOver, focus, contrast, reduced motion and supported window sizes.
+- Independent real brokers/gRPC services and supported producer import/export round trips.
+- Every relevant [capability acceptance criterion](CAPABILITIES.csv), with explicit owner-approved deviations where needed.
+- Consistent version/help/docs/licenses/notices/checksums/provenance.
 
-Redesigns the full-height welcome/workbench, branded startup experience, native selectors, buttons and focused fields, grouped auth/TLS panels, body editor and workflow empty states. Blank requests start without a body. Includes reproducible synthetic UI previews for compact/wide and light/dark layouts. See [UX evidence](milestones/UX-refresh.md).
-
-## 0.2.0 development release notes
-
-Adds native gRPC/MQTT/AMQP/Kafka workbenches, a shared native CLI, explicit Git workspace operations, sanitized token-protected sharing, reviewed data-only extension services, offline help and original Rill icon. The new package includes the CLI, official protoc and required compatibility runtimes. Protocol subsets and resource bounds remain documented in milestone evidence. Signing and manual release acceptance are pending until performed with actual credentials/devices.
+Use the [manual kit](../verification/README.md) and [testing guide](TESTING.md), then record separate real-service/fresh-machine evidence. Passing tests, screenshots or an MVP label cannot substitute for those gates. Release notes are maintained in [CHANGELOG.md](../CHANGELOG.md).

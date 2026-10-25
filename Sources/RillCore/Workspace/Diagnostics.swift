@@ -51,18 +51,21 @@ public struct SupportDiagnostics: Codable, Sendable {
     public let responseLimitBytes: Int
     public let previewLimitBytes: Int
 
-    public init(workspace: Workspace, persistence: PersistenceHealth, lastFailure: DiagnosticFailure?) {
+    public init(
+        workspace: Workspace, persistence: PersistenceHealth, lastFailure: DiagnosticFailure?
+    ) {
         applicationVersion = RillVersion.number
         schemaVersion = 1
         generatedAt = Date()
         let version = ProcessInfo.processInfo.operatingSystemVersion
-        operatingSystem = "macOS \(version.majorVersion).\(version.minorVersion).\(version.patchVersion)"
+        operatingSystem =
+            "macOS \(version.majorVersion).\(version.minorVersion).\(version.patchVersion)"
         #if arch(arm64)
-        architecture = "arm64"
+            architecture = "arm64"
         #elseif arch(x86_64)
-        architecture = "x86_64"
+            architecture = "x86_64"
         #else
-        architecture = "unknown"
+            architecture = "unknown"
         #endif
         workspaceVersion = workspace.version
         requestCount = workspace.requests.count
@@ -89,7 +92,8 @@ public struct ExecutionContext: Sendable {
     public let request: RequestDraft
     public let environment: Environment?
     public init(request: RequestDraft, environment: Environment?) {
-        self.request = request; self.environment = environment
+        self.request = request
+        self.environment = environment
     }
     public func matches(request: RequestDraft?, environment: Environment?) -> Bool {
         request == self.request && environment == self.environment

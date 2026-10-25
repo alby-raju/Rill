@@ -42,8 +42,22 @@ jobs:
           xcodebuild -version
           swift --version
           python3 --version
-      - name: Validate roadmap traceability
-        run: python3 scripts/audit-roadmap.py
+      - name: Validate documentation and capability records
+        run: python3 scripts/check-docs.py
+      - name: Check first-party formatting
+        if: matrix.runner == 'macos-15' && matrix.xcode == '26.3'
+        run: |
+          python3 -m venv "$RUNNER_TEMP/format-tools"
+          "$RUNNER_TEMP/format-tools/bin/pip" install -r requirements-dev.txt
+          case "$(uname -m)" in
+            arm64) RILL_FORMAT_ARCH=arm64; RILL_FORMAT_SHA=b7c872db63553ccffc7253aba3ed7d4885a27d83f1ba567b1138c6315a5847e5 ;;
+            x86_64) RILL_FORMAT_ARCH=amd64; RILL_FORMAT_SHA=d33eee0da0f92835b3562e9767a05cee7e4eaeef47daa03bfd09da17b4b590a6 ;;
+            *) echo 'Unsupported formatter architecture' >&2; exit 1 ;;
+          esac
+          curl --fail --location --silent --show-error "https://github.com/mvdan/sh/releases/download/v3.14.1/shfmt_v3.14.1_darwin_$RILL_FORMAT_ARCH" --output "$RUNNER_TEMP/shfmt"
+          echo "$RILL_FORMAT_SHA  $RUNNER_TEMP/shfmt" | shasum -a 256 -c -
+          chmod +x "$RUNNER_TEMP/shfmt"
+          RILL_RUFF="$RUNNER_TEMP/format-tools/bin/ruff" RILL_SHFMT="$RUNNER_TEMP/shfmt" bash scripts/format.sh --check
       - name: Build release executable
         run: swift build --configuration release
       - name: Verify pinned dependency notices

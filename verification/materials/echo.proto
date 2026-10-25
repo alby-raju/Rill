@@ -1,9 +1,12 @@
 syntax = "proto3";
 package rill.kit;
-message EchoMessage { string text = 1; int32 count = 2; }
+message EchoMessage {
+  string text = 1;
+  int32 count = 2;
+}
 service Echo {
- rpc Unary(EchoMessage) returns (EchoMessage);
- rpc ServerStream(EchoMessage) returns (stream EchoMessage);
- rpc ClientStream(stream EchoMessage) returns (EchoMessage);
- rpc Bidi(stream EchoMessage) returns (stream EchoMessage);
+  rpc Unary(EchoMessage) returns (EchoMessage);
+  rpc ServerStream(EchoMessage) returns (stream EchoMessage);
+  rpc ClientStream(stream EchoMessage) returns (EchoMessage);
+  rpc Bidi(stream EchoMessage) returns (stream EchoMessage);
 }

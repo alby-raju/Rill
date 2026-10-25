@@ -1,10 +1,12 @@
-import Foundation
 import Darwin
+import Foundation
 
 public enum BoundedFileInput {
     public static func read(_ url: URL, limit: Int = BoundedArchive.fileBytes) throws -> Data {
         try Task.checkCancellation()
-        guard (1...BoundedArchive.totalBytes).contains(limit) else { throw ArchiveImportError.limit }
+        guard (1...BoundedArchive.totalBytes).contains(limit) else {
+            throw ArchiveImportError.limit
+        }
         let descriptor = Darwin.open(url.path, O_RDONLY | O_NOFOLLOW | O_NONBLOCK)
         guard descriptor >= 0 else { throw ArchiveImportError.unavailable }
         return try consume(descriptor, limit: limit)
@@ -16,40 +18,71 @@ public enum BoundedFileInput {
         guard descriptor >= 0 else { throw ArchiveImportError.unavailable }
         defer { Darwin.close(descriptor) }
         // Canonicalize ancestor aliases only after refusing a selected root symlink.
-        guard let canonical = Darwin.realpath(selected.path, nil) else { throw ArchiveImportError.invalid }
-        let physicalPath = String(cString: canonical); free(canonical)
+        guard let canonical = Darwin.realpath(selected.path, nil) else {
+            throw ArchiveImportError.invalid
+        }
+        let physicalPath = String(cString: canonical)
+        free(canonical)
         let root = URL(fileURLWithPath: physicalPath, isDirectory: true)
         let failure = EnumerationFailure()
-        guard let enumerator = FileManager.default.enumerator(at: root, includingPropertiesForKeys: [.isDirectoryKey, .isRegularFileKey, .isSymbolicLinkKey], errorHandler: { _, _ in failure.mark(); return false }) else { throw ArchiveImportError.invalid }
-        var output: [ImportFile] = [], total = 0, count = 0, names = Set<String>()
+        guard
+            let enumerator = FileManager.default.enumerator(
+                at: root,
+                includingPropertiesForKeys: [
+                    .isDirectoryKey, .isRegularFileKey, .isSymbolicLinkKey,
+                ],
+                errorHandler: { _, _ in
+                    failure.mark()
+                    return false
+                })
+        else { throw ArchiveImportError.invalid }
+        var output: [ImportFile] = []
+        var total = 0
+        var count = 0
+        var names = Set<String>()
         let prefix = physicalPath.hasSuffix("/") ? physicalPath : physicalPath + "/"
         for case let url as URL in enumerator {
-            try Task.checkCancellation(); count += 1
-            guard count <= BoundedArchive.entryCount, url.path.hasPrefix(prefix) else { throw ArchiveImportError.limit }
-            let relative = String(url.path.dropFirst(prefix.count)), parts = try BoundedArchive.components(relative)
-            guard names.insert(BoundedArchive.key(relative)).inserted else { throw ArchiveImportError.unsafePath }
-            let values = try url.resourceValues(forKeys: [.isDirectoryKey, .isRegularFileKey, .isSymbolicLinkKey])
+            try Task.checkCancellation()
+            count += 1
+            guard count <= BoundedArchive.entryCount, url.path.hasPrefix(prefix) else {
+                throw ArchiveImportError.limit
+            }
+            let relative = String(url.path.dropFirst(prefix.count))
+            let parts = try BoundedArchive.components(relative)
+            guard names.insert(BoundedArchive.key(relative)).inserted else {
+                throw ArchiveImportError.unsafePath
+            }
+            let values = try url.resourceValues(forKeys: [
+                .isDirectoryKey, .isRegularFileKey, .isSymbolicLinkKey,
+            ])
             guard values.isSymbolicLink != true else { throw ArchiveImportError.unsupported }
             if values.isDirectory == true {
-                if [".git", "node_modules"].contains(url.lastPathComponent) { enumerator.skipDescendants() }
+                if [".git", "node_modules"].contains(url.lastPathComponent) {
+                    enumerator.skipDescendants()
+                }
                 continue
             }
             guard values.isRegularFile == true else { throw ArchiveImportError.unsupported }
             // Import only collection metadata/source. Never open a referenced upload.
-            guard url.pathExtension.lowercased() == "bru" || url.lastPathComponent == "bruno.json" else { continue }
+            guard url.pathExtension.lowercased() == "bru" || url.lastPathComponent == "bruno.json"
+            else { continue }
             var parent = Darwin.dup(descriptor)
             guard parent >= 0 else { throw ArchiveImportError.invalid }
             defer { Darwin.close(parent) }
             for component in parts.dropLast() {
                 let next = Darwin.openat(parent, component, O_RDONLY | O_DIRECTORY | O_NOFOLLOW)
                 guard next >= 0 else { throw ArchiveImportError.unsupported }
-                Darwin.close(parent); parent = next
+                Darwin.close(parent)
+                parent = next
             }
             let file = Darwin.openat(parent, parts.last!, O_RDONLY | O_NOFOLLOW | O_NONBLOCK)
             guard file >= 0 else { throw ArchiveImportError.unsupported }
             let data = try consume(file, limit: BoundedArchive.fileBytes)
-            guard data.count <= BoundedArchive.totalBytes - total else { throw ArchiveImportError.limit }
-            total += data.count; output.append(ImportFile(path: relative, data: data))
+            guard data.count <= BoundedArchive.totalBytes - total else {
+                throw ArchiveImportError.limit
+            }
+            total += data.count
+            output.append(ImportFile(path: relative, data: data))
         }
         guard !failure.failed else { throw ArchiveImportError.invalid }
         return output.sorted { $0.path < $1.path }
@@ -57,9 +90,12 @@ public enum BoundedFileInput {
     private static func consume(_ descriptor: Int32, limit: Int) throws -> Data {
         defer { Darwin.close(descriptor) }
         var before = stat()
-        guard fstat(descriptor, &before) == 0, before.st_mode & S_IFMT == S_IFREG else { throw ArchiveImportError.unsupported }
+        guard fstat(descriptor, &before) == 0, before.st_mode & S_IFMT == S_IFREG else {
+            throw ArchiveImportError.unsupported
+        }
         guard before.st_size >= 0, before.st_size <= limit else { throw ArchiveImportError.limit }
-        var output = Data(), chunk = [UInt8](repeating: 0, count: 65536)
+        var output = Data()
+        var chunk = [UInt8](repeating: 0, count: 65536)
         while true {
             try Task.checkCancellation()
             let count = Darwin.read(descriptor, &chunk, chunk.count)
@@ -70,9 +106,12 @@ public enum BoundedFileInput {
             output.append(contentsOf: chunk.prefix(count))
         }
         var after = stat()
-        guard fstat(descriptor, &after) == 0, before.st_dev == after.st_dev, before.st_ino == after.st_ino,
-              before.st_size == after.st_size, after.st_size == output.count,
-              before.st_mtimespec.tv_sec == after.st_mtimespec.tv_sec, before.st_mtimespec.tv_nsec == after.st_mtimespec.tv_nsec else { throw ArchiveImportError.invalid }
+        guard fstat(descriptor, &after) == 0, before.st_dev == after.st_dev,
+            before.st_ino == after.st_ino,
+            before.st_size == after.st_size, after.st_size == output.count,
+            before.st_mtimespec.tv_sec == after.st_mtimespec.tv_sec,
+            before.st_mtimespec.tv_nsec == after.st_mtimespec.tv_nsec
+        else { throw ArchiveImportError.invalid }
         return output
     }
 }

@@ -1,6 +1,6 @@
-import Foundation
 import CryptoKit
 import Darwin
+import Foundation
 
 public enum WorkspaceError: LocalizedError, Equatable {
     case unsupportedVersion(Int)
@@ -13,13 +13,18 @@ public enum WorkspaceError: LocalizedError, Equatable {
 
     public var errorDescription: String? {
         switch self {
-        case .unsupportedVersion: "This workspace was written by an unsupported version. The original file has been preserved."
-        case .invalidStructure: "The workspace has duplicate identities, invalid references or invalid values. The original file has been preserved."
+        case .unsupportedVersion:
+            "This workspace was written by an unsupported version. The original file has been preserved."
+        case .invalidStructure:
+            "The workspace has duplicate identities, invalid references or invalid values. The original file has been preserved."
         case .tooLarge: "The workspace exceeds the 32 MiB file limit."
         case .tooDeep: "The workspace exceeds the supported JSON nesting depth."
-        case .conflict: "The workspace changed in another process. Saving has paused to protect both versions. Export your current edits before reopening the app."
-        case .companionRollback: "The workspace was preserved, but a new unreferenced credential may remain in Keychain because cleanup failed."
-        case .unavailable: "The workspace could not be accessed. Check its permissions and available storage, then retry."
+        case .conflict:
+            "The workspace changed in another process. Saving has paused to protect both versions. Export your current edits before reopening the app."
+        case .companionRollback:
+            "The workspace was preserved, but a new unreferenced credential may remain in Keychain because cleanup failed."
+        case .unavailable:
+            "The workspace could not be accessed. Check its permissions and available storage, then retry."
         }
     }
 }
@@ -35,39 +40,65 @@ public enum ResourceLimits {
 
 public enum WorkspaceFile {
     public static func validate(_ workspace: Workspace) throws {
-        guard workspace.version == 1 else { throw WorkspaceError.unsupportedVersion(workspace.version) }
+        guard workspace.version == 1 else {
+            throw WorkspaceError.unsupportedVersion(workspace.version)
+        }
         func unique(_ values: [UUID]) -> Bool { Set(values).count == values.count }
         func fieldsValid(_ fields: [Field]) -> Bool { unique(fields.map(\.id)) }
-        guard unique((workspace.tlsProfiles ?? []).map(\.id)) else { throw WorkspaceError.invalidStructure }
+        guard unique((workspace.tlsProfiles ?? []).map(\.id)) else {
+            throw WorkspaceError.invalidStructure
+        }
         for profile in workspace.tlsProfiles ?? [] { try TLSProfiles.validate(profile) }
-        let profiles = workspace.authProfiles ?? [], secrets = workspace.namedSecrets ?? []
+        let profiles = workspace.authProfiles ?? []
+        let secrets = workspace.namedSecrets ?? []
         guard unique(profiles.map(\.id)), unique(secrets.map(\.id)),
-              profiles.allSatisfy({ !$0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }),
-              Set(try secrets.map { try NamedSecretResolver.environmentKey(for: $0.name) }).count == secrets.count else { throw WorkspaceError.invalidStructure }
+            profiles.allSatisfy({ !$0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            ),
+            Set(try secrets.map { try NamedSecretResolver.environmentKey(for: $0.name) }).count
+                == secrets.count
+        else { throw WorkspaceError.invalidStructure }
         for secret in secrets { try NamedSecretResolver.validateName(secret.name) }
         let sources = workspace.apiDefinitions ?? []
-        guard unique(sources.map(\.id)), sources.count <= 64, sources.allSatisfy({ $0.snapshot.count <= 8 * 1024 * 1024 && $0.location.utf8.count <= 4096 && $0.title.utf8.count <= 4096 }) else { throw WorkspaceError.invalidStructure }
+        guard unique(sources.map(\.id)), sources.count <= 64,
+            sources.allSatisfy({
+                $0.snapshot.count <= 8 * 1024 * 1024 && $0.location.utf8.count <= 4096
+                    && $0.title.utf8.count <= 4096
+            })
+        else { throw WorkspaceError.invalidStructure }
         let sourceIDs = Set(sources.map(\.id))
         for source in sources { _ = try JSONValueParser(source.snapshot).parse() }
         let collections = Set(workspace.collections.map(\.id))
         let environments = Set(workspace.environments.map(\.id))
         guard unique(workspace.collections.map(\.id)), unique(workspace.requests.map(\.id)),
-              unique(workspace.environments.map(\.id)), unique(workspace.history.map(\.id)),
-              workspace.selectedEnvironmentID.map({ environments.contains($0) }) ?? true else {
+            unique(workspace.environments.map(\.id)), unique(workspace.history.map(\.id)),
+            workspace.selectedEnvironmentID.map({ environments.contains($0) }) ?? true
+        else {
             throw WorkspaceError.invalidStructure
         }
         for request in workspace.requests {
             if let graphql = request.graphql { try GraphQL.validateStorage(graphql) }
             if let link = request.apiLink {
-                guard sourceIDs.contains(link.sourceID), link.operationKey.utf8.count <= 8192, link.baseline.count <= 2 * 1024 * 1024 else { throw WorkspaceError.invalidStructure }
+                guard sourceIDs.contains(link.sourceID), link.operationKey.utf8.count <= 8192,
+                    link.baseline.count <= 2 * 1024 * 1024
+                else { throw WorkspaceError.invalidStructure }
             }
             try ResponseRules.validate(request.assertions ?? [], request.extractions ?? [])
-            for hook in [request.preHook, request.postHook].compactMap({ $0 }) { try HookRuntime.validateStorage(hook) }
+            for hook in [request.preHook, request.postHook].compactMap({ $0 }) {
+                try HookRuntime.validateStorage(hook)
+            }
             let scripts = request.foreignScripts ?? []
-            guard scripts.count <= 16, scripts.allSatisfy({ $0.source.utf8.count <= 256 * 1024 && $0.origin.utf8.count <= 4096 && $0.stage.utf8.count <= 128 }), scripts.reduce(0, { $0 + $1.source.utf8.count }) <= 1024 * 1024 else { throw WorkspaceError.invalidStructure }
+            guard scripts.count <= 16,
+                scripts.allSatisfy({
+                    $0.source.utf8.count <= 256 * 1024 && $0.origin.utf8.count <= 4096
+                        && $0.stage.utf8.count <= 128
+                }), scripts.reduce(0, { $0 + $1.source.utf8.count }) <= 1024 * 1024
+            else { throw WorkspaceError.invalidStructure }
             guard request.collectionID.map({ collections.contains($0) }) ?? true,
-                  fieldsValid(request.headers), fieldsValid(request.parameters), fieldsValid(request.formFields ?? []), unique((request.multipartParts ?? []).map(\.id)),
-                  request.timeout.isFinite, (1...300).contains(request.timeout) else { throw WorkspaceError.invalidStructure }
+                fieldsValid(request.headers), fieldsValid(request.parameters),
+                fieldsValid(request.formFields ?? []),
+                unique((request.multipartParts ?? []).map(\.id)),
+                request.timeout.isFinite, (1...300).contains(request.timeout)
+            else { throw WorkspaceError.invalidStructure }
         }
         try EnvironmentResolver.validateHierarchy(workspace.environments)
         for environment in workspace.environments {
@@ -75,29 +106,41 @@ public enum WorkspaceFile {
         }
         // History may intentionally outlive a deleted request.
         for exchange in workspace.history {
-            guard (exchange.events?.count ?? 0) <= 32, unique((exchange.events ?? []).map(\.id)), (exchange.events ?? []).allSatisfy({ $0.elapsed.isFinite && $0.elapsed >= 0 }), unique(exchange.checks.map(\.id)), fieldsValid(exchange.headers),
-                  exchange.duration.isFinite, exchange.duration >= 0,
-                  exchange.downloadLimit.map({ (1...(256 * 1024 * 1024)).contains($0) }) ?? true,
-                  exchange.previewLimit.map({ (128...(8 * 1024 * 1024)).contains($0) }) ?? true,
-                  exchange.originalBodyBytes.map({ $0 >= exchange.body.count }) ?? true,
-                  (100...599).contains(exchange.status) else { throw WorkspaceError.invalidStructure }
+            guard (exchange.events?.count ?? 0) <= 32, unique((exchange.events ?? []).map(\.id)),
+                (exchange.events ?? []).allSatisfy({ $0.elapsed.isFinite && $0.elapsed >= 0 }),
+                unique(exchange.checks.map(\.id)), fieldsValid(exchange.headers),
+                exchange.duration.isFinite, exchange.duration >= 0,
+                exchange.downloadLimit.map({ (1...(256 * 1024 * 1024)).contains($0) }) ?? true,
+                exchange.previewLimit.map({ (128...(8 * 1024 * 1024)).contains($0) }) ?? true,
+                exchange.originalBodyBytes.map({ $0 >= exchange.body.count }) ?? true,
+                (100...599).contains(exchange.status)
+            else { throw WorkspaceError.invalidStructure }
         }
     }
 
     static func checkJSONBounds(_ data: Data) throws {
         guard data.count <= ResourceLimits.workspaceBytes else { throw WorkspaceError.tooLarge }
         // Bound nesting before asking the JSON decoder to allocate its tree.
-        var depth = 0, inString = false, escaped = false
+        var depth = 0
+        var inString = false
+        var escaped = false
         for byte in data {
             if inString {
-                if escaped { escaped = false }
-                else if byte == 92 { escaped = true }
-                else if byte == 34 { inString = false }
-            } else if byte == 34 { inString = true }
-            else if byte == 123 || byte == 91 {
+                if escaped {
+                    escaped = false
+                } else if byte == 92 {
+                    escaped = true
+                } else if byte == 34 {
+                    inString = false
+                }
+            } else if byte == 34 {
+                inString = true
+            } else if byte == 123 || byte == 91 {
                 depth += 1
                 if depth > ResourceLimits.jsonDepth { throw WorkspaceError.tooDeep }
-            } else if byte == 125 || byte == 93 { depth -= 1 }
+            } else if byte == 125 || byte == 93 {
+                depth -= 1
+            }
         }
     }
 
@@ -106,14 +149,19 @@ public enum WorkspaceFile {
         // Version 1 is the initial supported schema. Future migrations must be
         // explicit; unknown schemas are never normalized and overwritten.
         var workspace: Workspace
-        do { workspace = try JSONDecoder().decode(Workspace.self, from: data) }
-        catch { throw WorkspaceError.invalidStructure }
+        do { workspace = try JSONDecoder().decode(Workspace.self, from: data) } catch {
+            throw WorkspaceError.invalidStructure
+        }
         // Version-one builds previously accepted positive values outside the
         // effective transport range. Stage that known legacy normalization in
         // memory; the original bytes change only on a successful atomic save.
         if workspace.version == 1 {
-            for index in workspace.requests.indices where workspace.requests[index].timeout.isFinite && workspace.requests[index].timeout > 0 {
-                workspace.requests[index].timeout = min(max(workspace.requests[index].timeout, 1), 300)
+            for index in workspace.requests.indices
+            where workspace.requests[index].timeout.isFinite
+                && workspace.requests[index].timeout > 0
+            {
+                workspace.requests[index].timeout = min(
+                    max(workspace.requests[index].timeout, 1), 300)
             }
         }
         try validate(workspace)
@@ -137,15 +185,22 @@ public enum WorkspaceFile {
         let handle = try FileHandle(forReadingFrom: url)
         defer { try? handle.close() }
         var data = Data()
-        while let chunk = try handle.read(upToCount: min(65536, ResourceLimits.workspaceBytes + 1 - data.count)), !chunk.isEmpty {
+        while let chunk = try handle.read(
+            upToCount: min(65536, ResourceLimits.workspaceBytes + 1 - data.count)), !chunk.isEmpty
+        {
             data.append(chunk)
             guard data.count <= ResourceLimits.workspaceBytes else { throw WorkspaceError.tooLarge }
         }
         return data
     }
 
-    public static func writeNew(_ data: Data, to url: URL) throws { guard data.count <= ResourceLimits.workspaceBytes else { throw WorkspaceError.tooLarge }; try createNew(data, at: url) }
-    public static func create(_ workspace: Workspace, at url: URL) throws { try createNew(encode(workspace), at: url) }
+    public static func writeNew(_ data: Data, to url: URL) throws {
+        guard data.count <= ResourceLimits.workspaceBytes else { throw WorkspaceError.tooLarge }
+        try createNew(data, at: url)
+    }
+    public static func create(_ workspace: Workspace, at url: URL) throws {
+        try createNew(encode(workspace), at: url)
+    }
 
     public static func save(_ workspace: Workspace, to url: URL) throws {
         let data = try encode(workspace)
@@ -153,13 +208,19 @@ public enum WorkspaceFile {
     }
 
     static func createNew(_ data: Data, at url: URL) throws {
-        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         let descriptor = Darwin.open(url.path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0o600)
         guard descriptor >= 0 else { throw WorkspaceError.unavailable }
         let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
         var complete = false
-        defer { try? handle.close(); if !complete { try? FileManager.default.removeItem(at: url) } }
-        try handle.write(contentsOf: data); try handle.synchronize(); try handle.close()
+        defer {
+            try? handle.close()
+            if !complete { try? FileManager.default.removeItem(at: url) }
+        }
+        try handle.write(contentsOf: data)
+        try handle.synchronize()
+        try handle.close()
         complete = true
     }
 
@@ -167,10 +228,14 @@ public enum WorkspaceFile {
         let directory = url.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let temporary = directory.appendingPathComponent(".rill-\(UUID().uuidString).tmp")
-        let descriptor = Darwin.open(temporary.path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0o600)
+        let descriptor = Darwin.open(
+            temporary.path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0o600)
         guard descriptor >= 0 else { throw WorkspaceError.unavailable }
         let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
-        defer { try? handle.close(); try? FileManager.default.removeItem(at: temporary) }
+        defer {
+            try? handle.close()
+            try? FileManager.default.removeItem(at: temporary)
+        }
         try handle.write(contentsOf: data)
         try handle.synchronize()
         try handle.close()
@@ -183,7 +248,9 @@ public enum WorkspaceFile {
 public struct WorkspaceRevision: Codable, Equatable, Sendable {
     let digest: String?
     public static let absent = WorkspaceRevision(digest: nil)
-    init(data: Data) { digest = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined() }
+    init(data: Data) {
+        digest = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    }
     private init(digest: String?) { self.digest = digest }
 }
 
@@ -205,38 +272,52 @@ public struct WorkspaceRepository: Sendable {
                 return try body(WorkspaceSnapshot(workspace: .starter, revision: .absent))
             }
             let data = try WorkspaceFile.readBounded(from: url)
-            return try body(WorkspaceSnapshot(workspace: try WorkspaceFile.decode(data), revision: WorkspaceRevision(data: data)))
+            return try body(
+                WorkspaceSnapshot(
+                    workspace: try WorkspaceFile.decode(data),
+                    revision: WorkspaceRevision(data: data)))
         }
     }
 
     /// The callback runs after atomic replacement but before releasing the lock.
     /// It receives the committed revision even if a companion-store write fails.
-    public func commit(_ workspace: Workspace, expecting revision: WorkspaceRevision,
-                       onCommit: (WorkspaceRevision) throws -> Void = { _ in }) throws -> WorkspaceRevision {
-        try commitPrepared(workspace, expecting: revision, beforeWrite: {}, onWriteFailure: {}, onCommit: onCommit)
+    public func commit(
+        _ workspace: Workspace, expecting revision: WorkspaceRevision,
+        onCommit: (WorkspaceRevision) throws -> Void = { _ in }
+    ) throws -> WorkspaceRevision {
+        try commitPrepared(
+            workspace, expecting: revision, beforeWrite: {}, onWriteFailure: {}, onCommit: onCommit)
     }
-    public func commitWithCompanion(_ workspace: Workspace, expecting revision: WorkspaceRevision,
-                                    beforeWrite: () throws -> Void, onWriteFailure: () throws -> Void) throws -> WorkspaceRevision {
-        try commitPrepared(workspace, expecting: revision, beforeWrite: beforeWrite, onWriteFailure: onWriteFailure, onCommit: { _ in })
+    public func commitWithCompanion(
+        _ workspace: Workspace, expecting revision: WorkspaceRevision,
+        beforeWrite: () throws -> Void, onWriteFailure: () throws -> Void
+    ) throws -> WorkspaceRevision {
+        try commitPrepared(
+            workspace, expecting: revision, beforeWrite: beforeWrite,
+            onWriteFailure: onWriteFailure, onCommit: { _ in })
     }
-    private func commitPrepared(_ workspace: Workspace, expecting revision: WorkspaceRevision,
-                                beforeWrite: () throws -> Void, onWriteFailure: () throws -> Void,
-                                onCommit: (WorkspaceRevision) throws -> Void) throws -> WorkspaceRevision {
+    private func commitPrepared(
+        _ workspace: Workspace, expecting revision: WorkspaceRevision,
+        beforeWrite: () throws -> Void, onWriteFailure: () throws -> Void,
+        onCommit: (WorkspaceRevision) throws -> Void
+    ) throws -> WorkspaceRevision {
         var persisted = workspace
         // Even credential-only or otherwise identical saves advance the token.
         persisted.storageRevision = UUID()
         let data = try WorkspaceFile.encode(persisted)
         return try locked {
             let existing: Data?
-            if FileManager.default.fileExists(atPath: url.path) { existing = try WorkspaceFile.readBounded(from: url) }
-            else { existing = nil }
+            if FileManager.default.fileExists(atPath: url.path) {
+                existing = try WorkspaceFile.readBounded(from: url)
+            } else {
+                existing = nil
+            }
             let actual = existing.map(WorkspaceRevision.init(data:)) ?? .absent
             guard actual == revision else { throw WorkspaceError.conflict }
             if let existing { _ = try WorkspaceFile.decode(existing) }
             try Task.checkCancellation()
             try beforeWrite()
-            do { try WorkspaceFile.atomicWrite(data, to: url) }
-            catch {
+            do { try WorkspaceFile.atomicWrite(data, to: url) } catch {
                 let original = error
                 do { try onWriteFailure() } catch { throw WorkspaceError.companionRollback }
                 throw original
@@ -254,8 +335,10 @@ public struct WorkspaceRepository: Sendable {
 
 internal enum WorkspaceFileLock {
     static func withLock<T>(at url: URL, _ operation: () throws -> T) throws -> T {
-        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        let descriptor = Darwin.open(url.appendingPathExtension("lock").path, O_RDWR | O_CREAT | O_NOFOLLOW, 0o600)
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let descriptor = Darwin.open(
+            url.appendingPathExtension("lock").path, O_RDWR | O_CREAT | O_NOFOLLOW, 0o600)
         guard descriptor >= 0 else { throw WorkspaceError.unavailable }
         defer { Darwin.close(descriptor) }
         guard flock(descriptor, LOCK_EX | LOCK_NB) == 0 else { throw WorkspaceError.unavailable }

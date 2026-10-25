@@ -1,10 +1,12 @@
-import XCTest
 import Darwin
+import XCTest
+
 @testable import RillCore
 
 final class WorkspacePersistenceTests: XCTestCase {
     private func withFile(_ body: (URL) throws -> Void) throws {
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+            UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }
         try body(directory.appendingPathComponent("workspace.json"))
     }
@@ -37,15 +39,20 @@ final class WorkspacePersistenceTests: XCTestCase {
     }
     func testUnknownSchemaAndCorruptionAreNeverOverwritten() throws {
         try withFile { file in
-            var workspace = Workspace.starter; workspace.version = 99
-            try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+            var workspace = Workspace.starter
+            workspace.version = 99
+            try FileManager.default.createDirectory(
+                at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
             let unsupported = try JSONEncoder().encode(workspace)
             try unsupported.write(to: file)
             let repository = WorkspaceRepository(url: file)
-            XCTAssertThrowsError(try repository.load()) { XCTAssertEqual($0 as? WorkspaceError, .unsupportedVersion(99)) }
+            XCTAssertThrowsError(try repository.load()) {
+                XCTAssertEqual($0 as? WorkspaceError, .unsupportedVersion(99))
+            }
             XCTAssertThrowsError(try repository.commit(.starter, expecting: .absent))
             XCTAssertEqual(try Data(contentsOf: file), unsupported)
-            let corrupt = Data("{broken".utf8); try corrupt.write(to: file)
+            let corrupt = Data("{broken".utf8)
+            try corrupt.write(to: file)
             XCTAssertThrowsError(try repository.load())
             XCTAssertThrowsError(try repository.commit(.starter, expecting: .absent))
             XCTAssertEqual(try Data(contentsOf: file), corrupt)
@@ -53,12 +60,17 @@ final class WorkspacePersistenceTests: XCTestCase {
     }
     func testStaleWriterCannotReplaceNewerWorkspace() throws {
         try withFile { file in
-            let first = WorkspaceRepository(url: file), second = WorkspaceRepository(url: file)
-            let a = try first.load(), b = try second.load()
-            var updated = a.workspace; updated.requests[0].name = "Newer edit"
+            let first = WorkspaceRepository(url: file)
+            let second = WorkspaceRepository(url: file)
+            let a = try first.load()
+            let b = try second.load()
+            var updated = a.workspace
+            updated.requests[0].name = "Newer edit"
             let revision = try first.commit(updated, expecting: a.revision)
             XCTAssertNotEqual(revision, a.revision)
-            XCTAssertThrowsError(try second.commit(b.workspace, expecting: b.revision)) { XCTAssertEqual($0 as? WorkspaceError, .conflict) }
+            XCTAssertThrowsError(try second.commit(b.workspace, expecting: b.revision)) {
+                XCTAssertEqual($0 as? WorkspaceError, .conflict)
+            }
             XCTAssertEqual(try first.load().workspace.requests[0].name, "Newer edit")
         }
     }
@@ -68,11 +80,14 @@ final class WorkspacePersistenceTests: XCTestCase {
             let initial = try repository.load()
             _ = try repository.commit(initial.workspace, expecting: initial.revision)
             let snapshot = try repository.load()
-            var external = snapshot.workspace; external.requests[0].name = "External"
+            var external = snapshot.workspace
+            external.requests[0].name = "External"
             try WorkspaceFile.save(external, to: file)
-            XCTAssertThrowsError(try repository.commit(snapshot.workspace, expecting: snapshot.revision))
+            XCTAssertThrowsError(
+                try repository.commit(snapshot.workspace, expecting: snapshot.revision))
             try FileManager.default.removeItem(at: file)
-            XCTAssertThrowsError(try repository.commit(snapshot.workspace, expecting: snapshot.revision))
+            XCTAssertThrowsError(
+                try repository.commit(snapshot.workspace, expecting: snapshot.revision))
         }
     }
     func testHeldLockFailsWithoutBlockingOrChangingFile() throws {
@@ -80,12 +95,15 @@ final class WorkspacePersistenceTests: XCTestCase {
             try WorkspaceFile.save(.starter, to: file)
             let repository = WorkspaceRepository(url: file)
             let snapshot = try repository.load()
-            let descriptor = Darwin.open(file.appendingPathExtension("lock").path, O_RDWR | O_CREAT, 0o600)
+            let descriptor = Darwin.open(
+                file.appendingPathExtension("lock").path, O_RDWR | O_CREAT, 0o600)
             XCTAssertGreaterThanOrEqual(descriptor, 0)
             defer { Darwin.close(descriptor) }
             XCTAssertEqual(flock(descriptor, LOCK_EX | LOCK_NB), 0)
             defer { flock(descriptor, LOCK_UN) }
-            XCTAssertThrowsError(try repository.commit(snapshot.workspace, expecting: snapshot.revision)) { XCTAssertEqual($0 as? WorkspaceError, .unavailable) }
+            XCTAssertThrowsError(
+                try repository.commit(snapshot.workspace, expecting: snapshot.revision)
+            ) { XCTAssertEqual($0 as? WorkspaceError, .unavailable) }
         }
     }
     func testWorkspaceFilePermissionsArePrivate() throws {
@@ -96,10 +114,14 @@ final class WorkspacePersistenceTests: XCTestCase {
         }
     }
     func testOversizedWorkspaceAndDeepJSONAreRejected() throws {
-        XCTAssertThrowsError(try WorkspaceFile.decode(Data(repeating: 32, count: ResourceLimits.workspaceBytes + 1))) { XCTAssertEqual($0 as? WorkspaceError, .tooLarge) }
+        XCTAssertThrowsError(
+            try WorkspaceFile.decode(Data(repeating: 32, count: ResourceLimits.workspaceBytes + 1))
+        ) { XCTAssertEqual($0 as? WorkspaceError, .tooLarge) }
         let depth = ResourceLimits.jsonDepth + 1
         let deep = String(repeating: "[", count: depth) + "0" + String(repeating: "]", count: depth)
-        XCTAssertThrowsError(try WorkspaceFile.decode(Data(deep.utf8))) { XCTAssertEqual($0 as? WorkspaceError, .tooDeep) }
+        XCTAssertThrowsError(try WorkspaceFile.decode(Data(deep.utf8))) {
+            XCTAssertEqual($0 as? WorkspaceError, .tooDeep)
+        }
     }
     func testBracketsAndEscapesInsideStringsDoNotCountAsNesting() throws {
         var workspace = Workspace.starter
@@ -111,7 +133,8 @@ final class WorkspacePersistenceTests: XCTestCase {
         try withFile { file in
             let workspace = Workspace.starter
             // Represents the original version-one encoding without extra envelope fields.
-            try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try FileManager.default.createDirectory(
+                at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
             try JSONEncoder().encode(workspace).write(to: file)
             let repository = WorkspaceRepository(url: file)
             let loaded = try repository.load()
@@ -147,10 +170,13 @@ final class WorkspacePersistenceTests: XCTestCase {
             let repository = WorkspaceRepository(url: file)
             let initial = try repository.load()
             _ = try repository.commit(initial.workspace, expecting: initial.revision)
-            let a = try repository.load(), b = try repository.load()
+            let a = try repository.load()
+            let b = try repository.load()
             let next = try repository.commit(a.workspace, expecting: a.revision)
             XCTAssertNotEqual(next, a.revision)
-            XCTAssertThrowsError(try repository.commit(b.workspace, expecting: b.revision)) { XCTAssertEqual($0 as? WorkspaceError, .conflict) }
+            XCTAssertThrowsError(try repository.commit(b.workspace, expecting: b.revision)) {
+                XCTAssertEqual($0 as? WorkspaceError, .conflict)
+            }
         }
     }
     func testCompanionFailureReceivesCommittedRevisionForRetry() throws {
@@ -158,10 +184,12 @@ final class WorkspacePersistenceTests: XCTestCase {
             let repository = WorkspaceRepository(url: file)
             let snapshot = try repository.load()
             var committed: WorkspaceRevision?
-            XCTAssertThrowsError(try repository.commit(snapshot.workspace, expecting: snapshot.revision) { revision in
-                committed = revision
-                throw WorkspaceError.unavailable
-            })
+            XCTAssertThrowsError(
+                try repository.commit(snapshot.workspace, expecting: snapshot.revision) {
+                    revision in
+                    committed = revision
+                    throw WorkspaceError.unavailable
+                })
             let accepted = try XCTUnwrap(committed)
             XCTAssertEqual(try repository.load().revision, accepted)
             XCTAssertNoThrow(try repository.commit(snapshot.workspace, expecting: accepted))

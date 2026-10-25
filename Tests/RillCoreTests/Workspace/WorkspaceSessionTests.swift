@@ -1,4 +1,5 @@
 import XCTest
+
 @testable import RillCore
 
 final class TestCredentials: CredentialStore, @unchecked Sendable {
@@ -8,7 +9,10 @@ final class TestCredentials: CredentialStore, @unchecked Sendable {
     private var failWrite = false
     private var writeCount = 0
     func failures(read: Bool = false, write: Bool = false) {
-        lock.withLock { failRead = read; failWrite = write }
+        lock.withLock {
+            failRead = read
+            failWrite = write
+        }
     }
     func read(_ id: UUID) throws -> String {
         try lock.withLock {
@@ -20,8 +24,7 @@ final class TestCredentials: CredentialStore, @unchecked Sendable {
         try lock.withLock {
             if failWrite { throw NSError(domain: NSOSStatusErrorDomain, code: -1) }
             writeCount += 1
-            if value.isEmpty { values.removeValue(forKey: id) }
-            else { values[id] = value }
+            if value.isEmpty { values.removeValue(forKey: id) } else { values[id] = value }
         }
     }
     var count: Int { lock.withLock { writeCount } }
@@ -30,7 +33,8 @@ final class TestCredentials: CredentialStore, @unchecked Sendable {
 
 @MainActor final class WorkspaceSessionTests: XCTestCase {
     private func temporary() throws -> URL {
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+            UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         return directory.appendingPathComponent("workspace.json")
     }
@@ -40,10 +44,17 @@ final class TestCredentials: CredentialStore, @unchecked Sendable {
         let original = Workspace.starter
         try WorkspaceFile.save(original, to: file)
         let bytes = try Data(contentsOf: file)
-        let credentials = TestCredentials(); credentials.failures(read: true)
+        let credentials = TestCredentials()
+        credentials.failures(read: true)
         let session = WorkspaceSession(url: file, credentials: credentials)
-        do { _ = try await session.open(); XCTFail("Denied credential read was accepted") } catch { }
-        do { try await session.save(original); XCTFail("Unopened session saved") } catch { }
+        do {
+            _ = try await session.open()
+            XCTFail("Denied credential read was accepted")
+        } catch {}
+        do {
+            try await session.save(original)
+            XCTFail("Unopened session saved")
+        } catch {}
         XCTAssertEqual(try Data(contentsOf: file), bytes)
         XCTAssertEqual(credentials.count, 0)
     }
@@ -55,12 +66,16 @@ final class TestCredentials: CredentialStore, @unchecked Sendable {
         var workspace = try await session.open()
         workspace.requests[0].credential = "pending-secret"
         credentials.failures(write: true)
-        do { try await session.save(workspace); XCTFail("Credential write failure was ignored") } catch { }
+        do {
+            try await session.save(workspace)
+            XCTFail("Credential write failure was ignored")
+        } catch {}
         XCTAssertEqual(try WorkspaceFile.load(from: file).requests[0].credential, "")
         credentials.failures()
         try await session.save(workspace)
         XCTAssertEqual(try credentials.read(workspace.requests[0].id), "pending-secret")
-        XCTAssertFalse(String(decoding: try Data(contentsOf: file), as: UTF8.self).contains("pending-secret"))
+        XCTAssertFalse(
+            String(decoding: try Data(contentsOf: file), as: UTF8.self).contains("pending-secret"))
     }
     func testUnchangedCredentialsAreNotRewrittenAndDeletionFollowsSuccessfulSave() async throws {
         let file = try temporary()
@@ -89,11 +104,14 @@ final class TestCredentials: CredentialStore, @unchecked Sendable {
         try await seed.save(initial)
         let first = WorkspaceSession(url: file, credentials: credentials)
         let second = WorkspaceSession(url: file, credentials: credentials)
-        var a = try await first.open(), b = try await second.open()
+        var a = try await first.open()
+        var b = try await second.open()
         a.requests[0].credential = "new-secret"
         try await first.save(a)
-        do { try await second.save(b); XCTFail("Stale credential write was accepted") }
-        catch { XCTAssertEqual(error as? WorkspaceError, .conflict) }
+        do {
+            try await second.save(b)
+            XCTFail("Stale credential write was accepted")
+        } catch { XCTAssertEqual(error as? WorkspaceError, .conflict) }
         XCTAssertEqual(try credentials.read(a.requests[0].id), "new-secret")
     }
 }
