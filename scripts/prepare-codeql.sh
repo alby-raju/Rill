@@ -8,7 +8,7 @@ for RILL_UPSTREAM_TARGET in Yams ZIPFoundation GRPCNIOTransportHTTP2TransportSer
 done
 # Fail rather than silently analyzing a reused first-party module if this script
 # is accidentally changed to build the root products in future.
-if find .build -type d \( -name Rill.build -o -name RillCore.build -o -name RillCLI.build \) -print -quit | grep -q .; then
+if find .build -type f \( -name Rill.swiftmodule -o -name RillCore.swiftmodule -o -name RillCLI.swiftmodule \) -print -quit | grep -q .; then
   echo 'First-party build output exists before CodeQL extraction.' >&2
   exit 1
 fi
