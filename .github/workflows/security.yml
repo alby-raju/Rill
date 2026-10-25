@@ -75,7 +75,8 @@ jobs:
         if: matrix.language == 'swift' && needs.plan.outputs.native == 'true'
         env:
           DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
-        run: swift build --configuration release
+        # Extraction needs compiled source, not release optimizer work.
+        run: swift build --configuration debug
       - if: matrix.language != 'swift' || needs.plan.outputs.native == 'true'
         uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
         with:
