@@ -48,15 +48,54 @@ public enum WorkspaceOperations {
         workspace.requests.append(copy)
         return copy
     }
+    public static func copy(
+        _ request: RequestDraft, to collectionID: UUID?, in workspace: inout Workspace
+    ) throws -> RequestDraft {
+        try validateDestination(collectionID, in: workspace)
+        var copy = request
+        copy.id = UUID()
+        copy.name += " copy"
+        copy.collectionID = collectionID
+        let anchor = workspace.requests.lastIndex { $0.collectionID == collectionID }
+        workspace.requests.insert(copy, at: anchor.map { $0 + 1 } ?? workspace.requests.endIndex)
+        return copy
+    }
+    public static func relocate(_ id: UUID, to collectionID: UUID?, in workspace: inout Workspace)
+        throws
+    {
+        try validateDestination(collectionID, in: workspace)
+        guard let index = workspace.requests.firstIndex(where: { $0.id == id }) else {
+            throw EditingError.missingItem
+        }
+        guard workspace.requests[index].collectionID != collectionID else { return }
+        var request = workspace.requests.remove(at: index)
+        request.collectionID = collectionID
+        let anchor = workspace.requests.lastIndex { $0.collectionID == collectionID }
+        workspace.requests.insert(request, at: anchor.map { $0 + 1 } ?? workspace.requests.endIndex)
+    }
+    private static func validateDestination(_ id: UUID?, in workspace: Workspace) throws {
+        guard id == nil || workspace.collections.contains(where: { $0.id == id }) else {
+            throw EditingError.missingItem
+        }
+    }
     public static func move(
+        _ id: UUID, before target: UUID, after: Bool = false, in workspace: inout Workspace
+    ) throws {
+        guard let source = workspace.requests.first(where: { $0.id == id }),
+            let destination = workspace.requests.first(where: { $0.id == target }),
+            source.collectionID == destination.collectionID
+        else { throw EditingError.missingItem }
+        try place(id, before: target, after: after, in: &workspace)
+    }
+    public static func place(
         _ id: UUID, before target: UUID, after: Bool = false, in workspace: inout Workspace
     ) throws {
         guard id != target else { return }
         guard let source = workspace.requests.firstIndex(where: { $0.id == id }),
-            let destination = workspace.requests.first(where: { $0.id == target }),
-            workspace.requests[source].collectionID == destination.collectionID
+            let destination = workspace.requests.first(where: { $0.id == target })
         else { throw EditingError.missingItem }
-        let request = workspace.requests.remove(at: source)
+        var request = workspace.requests.remove(at: source)
+        request.collectionID = destination.collectionID
         let anchor = workspace.requests.firstIndex { $0.id == target }!
         workspace.requests.insert(request, at: anchor + (after ? 1 : 0))
     }

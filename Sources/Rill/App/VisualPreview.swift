@@ -67,12 +67,92 @@ import SwiftUI
                 guard
                     let window = NSApplication.shared.windows.first(where: {
                         $0.contentView != nil && $0.isVisible
-                    }), let view = window.contentView
+                    }), var view = window.contentView
                 else { finish(1) }
                 let compact = argument("--ui-width").flatMap(Double.init) ?? 1440
                 window.setContentSize(NSSize(width: max(1050, compact), height: 920))
+                func showSurface(_ host: NSView, size: NSSize) {
+                    let panel = NSWindow(
+                        contentRect: NSRect(origin: .zero, size: size), styleMask: [.borderless],
+                        backing: .buffered, defer: false)
+                    panel.contentView = host
+                    host.appearance = NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)
+                    panel.appearance = NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)
+                    window.addChildWindow(panel, ordered: .above)
+                    panel.orderFront(nil)
+                }
+                if let state = argument("--ui-state"), let store = previewStore {
+                    if state == "environment-empty" || state == "environment-editor" {
+                        if state == "environment-editor" {
+                            var local = RillCore.Environment(name: "Local development")
+                            local.variables = [
+                                Field(name: "base_url", value: "http://localhost:8080"),
+                                Field(name: "api_version", value: "v1"),
+                            ]
+                            store.workspace.environments = [
+                                local, RillCore.Environment(name: "Staging"),
+                            ]
+                            store.workspace.selectedEnvironmentID = local.id
+                        }
+                        let host = NSHostingView(
+                            rootView: EnvironmentEditor().environmentObject(store)
+                                .preferredColorScheme(scheme))
+                        showSurface(host, size: NSSize(width: 900, height: 590))
+                        view = host
+                    } else if state == "copy-request" || state == "move-request",
+                        let request = store.workspace.requests.first
+                    {
+                        store.workspace.collections = [
+                            RequestCollection(name: "Customer API"),
+                            RequestCollection(name: "Archived requests"),
+                        ]
+                        store.workspace.requests[0].collectionID = store.workspace.collections[0].id
+                        let host = NSHostingView(
+                            rootView: RequestTransferSheet(
+                                transfer: RequestTransfer(
+                                    requestID: request.id, copy: state == "copy-request")
+                            ).environmentObject(store).preferredColorScheme(scheme))
+                        showSurface(host, size: NSSize(width: 510, height: 510))
+                        view = host
+                    }
+                }
                 view.layoutSubtreeIfNeeded()
                 try await Task.sleep(for: .milliseconds(introduction ? 30 : 300))
+                if argument("--ui-state") == "collection-transfer", let store = previewStore,
+                    var request = store.workspace.requests.first
+                {
+                    let first = RequestCollection(name: "Customer API")
+                    let second = RequestCollection(name: "Archived requests")
+                    store.workspace.collections = [first, second]
+                    request.collectionID = first.id
+                    store.workspace.requests = [request]
+                    var draft = request
+                    draft.body = "unsaved synthetic payload"
+                    try store.editor.update(draft, savedIn: store.workspace)
+                    try store.transferRequest(request.id, to: second.id, copy: false)
+                    precondition(
+                        store.workspace.requests[0].id == request.id
+                            && store.workspace.requests[0].body == request.body)
+                    precondition(
+                        store.editor.request(request.id, in: store.workspace)?.body == draft.body
+                            && store.editor.request(request.id, in: store.workspace)?.collectionID
+                                == second.id
+                    )
+                    try store.transferRequest(request.id, to: first.id, copy: true)
+                    guard let copy = store.workspace.requests.first(where: { $0.id != request.id })
+                    else { preconditionFailure("Copy missing") }
+                    precondition(copy.body == draft.body && copy.collectionID == first.id)
+                    store.reorder(request.id, target: copy.id, after: false)
+                    precondition(
+                        store.workspace.requests.first?.id == request.id
+                            && store.editor.request(request.id, in: store.workspace)?.collectionID
+                                == first.id
+                    )
+                    print(
+                        "Collection transfer: visible draft copied; move/reorder retain identity and unsaved payload"
+                    )
+                    view.layoutSubtreeIfNeeded()
+                }
                 if argument("--ui-state") == "tabs-close", let store = previewStore {
                     let start = ProcessInfo.processInfo.systemUptime
                     store.closeTabs(.all)

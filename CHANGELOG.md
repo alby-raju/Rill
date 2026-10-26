@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.1 — Import and collection experience
+
+- Preserve unselected Postman binary/multipart upload placeholders and multiple selected files, with explicit local reselection warnings.
+- Add Copy/Move collection selection and cross-collection drag placement while retaining identities and unsaved edits when moving.
+- Replace nested environment/layout choices with direct controls and give the environment editor a full-height, actionable empty state.
+
 ## 0.4.0 — MVP development
 
 - Organize app/core/test source by feature area and apply consistent first-party code formatting.

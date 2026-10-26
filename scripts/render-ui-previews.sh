@@ -19,6 +19,11 @@ executable, root, mode = sys.argv[1], Path(sys.argv[2]), sys.argv[3]
 destination = root / ("docs/images" if mode == "--screenshots" else "dist/ui-review")
 destination.mkdir(parents=True, exist_ok=True)
 states = [
+    ("environment-empty", "dark", 1440),
+    ("environment-editor", "light", 1440),
+    ("copy-request", "dark", 1440),
+    ("collection-transfer", "dark", 1440),
+    ("move-request", "light", 1440),
     ("empty", "dark", 1440),
     ("empty", "light", 1050),
     ("blank", "light", 1050),

@@ -397,13 +397,28 @@ import UniformTypeIdentifiers
     func duplicate(_ request: RequestDraft) {
         guard canEdit else { return }
         attempt {
-            // Duplicate the visible draft rather than silently losing its settings.
-            var copy = request
-            copy.id = UUID()
-            copy.name += " copy"
-            workspace.requests.append(copy)
+            let copy = try WorkspaceOperations.copy(
+                request, to: request.collectionID, in: &workspace)
             selection = copy.id
         }
+    }
+    func transferRequest(_ id: UUID, to collectionID: UUID?, copy: Bool) throws {
+        guard canEdit, let request = editor.request(id, in: workspace) else {
+            throw EditingError.missingItem
+        }
+        if copy {
+            let duplicate = try WorkspaceOperations.copy(request, to: collectionID, in: &workspace)
+            selection = duplicate.id
+        } else {
+            if workspace.requests.contains(where: { $0.id == id }) {
+                try WorkspaceOperations.relocate(id, to: collectionID, in: &workspace)
+            }
+            if let index = editor.drafts.firstIndex(where: { $0.id == id }) {
+                editor.drafts[index].collectionID = collectionID
+            }
+        }
+        focusedCollectionID = collectionID
+        persist()
     }
     func delete(_ request: RequestDraft) {
         let alert = NSAlert()
@@ -417,7 +432,14 @@ import UniformTypeIdentifiers
         selection = editor.activeID
     }
     func reorder(_ id: UUID, target: UUID, after: Bool) {
-        attempt { try WorkspaceOperations.move(id, before: target, after: after, in: &workspace) }
+        guard canEdit else { return }
+        attempt {
+            try WorkspaceOperations.place(id, before: target, after: after, in: &workspace)
+            if let index = editor.drafts.firstIndex(where: { $0.id == id }) {
+                editor.drafts[index].collectionID =
+                    workspace.requests.first(where: { $0.id == id })?.collectionID
+            }
+        }
     }
     func reorderSelected(_ offset: Int) {
         if let selection {

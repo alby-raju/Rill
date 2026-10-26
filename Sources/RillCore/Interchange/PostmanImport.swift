@@ -270,6 +270,16 @@ public enum PostmanImporter {
                 request.credential = fields["value"] ?? ""
             }
         }
+        func uploadReference(_ value: Any?) throws -> UploadFileReference? {
+            if value == nil || value is NSNull || (value as? String) == "" {
+                warnings.insert(
+                    "Unselected upload placeholders were preserved. Select a local file for each enabled upload before Send."
+                )
+                return nil
+            }
+            guard let path = value as? String else { throw PostmanImportError.unsupported }
+            return try CommandImporter.reference(path)
+        }
         func bodyFields(_ body: [String: Any], request: inout RequestDraft) throws {
             switch body["mode"] as? String {
             case "raw":
@@ -306,7 +316,8 @@ public enum PostmanImporter {
                     }
                 } else {
                     request.bodyMode = .multipart
-                    request.multipartParts = try rows.map { row in
+                    var partCount = 0
+                    request.multipartParts = try rows.flatMap { row -> [MultipartPart] in
                         guard let name = row["key"] as? String else {
                             throw PostmanImportError.invalid
                         }
@@ -314,32 +325,52 @@ public enum PostmanImporter {
                         part.name = name
                         part.enabled = !(row["disabled"] as? Bool ?? false)
                         if row["type"] as? String == "file" {
-                            guard let path = row["src"] as? String else {
-                                throw PostmanImportError.unsupported
-                            }
                             part.kind = .file
-                            part.contentType = "application/octet-stream"
-                            part.file = try CommandImporter.reference(path)
-                            part.filename = URL(fileURLWithPath: path).lastPathComponent
+                            part.contentType =
+                                row["contentType"] as? String ?? "application/octet-stream"
+                            let sources: [Any?]
+                            if let paths = row["src"] as? [Any] {
+                                guard paths.count <= 10_000 else {
+                                    throw PostmanImportError.invalid
+                                }
+                                sources = paths.isEmpty ? [nil] : paths.map { Optional($0) }
+                            } else {
+                                sources = [row["src"]]
+                            }
+                            partCount += sources.count
+                            guard partCount <= 10_000 else { throw PostmanImportError.invalid }
+                            return try sources.map { source in
+                                var upload = part
+                                upload.id = UUID()
+                                upload.file = try uploadReference(source)
+                                upload.filename =
+                                    upload.file.map {
+                                        URL(fileURLWithPath: $0.path).lastPathComponent
+                                    } ?? ""
+                                return upload
+                            }
                         } else if row["type"] == nil || row["type"] as? String == "text" {
                             part.value = try text(row["value"])
                         } else {
                             throw PostmanImportError.unsupported
                         }
                         if let mime = row["contentType"] as? String { part.contentType = mime }
-                        return part
+                        partCount += 1
+                        guard partCount <= 10_000 else { throw PostmanImportError.invalid }
+                        return [part]
                     }
                 }
             case "file":
-                guard let file = body["file"] as? [String: Any], let path = file["src"] as? String
-                else { throw PostmanImportError.unsupported }
+                guard let file = body["file"] as? [String: Any] else {
+                    throw PostmanImportError.unsupported
+                }
                 if !request.headers.contains(where: {
                     $0.enabled && $0.name.lowercased() == "content-type"
                 }) {
                     request.contentType = "application/octet-stream"
                 }
                 request.bodyMode = .binary
-                request.binaryFile = try CommandImporter.reference(path)
+                request.binaryFile = try uploadReference(file["src"])
             default: throw PostmanImportError.unsupported
             }
         }
