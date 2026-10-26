@@ -37,6 +37,28 @@ class RepositoryChecks(unittest.TestCase):
         ]:
             self.assertFalse(plan.docs_only(paths))
 
+    def test_forms_and_tested_planner_changes_do_not_rebuild_the_app(self):
+        plan = load("ci-plan")
+        self.assertTrue(
+            plan.repository_only(
+                [
+                    "docs/CODE_OF_CONDUCT.md",
+                    ".github/DISCUSSION_TEMPLATE/q-a.yml",
+                    "scripts/ci-plan.py",
+                    "scripts/tests/test_repository_checks.py",
+                ]
+            )
+        )
+        for paths in [
+            [],
+            [".github/workflows/security.yml"],
+            ["scripts/prepare-codeql.sh"],
+            ["Package.swift"],
+            [".github/DISCUSSION_TEMPLATE/run.sh"],
+            ["Sources/Rill/App/RillApp.swift", ".github/DISCUSSION_TEMPLATE/q-a.yml"],
+        ]:
+            self.assertFalse(plan.repository_only(paths))
+
     def test_vulnerability_scan_rejects_matches_and_incomplete_service_results(self):
         audit = load("security-audit")
         count = len(json.loads((audit.ROOT / "Package.resolved").read_text())["pins"]) + 1

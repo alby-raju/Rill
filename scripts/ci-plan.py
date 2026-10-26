@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Conservative docs-only PR detection; unknown changes always require native CI."""
+"""Skip native CI only for explicit docs/forms/planner-only changes; fail closed."""
 
 import json
 import os
@@ -30,6 +30,26 @@ def docs_only(paths):
     )
 
 
+def repository_only(paths):
+    # These Python files have dedicated tests, workflow lint and Python CodeQL.
+    # Changes to other scripts, workflows, dependencies or product code still build.
+    planning = {
+        "scripts/ci-plan.py",
+        "scripts/check-docs.py",
+        "scripts/tests/test_repository_checks.py",
+    }
+    return bool(paths) and all(
+        docs_only([name])
+        or name in planning
+        or (
+            Path(name).parent.as_posix()
+            in {".github/DISCUSSION_TEMPLATE", ".github/ISSUE_TEMPLATE"}
+            and Path(name).suffix == ".yml"
+        )
+        for name in paths
+    )
+
+
 def main():
     event = os.environ["GITHUB_EVENT_NAME"]
     native = True
@@ -51,7 +71,7 @@ def main():
             .rstrip("\0")
             .split("\0")
         )
-        native = not docs_only(changed)
+        native = not repository_only(changed)
     matrix = {"include": FULL if event in {"schedule", "workflow_dispatch"} else [PRIMARY]}
     with open(os.environ["GITHUB_OUTPUT"], "a") as output:
         output.write("native=" + str(native).lower() + "\n")

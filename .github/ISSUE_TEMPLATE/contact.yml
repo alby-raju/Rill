@@ -1,0 +1,22 @@
+name: Request a private maintainer contact channel
+description: Request contact without posting sensitive details publicly.
+body:
+  - type: markdown
+    attributes:
+      value: "This request will be public. Do not include names, allegations, personal information, screenshots or vulnerability details. For vulnerabilities use Security > Report a vulnerability. For abuse use GitHub's Report content tools. This form is only a request to arrange maintainer contact; no response-time guarantee is offered."
+  - type: dropdown
+    id: topic
+    attributes:
+      label: Contact category
+      options:
+        - Community moderation
+        - Other private project matter
+    validations:
+      required: true
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Keep this request non-sensitive
+      options:
+        - label: I am requesting a private channel and have not included sensitive details.
+          required: true

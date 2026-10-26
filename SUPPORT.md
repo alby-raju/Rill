@@ -1,5 +1,7 @@
 # Getting help
 
+Use [Q&A Discussions](https://github.com/alby-raju/Rill/discussions/categories/q-a) for usage questions and mark a helpful answer when your question is resolved. Explore larger proposals in [Ideas](https://github.com/alby-raju/Rill/discussions/categories/ideas), and share synthetic workflows in [Show and tell](https://github.com/alby-raju/Rill/discussions/categories/show-and-tell). Announcements contain maintainer updates; General and Polls are available for broader community conversations.
+
 Use [GitHub Issues](https://github.com/alby-raju/Rill/issues) for reproducible bugs and focused feature requests. Search existing issues first. Security reports follow [SECURITY.md](SECURITY.md), not a public bug report.
 
 For a bug, include:
@@ -12,3 +14,5 @@ For a bug, include:
 For CLI failures include the command with secrets replaced, exit code and whether stdout was human output or `--json`. For a slow interaction, describe when the delay occurs and how many tabs/requests or bytes are involved. Collect process samples only with explicit consent and keep raw samples private.
 
 An MVP has supported subsets. Check [FEATURES.md](docs/FEATURES.md) before relying on import, protocol, script or schema compatibility. A feature request should describe the workflow and expected outcome rather than assume another tool's implementation can be reused.
+
+Follow the [community conduct policy](docs/CODE_OF_CONDUCT.md). Maintainer availability varies; community channels do not provide a response-time or feature-delivery guarantee.
