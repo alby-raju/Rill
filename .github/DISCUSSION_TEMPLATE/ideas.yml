@@ -1,0 +1,23 @@
+body:
+  - type: markdown
+    attributes:
+      value: "Explore an idea before proposing a large change. Focus on the user problem; maintainers can turn an agreed, actionable proposal into a feature issue. No delivery dates are implied."
+  - type: textarea
+    id: problem
+    attributes:
+      label: What workflow needs improvement?
+      description: Explain who is affected and what is difficult today.
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: What would a good outcome look like?
+      description: Include a concrete example and relevant protocol or format limits.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives, workarounds and tradeoffs
+      description: Consider complexity, accessibility, privacy and maintenance cost. Do not copy proprietary code.

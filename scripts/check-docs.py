@@ -12,6 +12,7 @@ REQUIRED = [
     "CONTRIBUTING.md",
     "LICENSE",
     "SECURITY.md",
+    "docs/CODE_OF_CONDUCT.md",
     "SUPPORT.md",
     "CHANGELOG.md",
     "ROADMAP.md",

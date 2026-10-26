@@ -1,0 +1,22 @@
+body:
+  - type: markdown
+    attributes:
+      value: "Share a Rill workflow, integration or first-party example. Use synthetic data and explain dependencies or limitations. Do not upload credentials, customer data or private workspaces."
+  - type: input
+    id: summary
+    attributes:
+      label: What did you make or learn?
+    validations:
+      required: true
+  - type: textarea
+    id: example
+    attributes:
+      label: Walkthrough or example
+      description: Include Rill version, setup steps and redacted screenshots or public links where useful.
+    validations:
+      required: true
+  - type: textarea
+    id: limits
+    attributes:
+      label: Requirements and limitations
+      description: Describe any extra services, cost, unsupported behavior or third-party licensing.
