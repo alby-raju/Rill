@@ -124,6 +124,7 @@ class Handler(BaseHTTPRequestHandler):
 servers = []
 for port, require_client in [(18750, False), (18751, True)]:
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
     context.load_cert_chain(root / "server.pem", root / "server.key")
     if require_client:
         context.load_verify_locations(root / "ca.pem")
