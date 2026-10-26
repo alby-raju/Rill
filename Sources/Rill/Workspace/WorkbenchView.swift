@@ -7,6 +7,7 @@ struct WorkbenchView: View {
     @SwiftUI.Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ViewState private var launchIntroductionFinished = false
     private var showingLaunch: Bool { store.loading || !launchIntroductionFinished }
+    @ViewState private var requestTransfer: RequestTransfer?
     @AppStorage("requestLayout") private var requestLayout = "automatic"
     var body: some View {
         NavigationSplitView {
@@ -66,6 +67,9 @@ struct WorkbenchView: View {
             } catch { /* A closed window does not need to finish its introduction. */  }
         }
         .tint(accent)
+        .sheet(item: $requestTransfer) {
+            RequestTransferSheet(transfer: $0).environmentObject(store)
+        }
         .sheet(isPresented: $store.showForeignScripts) {
             ForeignScriptReviewView().environmentObject(store)
         }
@@ -149,6 +153,18 @@ struct WorkbenchView: View {
                                 store.deleteCollection(collection)
                             }
                         }.onTapGesture { store.focusedCollectionID = collection.id }
+                        .dropDestination(for: String.self) { values, _ in
+                            guard let raw = values.first, let id = UUID(uuidString: raw) else {
+                                return false
+                            }
+                            do {
+                                try store.transferRequest(id, to: collection.id, copy: false)
+                                return true
+                            } catch {
+                                store.error = error.localizedDescription
+                                return false
+                            }
+                        }
                     }
                 }
                 if !filtered(nil).isEmpty {
@@ -228,6 +244,13 @@ struct WorkbenchView: View {
                     store.duplicate(
                         store.editor.request(request.id, in: store.workspace) ?? request)
                 }
+                Button("Copy to collection…") {
+                    requestTransfer = RequestTransfer(requestID: request.id, copy: true)
+                }
+                Button("Move to collection…") {
+                    requestTransfer = RequestTransfer(requestID: request.id, copy: false)
+                }
+                Divider()
                 Button("Move earlier") {
                     store.attempt {
                         try WorkspaceOperations.move(request.id, offset: -1, in: &store.workspace)
@@ -300,29 +323,8 @@ struct WorkbenchView: View {
             Image(systemName: "square.split.2x2").foregroundStyle(.secondary)
             Text("Workbench").font(.callout.weight(.medium))
             Spacer()
-            RillSelect(
-                title: "Environment", value: store.environment?.name ?? "No environment",
-                selection: Binding(
-                    get: { store.workspace.selectedEnvironmentID },
-                    set: {
-                        store.workspace.selectedEnvironmentID = $0
-                        store.persist()
-                    })
-            ) {
-                Text("No environment").tag(nil as UUID?)
-                ForEach(store.workspace.environments) { Text($0.name).tag(Optional($0.id)) }
-            }.frame(width: 190)
-            Menu {
-                Picker("Request layout", selection: $requestLayout) {
-                    Text("Automatic").tag("automatic")
-                    Text("Side by side").tag("horizontal")
-                    Text("Stacked").tag("vertical")
-                }
-            } label: {
-                Image(systemName: "rectangle.split.2x1")
-            }.menuStyle(.borderlessButton).frame(width: 28).help(
-                "Arrange request and response panels"
-            ).accessibilityLabel("Request and response layout")
+            EnvironmentSwitcher()
+            RequestLayoutSelector(selection: $requestLayout)
             Button {
                 store.showPalette = true
             } label: {

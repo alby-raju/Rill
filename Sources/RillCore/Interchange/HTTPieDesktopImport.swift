@@ -1,11 +1,13 @@
 import Foundation
 
 public enum HTTPieDesktopImportError: LocalizedError {
-    case invalid, unsupported
+    case invalid, unsupported, postmanCollection
     public var errorDescription: String? {
         switch self {
         case .invalid:
             "Expected a bounded HTTPie Desktop 1.0.0 JSON workspace, collection, request or environment export."
+        case .postmanCollection:
+            "This file is a Postman collection. Choose Import Postman JSON… to import it; it is not an HTTPie Desktop export."
         case .unsupported:
             "The HTTPie export contains an unsupported path parameter, auth, file-text body or malformed active body. No data was applied."
         }
@@ -21,8 +23,14 @@ public enum HTTPieDesktopImporter {
         try WorkspaceFile.checkJSONBounds(input)
         let data = input.starts(with: [0xef, 0xbb, 0xbf]) ? Data(input.dropFirst(3)) : input
         guard String(data: data, encoding: .utf8) != nil,
-            let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-            let meta = root["meta"] as? [String: Any], meta["format"] as? String == "httpie",
+            let root = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { throw HTTPieDesktopImportError.invalid }
+        if let info = root["info"] as? [String: Any], let schema = info["schema"] as? String,
+            URL(string: schema)?.host == "schema.getpostman.com"
+        {
+            throw HTTPieDesktopImportError.postmanCollection
+        }
+        guard let meta = root["meta"] as? [String: Any], meta["format"] as? String == "httpie",
             meta["version"] as? String == "1.0.0",
             let kind = meta["contentType"] as? String, let entry = root["entry"] as? [String: Any]
         else { throw HTTPieDesktopImportError.invalid }

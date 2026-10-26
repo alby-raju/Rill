@@ -6,7 +6,7 @@ This describes the MVP's implemented scope. Automated tests and an implemented c
 
 | Area | Available | Boundaries |
 |---|---|---|
-| Workspace | Collections, request CRUD/move/order, search, tabs/pins/reopen, separate drafts, inherited environments, checkpoints and backups | Checkpoints can lose edits since the last successful write. Closed-tab history retains the last 20 tabs. Backups omit credentials. |
+| Workspace | Collections, request CRUD/copy/move/order within and between collections, search, tabs/pins/reopen, separate drafts, inherited environments, checkpoints and backups | Checkpoints can lose edits since the last successful write. Closed-tab history retains the last 20 tabs. Backups omit credentials. |
 | Tab controls | Close one/all/left/right, one bulk Save All/Discard Changes/Cancel prompt | Explicit bulk actions include pinned tabs. Closing never deletes saved requests; Cancel keeps the whole target set open. |
 | Editors | Native undo, find, wrap, zoom, JSON/template styling/completion and lossless JSON formatting | Completion is not a language server. File uploads require local reselection if identity/size/time changes. |
 | HTTP | GET/POST/PUT/PATCH/DELETE/HEAD/OPTIONS, repeated query fields, headers, raw/form/multipart/binary bodies | GET/HEAD payloads are rejected by this transport. Header/body representability is validated before send. Redirects are same-origin only; timeout is 1–300 seconds. |
@@ -24,7 +24,7 @@ Default bounds include a 32 MiB workspace, 16 MiB HTTP response, 512 KiB preview
 - **Definitions:** Swagger 2/OpenAPI 3 JSON/YAML, local references, request/positive-contract generation and identity-preserving previewed refresh. External references are not fetched automatically.
 - **Schema:** an explicit subset of type/required/properties/additionalProperties, enum/const, array items, numeric/string/array/object limits, nullable, allOf/anyOf/oneOf and local JSON Pointer references. Unsupported rules must not silently pass; full dialect conformance is not claimed.
 - **Mocks/inspection:** editable loopback route/status/header/body mocks, passive header indicators and separately enabled bounded active probes. This is not full DAST or proof that an endpoint is secure.
-- **Formats:** native Rill; cURL/HTTPie commands; HTTPie Desktop 1.0.0; Postman v2.0/v2.1 collections/environments; Insomnia v4 JSON/v5 YAML; HAR; Bruno `.bru` file/folder/ZIP. Support differs by representation. Scoped variables, uncommon auth/body variants, cookies, plugins, transport settings and scripts may warn or reject. Bruno OpenCollection YAML is not implemented. File references are not attached files.
+- **Formats:** native Rill; cURL/HTTPie commands; HTTPie Desktop 1.0.0; Postman v2.0/v2.1 collections/environments; Insomnia v4 JSON/v5 YAML; HAR; Bruno `.bru` file/folder/ZIP. Support differs by representation. Scoped variables, uncommon auth/body variants, cookies, plugins, transport settings and scripts may warn or reject. Bruno OpenCollection YAML is not implemented. File references are not attached files. Postman unselected upload placeholders are retained with warnings; enabled uploads require local file selection before Send.
 - **Client generation:** cURL/HTTPie plus Python requests/httpx, Node fetch/axios, Java HttpClient/OkHttp, Go, Rust and C#. These are frozen-request source programs, not installed SDKs or universal wire-equivalence guarantees. Some header/body/TLS combinations reject explicitly; review generated source before sharing or execution.
 
 ## Live and broker protocols

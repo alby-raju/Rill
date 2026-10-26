@@ -67,7 +67,10 @@ struct RillSelect<Value: Hashable, Options: View>: View {
     @ViewBuilder var options: () -> Options
     var body: some View {
         Menu {
-            Section(title) { Picker(title, selection: $selection, content: options).labelsHidden() }
+            Section(title) {
+                Picker(title, selection: $selection, content: options).pickerStyle(.inline)
+                    .labelsHidden()
+            }
         } label: {
             HStack(spacing: 9) {
                 Text(value).lineLimit(1)

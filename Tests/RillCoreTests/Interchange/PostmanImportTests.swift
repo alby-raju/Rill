@@ -109,6 +109,84 @@ import XCTest
         XCTAssertEqual(result.workspace.requests[2].binaryFile?.byteCount, 0)
         XCTAssertTrue(result.warnings.contains { $0.contains("File paths were not read") })
     }
+    func testUnselectedUploadsAndMultipleFilesPreserveEditableRequests() throws {
+        let placeholders: [Any] = [NSNull(), "", []]
+        for source in placeholders {
+            let data = try collection([
+                item([
+                    "method": "POST", "url": "https://example.test/upload",
+                    "body": [
+                        "mode": "formdata",
+                        "formdata": [["key": "upload", "type": "file", "src": source]],
+                    ],
+                ])
+            ])
+            let imported = try PostmanImporter.parse(data)
+            XCTAssertEqual(imported.workspace.requests[0].multipartParts?.count, 1)
+            XCTAssertEqual(imported.workspace.requests[0].multipartParts?.first?.kind, .file)
+            XCTAssertNil(imported.workspace.requests[0].multipartParts?.first?.file)
+            XCTAssertThrowsError(
+                try UploadBody.create(imported.workspace.requests[0], environment: nil))
+            XCTAssertTrue(imported.warnings.contains { $0.contains("Unselected upload") })
+        }
+        let data = try collection([
+            item([
+                "method": "POST", "url": "https://example.test",
+                "body": ["mode": "file", "file": ["src": NSNull()]],
+            ]),
+            item([
+                "method": "POST", "url": "https://example.test",
+                "body": [
+                    "mode": "formdata",
+                    "formdata": [
+                        [
+                            "key": "upload", "type": "file",
+                            "src": ["/never/read/one", "/never/read/two"], "disabled": true,
+                        ]
+                    ],
+                ],
+            ]),
+        ])
+        let imported = try PostmanImporter.parse(data)
+        XCTAssertEqual(imported.workspace.requests[0].bodyMode, .binary)
+        XCTAssertNil(imported.workspace.requests[0].binaryFile)
+        XCTAssertThrowsError(
+            try UploadBody.create(imported.workspace.requests[0], environment: nil))
+        XCTAssertEqual(imported.workspace.requests[1].multipartParts?.count, 2)
+        XCTAssertTrue(
+            imported.workspace.requests[1].multipartParts?.allSatisfy { !$0.enabled } == true)
+        XCTAssertThrowsError(
+            try PostmanImporter.parse(
+                collection([
+                    item([
+                        "method": "POST", "url": "https://example.test",
+                        "body": ["mode": "file", "file": ["src": 42]],
+                    ])
+                ])))
+    }
+    func testMultipartExpansionRetainsPartBoundsAndWrongFormatHint() throws {
+        let files = Array(repeating: "/never/read/file", count: 5_001)
+        XCTAssertThrowsError(
+            try PostmanImporter.parse(
+                collection([
+                    item([
+                        "method": "POST", "url": "https://example.test",
+                        "body": [
+                            "mode": "formdata",
+                            "formdata": [
+                                ["key": "first", "type": "file", "src": files],
+                                ["key": "second", "type": "file", "src": files],
+                            ],
+                        ],
+                    ])
+                ])))
+        XCTAssertThrowsError(
+            try HTTPieDesktopImporter.parse(
+                collection([item(["method": "GET", "url": "https://example.test"])]))
+        ) { error in
+            XCTAssertTrue(error.localizedDescription.contains("Import Postman JSON"))
+        }
+    }
     func testEnvironmentMarkedSecretsTypedValuesAndDisabledState() throws {
         let data = try JSONSerialization.data(withJSONObject: [
             "_postman_variable_scope": "environment", "name": "Dev",
