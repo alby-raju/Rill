@@ -5,6 +5,8 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  schedule:
+    - cron: '41 3 * * 0'
   workflow_dispatch:
 
 permissions:
@@ -15,18 +17,38 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  plan:
+    name: Plan validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      native: ${{ steps.plan.outputs.native }}
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - id: plan
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python3 scripts/ci-plan.py
+      - run: python3 scripts/check-docs.py
+      - run: python3 -m unittest discover -s scripts/tests -v
+      - name: Check Python automation formatting
+        run: |
+          python3 -m venv "$RUNNER_TEMP/python-quality"
+          "$RUNNER_TEMP/python-quality/bin/pip" install -r requirements-dev.txt
+          "$RUNNER_TEMP/python-quality/bin/ruff" format --check scripts verification
+          "$RUNNER_TEMP/python-quality/bin/ruff" check scripts verification
   verify:
     name: Swift / ${{ matrix.runner }} / Xcode ${{ matrix.xcode }}
+    needs: plan
+    if: needs.plan.outputs.native == 'true'
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - runner: macos-15
-            xcode: '26.2'
-          - runner: macos-15-intel
-            xcode: '26.3'
-          - runner: macos-15
-            xcode: '26.3'
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     runs-on: ${{ matrix.runner }}
     # Cold Intel native runtime + protoc + debug test compilation can exceed 30m.
     timeout-minutes: 45
@@ -37,6 +59,17 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
+      - name: Identify exact build toolchain
+        id: toolchain
+        run: |
+          RILL_TOOLCHAIN_HASH="$( { xcodebuild -version; swift --version; xcrun --show-sdk-version; } | shasum -a 256 | cut -d ' ' -f 1)"
+          echo "fingerprint=$RILL_TOOLCHAIN_HASH" >> "$GITHUB_OUTPUT"
+      - name: Restore Swift build cache
+        id: cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: .build
+          key: swift-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.toolchain.outputs.fingerprint }}-${{ hashFiles('Package.swift', 'Package.resolved') }}
       - name: Show toolchain
         run: |
           xcodebuild -version
@@ -71,17 +104,25 @@ jobs:
       - name: Verify manual acceptance kit
         run: python3 verification/verify.py --cli "$(swift build --show-bin-path)/RillCLI"
       - name: Upload synthetic generated programs
-        if: matrix.runner == 'macos-15' && matrix.xcode == '26.2'
+        if: matrix.runner == 'macos-15' && matrix.xcode == '26.3'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: generated-client-fixtures
           path: ${{ runner.temp }}/rill-client-fixtures
           retention-days: 2
 
+      - name: Save trusted Swift build cache
+        if: github.event_name != 'pull_request' && steps.cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: .build
+          key: ${{ steps.cache.outputs.cache-primary-key }}
+
   clients:
     name: Compile and execute generated clients
-    needs: verify
-    runs-on: ubuntu-latest
+    needs: [plan, verify]
+    if: needs.plan.outputs.native == 'true'
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -91,9 +132,17 @@ jobs:
         with:
           name: generated-client-fixtures
           path: fixtures
-      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
-        with:
-          dotnet-version: '10.0.x'
+      - name: Select preinstalled .NET 10 SDK
+        run: |
+          dotnet --list-sdks
+          RILL_CLIENT_DOTNET_SDK="$(dotnet --list-sdks | awk '$1 ~ /^10[.]0[.][0-9]+$/ {print $1}' | sort -V | tail -n 1)"
+          if [ -z "$RILL_CLIENT_DOTNET_SDK" ]; then
+            echo 'The runner must provide a stable .NET 10 SDK; no rolling download fallback is used.' >&2
+            exit 1
+          fi
+          echo "RILL_CLIENT_DOTNET_SDK=$RILL_CLIENT_DOTNET_SDK" >> "$GITHUB_ENV"
+          echo "DOTNET_CLI_TELEMETRY_OPTOUT=1" >> "$GITHUB_ENV"
+          echo "DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1" >> "$GITHUB_ENV"
       - name: Install isolated test SDKs
         run: |
           python3 -m venv "$RUNNER_TEMP/client-python"
@@ -112,12 +161,21 @@ jobs:
   build-and-test:
     name: Build and test on macOS
     if: always()
-    needs: [verify, clients]
+    needs: [plan, verify, clients]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: Require every macOS configuration to pass
         env:
+          PLAN_RESULT: ${{ needs.plan.result }}
+          NATIVE_REQUIRED: ${{ needs.plan.outputs.native }}
           MATRIX_RESULT: ${{ needs.verify.result }}
           CLIENT_RESULT: ${{ needs.clients.result }}
-        run: test "$MATRIX_RESULT" = success && test "$CLIENT_RESULT" = success
+        run: |
+          test "$PLAN_RESULT" = success
+          if [ "$NATIVE_REQUIRED" = true ]; then
+            test "$MATRIX_RESULT" = success && test "$CLIENT_RESULT" = success
+          else
+            test "$NATIVE_REQUIRED" = false
+            test "$MATRIX_RESULT" = skipped && test "$CLIENT_RESULT" = skipped
+          fi

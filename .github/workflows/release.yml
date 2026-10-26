@@ -1,0 +1,94 @@
+name: Development release
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'New prerelease tag (v0.4.0-dev.1 format); never reuse a tag'
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: development-release
+  cancel-in-progress: false
+jobs:
+  validate:
+    permissions:
+      contents: read
+      checks: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Require main, new matching tag and green checks
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: python3 scripts/validate-release.py "$RELEASE_TAG"
+  build:
+    needs: validate
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15, macos-15-intel]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - run: python3 scripts/check-docs.py
+      - run: python3 scripts/security-audit.py
+      - run: bash scripts/test.sh
+      - run: python3 scripts/collect-dependency-notices.py --check
+      - run: bash scripts/release-artifacts.sh
+      - run: python3 scripts/build-verification-kit.py
+      - uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        with:
+          subject-path: dist/*.dmg
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-${{ matrix.runner }}
+          path: |
+            dist/*.dmg
+            dist/*.sha256
+            dist/*.provenance.json
+            dist/Rill-Verification-Kit.zip
+          if-no-files-found: error
+          retention-days: 14
+  draft:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: release-*
+          path: release-assets
+      - name: Stage complete draft prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir publish
+          cp release-assets/release-macos-15/*.dmg release-assets/release-macos-15/*.sha256 release-assets/release-macos-15/*.provenance.json publish/
+          cp release-assets/release-macos-15-intel/*.dmg release-assets/release-macos-15-intel/*.sha256 release-assets/release-macos-15-intel/*.provenance.json publish/
+          cp release-assets/release-macos-15/Rill-Verification-Kit.zip publish/
+          cp LICENSE THIRD_PARTY_NOTICES.txt Package.resolved publish/
+          (cd publish && sha256sum -- *.dmg *.zip LICENSE THIRD_PARTY_NOTICES.txt Package.resolved > SHA256SUMS)
+          gh release create "$RELEASE_TAG" publish/* --target "$GITHUB_SHA" --draft --prerelease --title "Rill $RELEASE_TAG — development preview" --notes-file .github/development-release-notes.md

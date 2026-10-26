@@ -1,5 +1,7 @@
 # Rill
 
+[![Swift CI](https://github.com/alby-raju/Rill/actions/workflows/swift.yml/badge.svg)](https://github.com/alby-raju/Rill/actions/workflows/swift.yml) [![Security](https://github.com/alby-raju/Rill/actions/workflows/security.yml/badge.svg)](https://github.com/alby-raju/Rill/actions/workflows/security.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 **A native macOS API workbench, built with Swift and SwiftUI.**
 
 Compose requests, inspect responses, run API workflows, and explore live protocols in a local workspace. Rill works without an account or hosted workspace. Its name comes from a small stream.

@@ -1,0 +1,10 @@
+changelog:
+  exclude:
+    labels: [duplicate, invalid]
+  categories:
+    - title: Security
+      labels: [security]
+    - title: Dependencies
+      labels: [dependencies]
+    - title: Improvements and fixes
+      labels: ['*']
