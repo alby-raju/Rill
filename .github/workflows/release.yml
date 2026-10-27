@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'New prerelease tag (v0.4.2-dev.1 format); never reuse a tag'
+        description: 'New prerelease tag (v0.4.3-dev.1 format); never reuse a tag'
         required: true
         type: string
 permissions:

@@ -1,3 +1,4 @@
+import RillCore
 import SwiftUI
 
 // Explicit type alias avoids macro/type name ambiguity in newer SDKs.
@@ -12,7 +13,7 @@ typealias ViewState<Value> = SwiftUI.State<Value>
             WorkbenchView().environmentObject(store).defaultAppStorage(RillPreview.preferences)
                 .onAppear {
                     delegate.store = store
-                    if let url = Bundle.module.url(forResource: "Rill", withExtension: "icns") {
+                    if let url = RillResources.url(forResource: "Rill", withExtension: "icns") {
                         NSApplication.shared.applicationIconImage = NSImage(contentsOf: url)
                     }
                 }
@@ -20,7 +21,10 @@ typealias ViewState<Value> = SwiftUI.State<Value>
                     RillPreview.scheme
                         ?? (appearance == "dark" ? .dark : appearance == "light" ? .light : nil)
                 )
-                .task { await RillPreview.captureIfRequested() }
+                .task {
+                    await InstallationCheck.verifyIfRequested()
+                    await RillPreview.captureIfRequested()
+                }
                 .frame(minWidth: 1050, minHeight: 700)
         }
         .windowStyle(.hiddenTitleBar)

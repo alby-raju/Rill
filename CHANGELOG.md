@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.3 — Installed app launch
+
+- Resolve icon and offline-help resources relative to the installed app without SwiftPM build-machine fallback paths or fatal resource lookup.
+- Verify the relocated optimized app actually opens a window and reads its packaged resources, with build-tree bundles temporarily unavailable and a missing-help negative case. Use an isolated temporary workspace for these checks.
+
 ## 0.4.2 — Portable Git hardening
 
 - Reject nonportable filter names before Git configuration overrides are constructed.
