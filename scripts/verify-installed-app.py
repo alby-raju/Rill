@@ -35,13 +35,36 @@ with tempfile.TemporaryDirectory(prefix="rill-installed-smoke-") as temporary:
             hidden.append((bundle, target))
 
         def launch():
-            return subprocess.run(
-                [str(relocated / "Contents/MacOS/Rill"), "--verify-installation"],
+            stdout = Path(temporary) / "launch.stdout"
+            stderr = Path(temporary) / "launch.stderr"
+            stdout.unlink(missing_ok=True)
+            stderr.unlink(missing_ok=True)
+            # Finder launches via Launch Services. Executing the Mach-O directly
+            # can enter AppKit's event loop without opening a SwiftUI window.
+            result = subprocess.run(
+                [
+                    "/usr/bin/open",
+                    "-n",
+                    "-W",
+                    "--stdout",
+                    str(stdout),
+                    "--stderr",
+                    str(stderr),
+                    str(relocated),
+                    "--args",
+                    "--verify-installation",
+                ],
                 cwd=temporary,
                 env=environment,
                 capture_output=True,
                 text=True,
                 timeout=25,
+            )
+            return subprocess.CompletedProcess(
+                result.args,
+                result.returncode,
+                stdout.read_text() if stdout.exists() else "",
+                stderr.read_text() if stderr.exists() else result.stderr,
             )
 
         result = launch()
@@ -65,7 +88,10 @@ with tempfile.TemporaryDirectory(prefix="rill-installed-smoke-") as temporary:
             ["codesign", "--force", "--sign", "-", str(relocated)], check=True, capture_output=True
         )
         missing = launch()
-        if missing.returncode == 0 or "RILL_INSTALLATION_OK" in missing.stdout:
+        if (
+            "Rill installation verification failed:" not in missing.stderr
+            or "RILL_INSTALLATION_OK" in missing.stdout
+        ):
             raise SystemExit("Missing packaged help was incorrectly accepted")
         print("Missing-resource negative case rejected; build-tree fallbacks unavailable.")
     finally:

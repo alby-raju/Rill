@@ -10,6 +10,24 @@ import SwiftUI
         "Rill-Installation-Check-" + UUID().uuidString, isDirectory: true)
     static weak var store: WorkbenchStore?
 
+    static func makeStore() -> WorkbenchStore {
+        do {
+            try FileManager.default.createDirectory(
+                at: directory, withIntermediateDirectories: false,
+                attributes: [.posixPermissions: 0o700])
+            // An absent workspace would hydrate the normal starter request via
+            // Keychain. The installation check must never query user credentials.
+            try WorkspaceFile.create(
+                Workspace(), at: directory.appendingPathComponent("workspace.json"))
+        } catch {
+            fputs("Unable to create isolated installation workspace.\n", stderr)
+            exit(1)
+        }
+        let result = WorkbenchStore(storageDirectory: directory, preferences: preferences)
+        store = result
+        return result
+    }
+
     static func verifyIfRequested() async {
         guard enabled else { return }
         var success = false

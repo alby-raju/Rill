@@ -20,13 +20,7 @@ import SwiftUI
         private static weak var previewStore: WorkbenchStore?
     #endif
     static func makeStore() -> WorkbenchStore {
-        if InstallationCheck.enabled {
-            let store = WorkbenchStore(
-                storageDirectory: InstallationCheck.directory,
-                preferences: InstallationCheck.preferences)
-            InstallationCheck.store = store
-            return store
-        }
+        if InstallationCheck.enabled { return InstallationCheck.makeStore() }
         #if DEBUG
             if let state = argument("--ui-state"), argument("--ui-snapshot") != nil {
                 let store = WorkbenchStore(
