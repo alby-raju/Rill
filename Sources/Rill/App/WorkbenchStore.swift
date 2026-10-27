@@ -125,17 +125,22 @@ import UniformTypeIdentifiers
     private let directory: URL
     private let visualPreview: Bool
 
-    init(preview: String? = nil) {
+    init(
+        preview: String? = nil, storageDirectory: URL? = nil, preferences: UserDefaults = .standard
+    ) {
         visualPreview = preview != nil
         directory =
-            preview != nil
-            ? FileManager.default.temporaryDirectory.appendingPathComponent(
-                "Rill-Preview-" + UUID().uuidString)
-            : FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-                .appendingPathComponent("Rill")
+            storageDirectory
+            ?? (preview != nil
+                ? FileManager.default.temporaryDirectory.appendingPathComponent(
+                    "Rill-Preview-" + UUID().uuidString)
+                : FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[
+                    0
+                ]
+                .appendingPathComponent("Rill"))
         historyArchive = ExchangeHistory(
             url: directory.appendingPathComponent("exchange-history.json"))
-        if let data = UserDefaults.standard.data(forKey: "responseSettings"),
+        if let data = preferences.data(forKey: "responseSettings"),
             let settings = try? JSONDecoder().decode(ResponseSettings.self, from: data),
             (try? settings.validate()) != nil
         {

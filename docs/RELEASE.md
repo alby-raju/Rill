@@ -1,6 +1,6 @@
 # Development builds and release preparation
 
-**0.4.2 is the MVP development version (build 9), targeting macOS 15+.** Packages are architecture-specific. CI validates Apple Silicon and Intel source/toolchains; that is not a fresh-installed-artifact result on every supported OS.
+**0.4.3 is the MVP development version (build 10), targeting macOS 15+.** Packages are architecture-specific. CI validates Apple Silicon and Intel source/toolchains; that is not a fresh-installed-artifact result on every supported OS.
 
 Paid Developer ID signing/notarization are **deferred at the owner's request**. Do not describe an ad-hoc development package as a notarized public release. No membership purchase is needed to build/test locally, and publication is a deliberate maintainer step after successful CI and review.
 
@@ -14,7 +14,7 @@ python3 scripts/collect-dependency-notices.py --check
 bash scripts/release-artifacts.sh
 ```
 
-The packaging pipeline stages a clean `dist/Rill.app` with the app/CLI, official protobuf compiler/includes, first-party icon/offline help, MIT license, third-party notices/resources and required Swift runtime compatibility libraries. Nested code and the app receive verified ad-hoc signatures. It creates an architecture-specific compressed DMG, SHA-256 checksum and provenance record containing source revision/dirty state and dependency/notice hashes.
+The packaging pipeline stages a clean `dist/Rill.app` with the app/CLI, official protobuf compiler/includes, first-party icon/offline help, MIT license, third-party notices/resources and required Swift runtime compatibility libraries. Nested code and the app receive verified ad-hoc signatures. Packaging also launches a relocated optimized app with an isolated workspace, temporarily hides build-tree resource bundles, verifies its window/icon/offline help, and rejects a deliberately missing-help test copy. It creates an architecture-specific compressed DMG, SHA-256 checksum and provenance record containing source revision/dirty state and dependency/notice hashes.
 
 Use only a clean expected revision for a reviewable artifact. Verify its version, signature, checksum, resources and bundled CLI. Build separately on Intel and Apple Silicon; do not label a single-architecture artifact universal. Keep generated output out of Git.
 
@@ -39,12 +39,12 @@ Use the [manual kit](../verification/README.md) and [testing guide](TESTING.md),
 
 ## GitHub development prereleases
 
-Run **Development release** manually on `main`, supplying a new tag matching the source version, such as `v0.4.2-dev.1`. Run the **Security** workflow manually on the intended main revision and wait for deep Swift analysis before starting release preparation (the nightly run also qualifies if it analyzed that exact revision). The release workflow rejects other branches, mismatched/reused tags and revisions without successful build, dependency scan and both CodeQL checks. Routine PR security checks do not substitute for deep Swift analysis. It tests and packages on separate Apple Silicon and Intel runners, audits dependencies, verifies notices, and attests each DMG using GitHub OIDC (no stored signing key).
+Run **Development release** manually on `main`, supplying a new tag matching the source version, such as `v0.4.3-dev.1`. Run the **Security** workflow manually on the intended main revision and wait for deep Swift analysis before starting release preparation (the nightly run also qualifies if it analyzed that exact revision). The release workflow rejects other branches, mismatched/reused tags and revisions without successful build, dependency scan and both CodeQL checks. Routine PR security checks do not substitute for deep Swift analysis. It tests and packages on separate Apple Silicon and Intel runners, audits dependencies, verifies notices, and attests each DMG using GitHub OIDC (no stored signing key).
 
 Only after both builds pass does it create a **draft prerelease** containing both installers, checksums, provenance, verification kit, MIT license, third-party notices and dependency pins. A failed build creates no release. A failed draft upload may leave an incomplete draft: inspect/delete that unpublished draft before retrying; never replace a published tag. Review all assets and replace the notes' maintainer placeholder with highlights, limitations and actual acceptance results, then publish explicitly:
 
 ```sh
-gh release edit v0.4.2-dev.1 --draft=false --prerelease --repo alby-raju/Rill
+gh release edit v0.4.3-dev.1 --draft=false --prerelease --repo alby-raju/Rill
 ```
 
 Repository release immutability freezes published assets and their tag. Do not publish until every intended asset is attached. Use a new version/tag to correct a published release. This is a development preview, not a stable/notarized distribution claim.
@@ -53,7 +53,7 @@ Download the assets into one directory, then verify:
 
 ```sh
 shasum -a 256 -c SHA256SUMS
-gh attestation verify Rill-0.4.2-arm64-development.dmg --repo alby-raju/Rill
+gh attestation verify Rill-0.4.3-arm64-development.dmg --repo alby-raju/Rill
 ```
 
 The attestation proves the GitHub build identity and artifact digest; it does not establish Apple trust or guarantee absence of vulnerabilities. Preserve the workflow run, exact source revision and acceptance evidence with release notes.

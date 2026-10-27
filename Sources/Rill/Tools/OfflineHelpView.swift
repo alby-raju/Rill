@@ -1,3 +1,4 @@
+import RillCore
 import SwiftUI
 
 struct HelpSection: Codable, Identifiable { let id: String, title: String, body: String }
@@ -31,7 +32,7 @@ struct OfflineHelpView: View {
             }
         }.padding(28).frame(width: 850, height: 720)
             .onAppear {
-                if let url = Bundle.module.url(forResource: "Help", withExtension: "json"),
+                if let url = RillResources.url(forResource: "Help", withExtension: "json"),
                     let data = try? Data(contentsOf: url)
                 {
                     sections = (try? JSONDecoder().decode([HelpSection].self, from: data)) ?? []

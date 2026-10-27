@@ -12,12 +12,21 @@ import SwiftUI
     }
     private static let preferenceDomain = "app.rill.visual-preview." + UUID().uuidString
     static let preferences: UserDefaults =
-        isRendering ? UserDefaults(suiteName: preferenceDomain)! : .standard
+        InstallationCheck.enabled
+        ? InstallationCheck.preferences
+        : isRendering ? UserDefaults(suiteName: preferenceDomain)! : .standard
 
     #if DEBUG
         private static weak var previewStore: WorkbenchStore?
     #endif
     static func makeStore() -> WorkbenchStore {
+        if InstallationCheck.enabled {
+            let store = WorkbenchStore(
+                storageDirectory: InstallationCheck.directory,
+                preferences: InstallationCheck.preferences)
+            InstallationCheck.store = store
+            return store
+        }
         #if DEBUG
             if let state = argument("--ui-state"), argument("--ui-snapshot") != nil {
                 let store = WorkbenchStore(
