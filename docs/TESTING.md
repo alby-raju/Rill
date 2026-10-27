@@ -9,7 +9,7 @@ bash scripts/test.sh
 
 The wrapper builds the native CLI and selected protobuf compiler, starts loopback HTTP/TLS/live/MQTT/AMQP fixtures, waits for readiness, runs tests and stops its fixtures. It uses ports 18749–18757; stop optional manual TLS fixtures first if they conflict. Required endpoint cases must not be skipped in CI. A bare `swift test` without fixture variables is only a partial run.
 
-The current suite has **259 tests**, covering persistence/recovery, request fidelity, credentials/TLS, imports/bounds, assertions/hooks/runners, schemas, native protocol sessions, CLI behavior, privacy and bulk-tab safety. Tests are grouped under `Tests/RillCoreTests` by behavior domain. The native Kafka mock bridge is test-only and is not independent production-broker acceptance.
+The current suite has **260 tests**, covering persistence/recovery, request fidelity, credentials/TLS, imports/bounds, assertions/hooks/runners, schemas, native protocol sessions, CLI behavior, privacy and bulk-tab safety. Tests are grouped under `Tests/RillCoreTests` by behavior domain. The native Kafka mock bridge is test-only and is not independent production-broker acceptance.
 
 ## Focus a regression
 

@@ -34,7 +34,14 @@ public enum WorkspaceGit {
                 throw WorkspaceError.invalidStructure
             }
             let driver = String(key[key.index(key.startIndex, offsetBy: 7)..<separator])
-            guard !driver.isEmpty, driver.utf8.count <= 1024 else {
+            let allowed = CharacterSet(
+                charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_.-")
+            // A subsection containing '=' would be reinterpreted as the value
+            // separator in Git's -c key=value syntax. Reject nonportable names
+            // before any operation can inspect attributes or launch a helper.
+            guard !driver.isEmpty, driver.utf8.count <= 1024,
+                driver.unicodeScalars.allSatisfy({ allowed.contains($0) })
+            else {
                 throw WorkspaceError.invalidStructure
             }
             drivers.insert(driver)
