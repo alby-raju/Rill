@@ -4,18 +4,51 @@ public enum WorkspaceGit {
     private static func run(_ arguments: [String], directory: URL, timeout: Double = 10)
         async throws -> ProcessRunResult
     {
-        // Operates only on the explicitly selected checkout. No hooks, automatic signing,
-        // remote fetch/push or credential helpers execute as a side effect of these commands.
+        // Git's argv is not a shell, but configured clean/smudge/process filters can
+        // still launch helpers. Read effective driver names without their values,
+        // then override every driver before status/add/commit inspect attributes.
         let environment = [
             "PATH": "/usr/bin:/bin", "HOME": FileManager.default.homeDirectoryForCurrentUser.path,
             "GIT_TERMINAL_PROMPT": "0", "GIT_CONFIG_NOSYSTEM": "1", "GIT_NO_LAZY_FETCH": "1",
+            "GIT_ATTR_NOSYSTEM": "1",
         ]
+        let base = [
+            "--no-pager", "-c", "core.hooksPath=/dev/null", "-c", "commit.gpgSign=false", "-c",
+            "core.fsmonitor=false", "-c", "gc.auto=0", "-c", "maintenance.auto=false",
+            "-c", "core.attributesFile=/dev/null", "-c", "commit.verbose=false",
+            "-c", "commit.status=false",
+        ]
+        let configuration = try await BoundedProcess.run(
+            executable: URL(fileURLWithPath: "/usr/bin/git"),
+            arguments: base + [
+                "config", "--includes", "--null", "--name-only", "--get-regexp",
+                #"^filter\..*\.(clean|smudge|process|required)$"#,
+            ],
+            directory: directory, timeout: timeout, outputLimit: 65536, environment: environment)
+        guard [0, 1].contains(configuration.status),
+            let keys = String(data: configuration.output, encoding: .utf8)
+        else { throw WorkspaceError.unavailable }
+        var drivers = Set<String>()
+        for key in keys.split(separator: "\0") {
+            guard key.hasPrefix("filter."), let separator = key.lastIndex(of: ".") else {
+                throw WorkspaceError.invalidStructure
+            }
+            let driver = String(key[key.index(key.startIndex, offsetBy: 7)..<separator])
+            guard !driver.isEmpty, driver.utf8.count <= 1024 else {
+                throw WorkspaceError.invalidStructure
+            }
+            drivers.insert(driver)
+        }
+        guard drivers.count <= 48 else { throw WorkspaceError.invalidStructure }
+        let filters = drivers.sorted().flatMap { driver in
+            ["clean", "smudge", "process", "required"].flatMap { key in
+                ["-c", "filter.\(driver).\(key)=\(key == "required" ? "false" : "")"]
+            }
+        }
         let result = try await BoundedProcess.run(
             executable: URL(fileURLWithPath: "/usr/bin/git"),
-            arguments: [
-                "-c", "core.hooksPath=/dev/null", "-c", "commit.gpgSign=false", "-c",
-                "core.fsmonitor=false", "-c", "gc.auto=0",
-            ] + arguments, directory: directory, timeout: timeout, environment: environment)
+            arguments: base + filters + arguments, directory: directory, timeout: timeout,
+            environment: environment)
         guard result.status == 0 else { throw WorkspaceError.unavailable }
         return result
     }
@@ -75,7 +108,9 @@ public enum WorkspaceGit {
         else { throw WorkspaceError.invalidStructure }
         let directory = try root(directory)
         _ = try await status(directory)
-        let staged = try await run(["diff", "--cached", "--name-only", "-z"], directory: directory)
+        let staged = try await run(
+            ["diff", "--no-ext-diff", "--no-textconv", "--cached", "--name-only", "-z"],
+            directory: directory)
         let paths = staged.output.split(separator: 0).map { String(decoding: $0, as: UTF8.self) }
         guard paths.allSatisfy({ ["workspace.json", ".gitignore"].contains($0) }) else {
             throw WorkspaceError.conflict

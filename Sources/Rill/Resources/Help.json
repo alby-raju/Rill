@@ -62,7 +62,7 @@
   {
     "id": "release",
     "title": "Version and release status",
-    "body": "Rill 0.4.1 is an MVP development build, not a signed-off parity release. Native runtimes, compatibility libraries, compiler and notices are bundled. Paid Developer ID signing and notarization are deferred. Gatekeeper, fresh-Mac installs, real-provider interoperability, accessibility and complete acceptance remain future release gates. Ad-hoc local signatures do not establish a public distribution identity. See the repository Features, Testing and Release guides for supported subsets and acceptance gates."
+    "body": "Rill 0.4.2 is an MVP development build, not a signed-off parity release. Native runtimes, compatibility libraries, compiler and notices are bundled. Paid Developer ID signing and notarization are deferred. Gatekeeper, fresh-Mac installs, real-provider interoperability, accessibility and complete acceptance remain future release gates. Ad-hoc local signatures do not establish a public distribution identity. See the repository Features, Testing and Release guides for supported subsets and acceptance gates."
   },
   {
     "id": "license",
