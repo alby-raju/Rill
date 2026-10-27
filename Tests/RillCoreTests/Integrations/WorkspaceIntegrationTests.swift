@@ -74,6 +74,43 @@ import XCTest
                 contentsOf: directory.appendingPathComponent("workspace.json"), encoding: .utf8
             ).contains("private-keychain"))
     }
+    func testPortableGitIgnoresExternalFiltersAndPreservesRawBytes() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "rill-git-filter-" + UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        for key in ["clean", "process"] {
+            let directory = root.appendingPathComponent(key)
+            try await WorkspaceGit.initialize(directory)
+            let marker = directory.appendingPathComponent("helper-ran")
+            let include = directory.appendingPathComponent("helper.config")
+            try "[filter \"audit\"]\n\t\(key) = /usr/bin/touch \(marker.path)\n\trequired = true\n"
+                .write(to: include, atomically: false, encoding: .utf8)
+            let config = directory.appendingPathComponent(".git/config")
+            let text =
+                try String(contentsOf: config, encoding: .utf8)
+                + "\n[user]\nname = Fixture\nemail = fixture@example.invalid\n"
+                + "[include]\npath = \(include.path)\n"
+            try text.write(to: config, atomically: false, encoding: .utf8)
+            try "workspace.json filter=audit\n".write(
+                to: directory.appendingPathComponent(".gitattributes"), atomically: false,
+                encoding: .utf8)
+            var workspace = Workspace()
+            workspace.requests = [RequestDraft()]
+            try WorkspaceGit.export(workspace, to: directory)
+            let expected = try Data(contentsOf: directory.appendingPathComponent("workspace.json"))
+            _ = try await WorkspaceGit.commit(directory, message: "Portable bytes")
+            XCTAssertFalse(FileManager.default.fileExists(atPath: marker.path))
+            let committed = try await BoundedProcess.run(
+                executable: URL(fileURLWithPath: "/usr/bin/git"),
+                arguments: ["show", "HEAD:workspace.json"], directory: directory)
+            XCTAssertEqual(committed.output, expected)
+            workspace.requests[0].name = "Changed fixture"
+            try WorkspaceGit.export(workspace, to: directory)
+            _ = try await WorkspaceGit.status(directory)
+            _ = try await WorkspaceGit.commit(directory, message: "Updated portable bytes")
+            XCTAssertFalse(FileManager.default.fileExists(atPath: marker.path))
+        }
+    }
     func testPluginTrustIsContentBoundAndMockServicesStayDataOnly() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(
             "rill-plugin-" + UUID().uuidString)

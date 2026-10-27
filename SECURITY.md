@@ -13,6 +13,7 @@ Include the affected version/commit, platform, impact and a minimal synthetic re
 - Credentials use macOS Keychain; named process-environment fallbacks are read-only. Entered URLs, fields, bodies, schemas and environment values can still contain secrets in plain-text workspace data.
 - Portable reports, diagnostics and sanitized sharing omit disallowed runtime values. Explicit raw exports and generated client source need review before sharing.
 - TLS verifies certificates/hostnames by default. Insecure profiles are explicit per-request development choices; no silent fallback is allowed.
+- Portable Git operations disable configured content filters, hooks, signing, fsmonitor and external diff/text conversion. Use your own trusted checkout; this is not an OS sandbox for a repository another process can modify concurrently.
 - Imports are bounded and validated before Apply. Foreign script source is disabled review material. Rill hooks are a finite operation language; extensions are reviewed data services, not arbitrary executable plugins.
 - Local sharing is token-protected and loopback by default. Explicit LAN HTTP is plaintext.
 - Native parsers and libraries have bounded entry points, but an in-process parser is not an OS sandbox or a promise of a hard memory/time ceiling for every dependency allocation.
@@ -21,7 +22,7 @@ For exact supported behavior see [features and limits](docs/FEATURES.md). Depend
 
 ## Automated checks and maintenance
 
-GitHub secret scanning and push protection are enabled, with private vulnerability reporting and Dependabot alerts/security updates. Weekly Dependabot PRs cover Swift, GitHub Actions and Python development requirements; updates receive normal review and CI, with refreshed dependency notices when needed.
+GitHub secret scanning and push protection are enabled, with private vulnerability reporting and Dependabot alerts/security updates. Actions are required by repository policy to use full-length commit SHAs. Weekly Dependabot PRs cover Swift, GitHub Actions and Python development requirements; updates receive normal review and CI, with refreshed dependency notices when needed.
 
 The Security workflow audits dependencies and analyzes Python on every PR/main push. Deep Swift CodeQL analysis runs nightly and on manual dispatch using a fresh first-party Debug build; upstream libraries are prepared before tracing and release compilation is checked separately. Swift extraction is intentionally outside the routine PR critical path. A release still requires successful Swift analysis on its exact source revision; a missing, skipped or failed scan cannot satisfy the release gate. `python3 scripts/security-audit.py` queries OSV for every locked Swift commit and pinned Python development tool, fails on advisory matches and service errors, and prints affected identities without uploading workspace data. Only public dependency revisions/names are sent. Commit matching depends on OSV coverage; vendored native code and dynamically installed client-validation SDKs still need their upstream advisory review. No advisory suppression or automatic merge is configured.
 

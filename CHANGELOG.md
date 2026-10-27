@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.2 — Portable Git hardening
+
+- Disable effective Git clean, smudge and process filters for portable workspace operations, including drivers defined through included configuration. Preserve exported bytes without launching configured helpers.
+- Keep hooks, signing, fsmonitor, external diff/text conversion and automatic maintenance disabled for those operations.
+
 ## 0.4.1 — Import and collection experience
 
 - Preserve unselected Postman binary/multipart upload placeholders and multiple selected files, with explicit local reselection warnings.
