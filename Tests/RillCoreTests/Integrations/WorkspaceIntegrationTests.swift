@@ -111,6 +111,27 @@ import XCTest
             XCTAssertFalse(FileManager.default.fileExists(atPath: marker.path))
         }
     }
+    func testPortableGitRejectsAmbiguousConfigurationKeysBeforeHelpersRun() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "rill-git-key-" + UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try await WorkspaceGit.initialize(root)
+        let marker = root.appendingPathComponent("helper-ran")
+        let config = root.appendingPathComponent(".git/config")
+        let settings =
+            try String(contentsOf: config, encoding: .utf8)
+            + "\n[user]\nname = Fixture\nemail = fixture@example.invalid\n"
+            + "[filter \"ambiguous=name\"]\nclean = /usr/bin/touch \(marker.path)\n"
+        try settings.write(to: config, atomically: false, encoding: .utf8)
+        try "workspace.json filter=ambiguous=name\n".write(
+            to: root.appendingPathComponent(".gitattributes"), atomically: false, encoding: .utf8)
+        try WorkspaceGit.export(Workspace(), to: root)
+        do {
+            _ = try await WorkspaceGit.commit(root, message: "Reject ambiguous key")
+            XCTFail("Ambiguous filter configuration must fail closed")
+        } catch { XCTAssertEqual(error as? WorkspaceError, .invalidStructure) }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: marker.path))
+    }
     func testPluginTrustIsContentBoundAndMockServicesStayDataOnly() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(
             "rill-plugin-" + UUID().uuidString)

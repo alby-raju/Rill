@@ -2,6 +2,7 @@
 
 ## 0.4.2 — Portable Git hardening
 
+- Reject nonportable filter names before Git configuration overrides are constructed.
 - Disable effective Git clean, smudge and process filters for portable workspace operations, including drivers defined through included configuration. Preserve exported bytes without launching configured helpers.
 - Keep hooks, signing, fsmonitor, external diff/text conversion and automatic maintenance disabled for those operations.
 
