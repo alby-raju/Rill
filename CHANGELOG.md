@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Add offline CLI `preflight` for Postman collection/environment inputs, temporary variable overrides, redacted script/variable/import blockers and optional bounded unencrypted PEM certificate/key pairing/expiry checks. This does not execute requests or provide Newman script compatibility.
+
+
 ## 0.4.3 — Installed app launch
 
 - Resolve icon and offline-help resources relative to the installed app without SwiftPM build-machine fallback paths or fatal resource lookup.

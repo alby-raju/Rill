@@ -8,7 +8,7 @@ Rill has reached an MVP development milestone. The next goal is a fast, local AP
 
 | Order | Milestone | User outcome | Status |
 | --- | --- | --- | --- |
-| 1 | CLI file runner and migration diagnostics | Run collection/environment files without importing into a desktop workspace | Planned |
+| 1 | CLI file runner and migration diagnostics | Run collection/environment files without importing into a desktop workspace | In progress: offline preflight |
 | 2 | Workflow compatibility and trustworthy reports | Understand which scripts work and why a run passed or failed | Planned |
 | 3 | First-class mock workbench | Find, edit and run local mocks directly from the app or CLI | Planned |
 | 4 | Performance and failure investigation | Keep large workspaces responsive and compare repeatable runs | Planned |
@@ -24,6 +24,8 @@ Milestones are delivery groups, not a promise to fit each into one PR. Use indep
 - [ ] **CLI-03 — Headless TLS.** Add client certificate/key/PKCS#12, passphrase-file, custom CA and explicit insecure options. Validate matched identities; support certificate selection per destination and define redirect/hostname behavior. File runs must not require importing identities into a personal Keychain. Never print private keys or passphrases.
 - [ ] **CLI-04 — CLI installation and discoverability.** Shell completion, permanent install guidance, `doctor`, useful per-command help, actionable errors and CI-friendly exit codes. Provide a CLI-only macOS archive; evaluate Homebrew after reproducible standalone packaging works.
 - [ ] **CLI-05 — Explain before sending.** Add a validation/dry-run mode that reports unsupported imports/scripts, unresolved inputs, selected environment and redacted execution plan without sending requests. Unsupported behavior must not produce a misleading success.
+
+First CLI-05 increment: development source provides offline Postman `preflight` with redacted script/variable/import diagnostics and optional unencrypted PEM pairing/expiry inspection. It does not send requests, produce a full execution plan or establish Newman compatibility. Direct file runs and other milestone items remain open.
 
 Acceptance: a sanitized suite shaped like the owner's 600-request collection runs from collection/environment files with four temporary variable overrides, mTLS and a simultaneous terminal/JSON report. Test from paths with spaces, without the desktop app running, and verify input files and personal workspace remain unchanged. Never publish the owner's collection, internal endpoints, environment or certificates as fixtures.
 

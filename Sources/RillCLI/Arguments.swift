@@ -22,6 +22,7 @@ struct Arguments: Sendable {
             "port", "routes", "repo", "message", "token-file", "destination", "client-id",
             "client-secret-name", "scope", "save-secret", "plugins-dir", "trust-file", "plugin",
             "service", "wait", "send", "auth-profile", "proto-include",
+            "environment-file", "env-var", "ssl-client-cert", "ssl-client-key",
         ]
         var index = 0
         var foundCommand = false
@@ -40,7 +41,7 @@ struct Arguments: Sendable {
                     }
                     guard
                         values[name] == nil
-                            || ["header", "metadata", "proto-include"].contains(name)
+                            || ["header", "metadata", "proto-include", "env-var"].contains(name)
                     else { throw CLIError.usage("Duplicate option.") }
                     values[name, default: []].append(input[index])
                 } else {
@@ -55,6 +56,14 @@ struct Arguments: Sendable {
                 operands.append(item)
             }
             index += 1
+        }
+        let preflightOnly: Set<String> = [
+            "environment-file", "env-var", "ssl-client-cert", "ssl-client-key",
+        ]
+        if command != "preflight", !preflightOnly.isDisjoint(with: values.keys) {
+            throw CLIError.usage(
+                "File environment/variable/certificate options currently require preflight; direct file execution is not implemented."
+            )
         }
         if let color = value("color"), !["auto", "always", "never"].contains(color) {
             throw CLIError.usage("--color expects auto, always or never.")
@@ -212,6 +221,10 @@ let usage = """
 
     Usage: rill COMMAND [input] [--workspace PATH] [options]
 
+      preflight FILE               Offline Postman v2 collection inspection; sends no requests
+          --environment-file FILE --env-var key=value (repeatable)
+          --ssl-client-cert FILE --ssl-client-key FILE (unencrypted PEM key)
+          --json                   Structured diagnostics; exit 2 for blocked inputs
       init                         Create a new empty workspace (never overwrites)
       list | search TEXT           List saved IDs/names; search metadata
       run-request NAME_OR_ID       Run one saved request through shared workflow engine
