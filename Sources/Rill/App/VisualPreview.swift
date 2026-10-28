@@ -26,6 +26,14 @@ import SwiftUI
                 let store = WorkbenchStore(
                     preview: ["blank", "intro"].contains(state) ? "empty" : state)
                 previewStore = store
+                if ["collections-expanded", "collections-collapsed"].contains(state) {
+                    let collection = RequestCollection(name: "Sample collection")
+                    store.workspace.collections = [collection]
+                    store.workspace.requests[0].collectionID = collection.id
+                    preferences.set(
+                        state == "collections-collapsed" ? collection.id.uuidString : "",
+                        forKey: "collapsedCollectionIDs")
+                }
                 if state == "blank" {
                     store.newRequest()
                     precondition(

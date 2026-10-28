@@ -8,10 +8,13 @@ struct WorkbenchView: View {
     @ViewState private var launchIntroductionFinished = false
     private var showingLaunch: Bool { store.loading || !launchIntroductionFinished }
     @ViewState private var requestTransfer: RequestTransfer?
+    @AppStorage("collapsedCollectionIDs") private var collapsedCollectionIDs = ""
+    @ViewState private var collapsedSearchCollections: Set<UUID> = []
     @AppStorage("requestLayout") private var requestLayout = "automatic"
     var body: some View {
         NavigationSplitView {
-            sidebar.navigationSplitViewColumnWidth(min: 220, ideal: 250, max: 360)
+            sidebar.onChange(of: store.search) { _, _ in collapsedSearchCollections.removeAll() }
+                .navigationSplitViewColumnWidth(min: 220, ideal: 250, max: 360)
                 .background(SplitAutosave(name: "rill.sidebar", vertical: true))
         } detail: {
             VStack(spacing: 0) {
@@ -139,20 +142,41 @@ struct WorkbenchView: View {
             List(selection: $store.selection) {
                 ForEach(store.workspace.collections) { collection in
                     Section {
-                        ForEach(filtered(collection.id)) { request in requestRow(request) }
-                    } header: {
-                        HStack {
-                            Image(systemName: "folder")
-                            Text(collection.name)
-                            Spacer()
+                        if collectionExpansion(collection.id).wrappedValue {
+                            ForEach(filtered(collection.id)) { request in requestRow(request) }
                         }
+                    } header: {
+                        Button {
+                            let expanded = collectionExpansion(collection.id)
+                            expanded.wrappedValue.toggle()
+                        } label: {
+                            HStack {
+                                Image(
+                                    systemName: collectionExpansion(collection.id).wrappedValue
+                                        ? "chevron.down" : "chevron.right"
+                                )
+                                .font(.system(size: 9, weight: .semibold)).frame(width: 12)
+                                Image(systemName: "folder")
+                                Text(collection.name)
+                                Spacer()
+                            }.contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(
+                            (collectionExpansion(collection.id).wrappedValue
+                                ? "Collapse " : "Expand ") + collection.name
+                        )
+                        .accessibilityValue(
+                            collectionExpansion(collection.id).wrappedValue
+                                ? "Expanded" : "Collapsed"
+                        )
                         .contextMenu {
                             Button("New request") { store.newRequest(in: collection.id) }
                             Button("Rename…") { store.renameCollection(collection) }
                             Button("Delete collection…", role: .destructive) {
                                 store.deleteCollection(collection)
                             }
-                        }.onTapGesture { store.focusedCollectionID = collection.id }
+                        }
                         .dropDestination(for: String.self) { values, _ in
                             guard let raw = values.first, let id = UUID(uuidString: raw) else {
                                 return false
@@ -216,6 +240,35 @@ struct WorkbenchView: View {
                 .menuStyle(.borderlessButton)
             }.buttonStyle(.plain).font(.callout).foregroundStyle(.secondary).padding(20)
         }.background(Color(nsColor: .windowBackgroundColor))
+    }
+    private func collectionExpansion(_ id: UUID) -> Binding<Bool> {
+        Binding(
+            get: {
+                if !store.search.isEmpty { return !collapsedSearchCollections.contains(id) }
+                return !collapsedCollectionIDs.split(separator: ",").contains(
+                    Substring(id.uuidString))
+            },
+            set: { expanded in
+                store.focusedCollectionID = id
+                if !store.search.isEmpty {
+                    if expanded {
+                        collapsedSearchCollections.remove(id)
+                    } else {
+                        collapsedSearchCollections.insert(id)
+                    }
+                } else {
+                    let current = Set(store.workspace.collections.map { $0.id.uuidString })
+                    var collapsed = Set(
+                        collapsedCollectionIDs.split(separator: ",").map(String.init)
+                    ).intersection(current)
+                    if expanded {
+                        collapsed.remove(id.uuidString)
+                    } else {
+                        collapsed.insert(id.uuidString)
+                    }
+                    collapsedCollectionIDs = collapsed.sorted().joined(separator: ",")
+                }
+            })
     }
     private func filtered(_ collection: UUID?) -> [RequestDraft] {
         store.workspace.requests.filter {

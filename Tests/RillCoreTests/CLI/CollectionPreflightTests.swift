@@ -97,6 +97,17 @@ final class CollectionPreflightTests: XCTestCase {
         let limited = try CollectionPreflight.inspect(
             collection: collection([request("http://127.0.0.1:1/" + many)]), overrides: ["x": "ok"])
         XCTAssertTrue(limited.issues.contains { $0.code == "variables.unresolved_cyclic_or_limit" })
+        let literal: [String: Any] = [
+            "name": "fixture",
+            "request": [
+                "method": "POST", "url": "http://127.0.0.1:1",
+                "body": [
+                    "mode": "raw", "raw": "{{" + String(repeating: " ", count: 100_000) + "literal",
+                ],
+            ],
+        ]
+        XCTAssertTrue(try CollectionPreflight.inspect(collection: collection([literal])).passed)
+
     }
 
 }

@@ -70,7 +70,7 @@ public struct CollectionPreflight: Encodable, Sendable {
             values(env["values"], path: "/environment/values")
         }
         for (key, value) in overrides { variables[key] = value }
-        let pattern = try NSRegularExpression(pattern: #"\{\{\s*([^{}]+?)\s*\}\}"#)
+        let pattern = try NSRegularExpression(pattern: #"\{\{([^{}]+)\}\}"#)
         var remainingReferences = 100_000
         func references(_ text: String, seen: Set<String> = [], depth: Int = 0) -> Bool {
             guard depth <= 32, remainingReferences >= 0, !Task.isCancelled else { return false }

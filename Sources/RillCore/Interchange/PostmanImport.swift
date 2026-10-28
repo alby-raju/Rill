@@ -1,10 +1,12 @@
 import Foundation
 
 public enum PostmanImportError: LocalizedError {
-    case invalid, unsupported
+    case invalid, unsupported, unsupportedBody
     public var errorDescription: String? {
         switch self {
         case .invalid: "Expected a bounded Postman v2.0/v2.1 collection or environment JSON export."
+        case .unsupportedBody:
+            "A GET or HEAD request contains a nonempty or structured body, which Rill's current HTTP transport cannot send. No data was applied."
         case .unsupported:
             "This Postman export contains an unsupported or ambiguous auth, URL, variable, header or body representation. No data was applied."
         }
@@ -217,6 +219,16 @@ public enum PostmanImporter {
                 try bodyFields(body, request: &result)
             } else if object["body"] != nil {
                 warnings.insert("Disabled request bodies are omitted.")
+            }
+            if result.method == .GET || result.method == .HEAD {
+                if result.bodyMode == .text && result.body.isEmpty {
+                    result.bodyMode = RequestBodyMode.none
+                    warnings.insert(
+                        "An explicitly empty GET/HEAD raw body was imported as no body; no nonempty payload was discarded."
+                    )
+                } else if result.bodyMode != RequestBodyMode.none {
+                    throw PostmanImportError.unsupportedBody
+                }
             }
             try authentication(object["auth"] as? [String: Any] ?? inherited, request: &result)
             // Reuse recognized-header extraction/body checks without expanding templates.
