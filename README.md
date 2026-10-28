@@ -6,7 +6,7 @@
 
 Compose requests, inspect responses, run API workflows, and explore live protocols in a local workspace. Rill works without an account or hosted workspace. Its name comes from a small stream.
 
-[Get started](#get-started) · [Features and limits](docs/FEATURES.md) · [CLI](docs/CLI.md) · [Contribute](CONTRIBUTING.md) · [Roadmap](ROADMAP.md) · [Community and support](SUPPORT.md)
+[Wiki](https://github.com/alby-raju/Rill/wiki) · [Get started](#get-started) · [Features and limits](docs/FEATURES.md) · [CLI](docs/CLI.md) · [Contribute](CONTRIBUTING.md) · [Roadmap](ROADMAP.md) · [Community and support](SUPPORT.md)
 
 ![Rill workbench with a request and validated JSON response](docs/images/workbench-dark.png)
 
@@ -15,6 +15,12 @@ Compose requests, inspect responses, run API workflows, and explore live protoco
 Rill is an **MVP development build** for **macOS 15+**, on Apple Silicon and Intel. The app and CLI share the same execution engine. This is a usable first release with documented protocol/import subsets; it is not a claim of complete standards conformance or parity with another product.
 
 Development installers are ad-hoc signed. Paid Developer ID signing and notarization are deferred. See [installation and release notes](docs/RELEASE.md) for the exact distribution status and remaining acceptance gates.
+
+## Where Rill is heading
+
+Our next focus is **CLI-first API testing**: direct collection/environment file runs, explicit script compatibility, useful failure reports, a visible mock workbench, and measured large-workspace performance. Linux and Windows are planned as CLI portability work first; desktop apps require a separate architecture decision.
+
+**These enhancements are planned, not available in the current release.** Read the [prioritized roadmap](ROADMAP.md) and [suggest priorities in Discussions](https://github.com/alby-raju/Rill/discussions). The [Wiki](https://github.com/alby-raju/Rill/wiki) is the onboarding hub; versioned documentation in this repository defines current behavior.
 
 ## What you can do
 
