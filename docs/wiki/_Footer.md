@@ -1,0 +1,1 @@
+Rill is an MVP development preview. [Current limits](https://github.com/alby-raju/Rill/blob/main/docs/FEATURES.md) · [Planned work](https://github.com/alby-raju/Rill/blob/main/ROADMAP.md) · [Report a vulnerability privately](https://github.com/alby-raju/Rill/blob/main/SECURITY.md)
