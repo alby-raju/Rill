@@ -340,6 +340,28 @@ import XCTest
         } catch { XCTAssertEqual(error as? WorkspaceError, .conflict) }
         XCTAssertEqual(requests.count, count)
     }
+    func testEmptyGETAndHEADRawBodiesImportWithoutDroppingPayloads() throws {
+        for method in ["GET", "HEAD"] {
+            let source: [String: Any] = [
+                "method": method, "url": "https://example.test/resource",
+                "body": ["mode": "raw", "raw": ""],
+            ]
+            let result = try PostmanImporter.parse(collection([item(source)]))
+            XCTAssertEqual(result.workspace.requests.first?.bodyMode, RequestBodyMode.none)
+            XCTAssertTrue(result.warnings.contains { $0.contains("explicitly empty") })
+            for payload in [" ", "nonempty"] {
+                var nonempty = source
+                nonempty["body"] = ["mode": "raw", "raw": payload]
+                XCTAssertThrowsError(try PostmanImporter.parse(collection([item(nonempty)]))) {
+                    error in
+                    guard case PostmanImportError.unsupportedBody = error else {
+                        return XCTFail("Expected collection-specific unsupported body error")
+                    }
+                }
+            }
+        }
+    }
+
 }
 
 private struct CleanupDeniedCredentials: CredentialStore {
@@ -349,4 +371,5 @@ private struct CleanupDeniedCredentials: CredentialStore {
         if value.isEmpty { throw WorkspaceError.unavailable }
         try backing.write(value, id: id)
     }
+
 }

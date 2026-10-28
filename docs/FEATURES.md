@@ -50,3 +50,9 @@ Git init/status/export/commit operate only on an explicitly selected portable ch
 ## Release acceptance
 
 Developer ID signing/notarization are deferred. Fresh supported-Mac installs, upgrades/Keychain behavior, VoiceOver/keyboard/contrast/reduced motion, independent real services and full capability sign-off remain separate release gates. See [RELEASE.md](RELEASE.md) and [ROADMAP.md](../ROADMAP.md).
+
+### Collection import and navigation (0.4.4 development)
+
+Explicitly empty GET/HEAD raw bodies in Postman and HTTPie Desktop JSON imports become explicit no-body requests, with an import warning. Nonempty or structured GET/HEAD bodies are rejected; payloads are not silently discarded. The current HTTP transport still does not send GET/HEAD bodies.
+
+Sidebar collection headers can be collapsed and expanded. Their state is saved locally; search temporarily expands collections without overwriting the saved state. Selection and the open request editor remain independent of sidebar expansion.

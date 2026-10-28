@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased
+## 0.4.4 (unreleased)
+
+- Import explicitly empty GET/HEAD raw bodies as no body, with a warning, in Postman and HTTPie Desktop collections. Nonempty/structured payloads remain rejected with a collection-specific explanation.
+- Restore collapsible collection headers with saved expansion state and temporary search expansion.
+- Keep CLI preflight template scanning bounded on unterminated whitespace-heavy input.
 
 - Add offline CLI `preflight` for Postman collection/environment inputs, temporary variable overrides, redacted script/variable/import blockers and optional bounded unencrypted PEM certificate/key pairing/expiry checks. This does not execute requests or provide Newman script compatibility.
 

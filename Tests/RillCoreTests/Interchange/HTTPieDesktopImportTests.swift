@@ -129,4 +129,16 @@ final class HTTPieDesktopImportTests: XCTestCase {
             try HTTPieDesktopImporter.parse(
                 Data(repeating: 32, count: ResourceLimits.workspaceBytes + 1)))
     }
+    func testEmptyGETTextBodyReusesPostmanNormalization() throws {
+        var source = request(["type": "text", "text": ["format": "application/json", "value": ""]])
+        source["method"] = "GET"
+        let result = try HTTPieDesktopImporter.parse(document(source, kind: "request"))
+        XCTAssertEqual(result.workspace.requests.first?.bodyMode, RequestBodyMode.none)
+        XCTAssertTrue(result.warnings.contains { $0.contains("explicitly empty") })
+        source["body"] = [
+            "type": "text", "text": ["format": "application/json", "value": "payload"],
+        ]
+        XCTAssertThrowsError(try HTTPieDesktopImporter.parse(document(source, kind: "request")))
+    }
+
 }
