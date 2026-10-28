@@ -41,3 +41,24 @@ The summary shows final request visits, checks across all attempts, retries, rec
 Performance reports show throughput, p50/p95/p99 and min/max latency, plus optional per-sample detail. Performance latency includes failed executed samples; unexecuted/cancelled samples are excluded. Collection response latency includes only attempts that received an HTTP response. Neither report invents timing or success values for missing responses.
 
 TTY sessions show append-only progress on stderr as each attempt completes. Redirected output and `--json` have no progress; `--quiet` suppresses normal output and progress. Colors are automatic only on a capable TTY, respecting `NO_COLOR` and `TERM=dumb`; override with `--color always|never`. Color is supplementary: every result has a text state. Existing exit codes, cancellation/report flushing and payload export behavior are unchanged.
+
+## Offline collection preflight (unreleased)
+
+Available from development source after 0.4.3; it is not included in the published 0.4.3 app. Build `RillCLI`, then inspect a local Postman v2 collection without importing or sending it:
+
+```sh
+swift run RillCLI preflight ./collection.json \
+  --environment-file ./environment.json \
+  --env-var runCleanup=true \
+  --ssl-client-cert ./client.crt \
+  --ssl-client-key ./client.key \
+  --json
+```
+
+`--env-var` is repeatable; precedence is collection variables, then enabled environment values, then overrides (last override wins). Empty override values are valid. Other run commands reject these new file options rather than silently ignoring them. Native workspace inputs, direct file execution, globals, iteration data and a complete execution plan remain future work.
+
+Preflight blocks nonempty foreign scripts at collection/folder/request scope, unsupported importer representations, omitted transport settings, unresolved/cyclic/over-budget template references, invalid environments and empty collections. Script-produced variables are not inferred. Diagnostics identify JSON locations using indices, without echoing request names, arbitrary keys, URLs, variable values or script text. Terminal output shows the first 20 diagnostics by default; `--detail` expands it. At most 1,000 diagnostic records are retained; the total blocker count remains visible. Static variable analysis is bounded and conservative; it does not evaluate dynamic providers, JavaScript or arbitrary body-file contents.
+
+Optional PEM certificate/key inspection uses the fixed system `/usr/bin/openssl` with bounded input/output and deadlines. It checks PEM parsing, public-key pairing and certificate notAfter expiry only. It does not verify notBefore validity, certificate chains, hostname, revocation, server trust or actual mTLS negotiation. Only unencrypted PEM private keys are supported in this increment; encrypted keys, PKCS#12 and CA options remain future work. No private key or password is printed or imported into Keychain.
+
+Exit 0 means these static checks passed, **not** that the suite executed or matched Newman semantics. Blocked/invalid input exits 2; cancellation exits 130. JSON output has `passed`, `sendsRequests: false`, and a versioned `checks` object containing counts and `{code, location}` diagnostics. Malformed/unreadable input can instead produce a redacted stderr configuration error with exit 2. No request, workspace import, credential hydration or file export occurs.

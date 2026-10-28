@@ -228,4 +228,75 @@ import XCTest
             String(decoding: socket.output, as: UTF8.self).contains("private-stream-payload"))
     }
 
+    func testOfflinePreflightDoesNotWriteWorkspaceAndRejectsMisappliedOptions() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "rill-preflight-" + UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let file = directory.appendingPathComponent("collection with spaces.json")
+        let input = Data(
+            #"{"info":{"name":"private-label","schema":"https://schema.getpostman.com/json/collection/v2.1.0/collection.json"},"item":[{"name":"private-request","request":{"method":"GET","url":"http://127.0.0.1:1/{{missing}}"}}]}"#
+                .utf8)
+        try input.write(to: file)
+        let failed = try await cli(["preflight", file.path, "--json"])
+        XCTAssertEqual(failed.status, 2)
+        let value = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: failed.output) as? [String: Any])
+        XCTAssertEqual(value["passed"] as? Bool, false)
+        XCTAssertEqual(value["sendsRequests"] as? Bool, false)
+        let passed = try await cli([
+            "preflight", file.path, "--env-var", "missing=private-value", "--env-var",
+            "missing=override-value", "--json",
+        ])
+        XCTAssertEqual(passed.status, 0)
+        for secret in [
+            "private-label", "private-request", "private-value", "override-value", "127.0.0.1",
+        ] {
+            XCTAssertFalse(String(decoding: passed.output, as: UTF8.self).contains(secret))
+        }
+        XCTAssertEqual(try Data(contentsOf: file), input)
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: directory.path).count, 1)
+        let ignored = try await cli(["run-collection", "fake", "--env-var", "key=value"])
+        XCTAssertEqual(ignored.status, 2)
+        let incomplete = try await cli([
+            "preflight", file.path, "--env-var", "missing=value", "--ssl-client-cert", file.path,
+            "--json",
+        ])
+        XCTAssertEqual(incomplete.status, 2)
+        XCTAssertTrue(
+            String(decoding: incomplete.output, as: UTF8.self).contains(
+                "tls.invalid_expired_or_mismatched_pem_pair"))
+    }
+
+    func testPreflightCertificateKeyPairAndMismatch() async throws {
+        guard let folder = ProcessInfo.processInfo.environment["RILL_TEST_TLS_DIR"] else {
+            throw XCTSkip("TLS fixture directory required")
+        }
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "rill-pem-preflight-" + UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let file = directory.appendingPathComponent("collection.json")
+        try Data(
+            #"{"info":{"name":"fixture","schema":"https://schema.getpostman.com/json/collection/v2.1.0/collection.json"},"item":[{"name":"fixture","request":{"method":"GET","url":"https://127.0.0.1:1"}}]}"#
+                .utf8
+        ).write(to: file)
+        let cert = URL(fileURLWithPath: folder).appendingPathComponent("server.pem").path
+        let key = URL(fileURLWithPath: folder).appendingPathComponent("server.key").path
+        let passed = try await cli(
+            ["preflight", file.path, "--ssl-client-cert", cert, "--ssl-client-key", key, "--json"],
+            timeout: 30)
+        XCTAssertEqual(passed.status, 0)
+        let bad = try await cli([
+            "preflight", file.path, "--ssl-client-cert", cert, "--ssl-client-key", file.path,
+            "--json",
+        ])
+        XCTAssertEqual(bad.status, 2)
+        let mismatch = try await cli([
+            "preflight", file.path, "--ssl-client-cert", cert, "--ssl-client-key",
+            URL(fileURLWithPath: folder).appendingPathComponent("ca.key").path, "--json",
+        ])
+        XCTAssertEqual(mismatch.status, 2)
+    }
+
 }
