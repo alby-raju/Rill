@@ -4,8 +4,8 @@ set -euo pipefail
 RILL_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$RILL_ROOT"
 RILL_MODE="${1:-}"
-if [[ "$RILL_MODE" != "" && "$RILL_MODE" != "--screenshots" ]]; then
-  echo 'Usage: bash scripts/render-ui-previews.sh [--screenshots]' >&2
+if [[ "$RILL_MODE" != "" && "$RILL_MODE" != "--screenshots" && "$RILL_MODE" != "--selectors" ]]; then
+  echo 'Usage: bash scripts/render-ui-previews.sh [--screenshots|--selectors]' >&2
   exit 2
 fi
 swift build --product Rill
@@ -46,6 +46,8 @@ states = [
 ]
 if mode == "--screenshots":
     states = [("response-passed", "dark", 1440), ("empty", "light", 1050)]
+elif mode == "--selectors":
+    states = [state for state in states if state[0].startswith("selector-")]
 for state, theme, width in states:
     name = (
         {"response-passed": "workbench-dark", "empty": "welcome-light"}[state]
