@@ -271,7 +271,7 @@ struct WorkbenchView: View {
                 }
                 .menuStyle(.borderlessButton)
             }.buttonStyle(.plain).font(.callout).foregroundStyle(.secondary).padding(20)
-        }.background(Color(nsColor: .windowBackgroundColor))
+        }.modifier(RillGlassSurface(role: .navigation, cornerRadius: 0))
     }
     private func collectionExpansion(_ id: UUID) -> Binding<Bool> {
         Binding(
@@ -380,7 +380,7 @@ struct WorkbenchView: View {
                         }.font(.caption).padding(.horizontal, 12).padding(.vertical, 10)
                             .background(
                                 store.selection == id ? accent.opacity(0.13) : Color.clear,
-                                in: RoundedRectangle(cornerRadius: 6)
+                                in: RoundedRectangle(cornerRadius: 10)
                             )
                             .overlay(
                                 RequestTabMenu(
@@ -401,7 +401,7 @@ struct WorkbenchView: View {
                     }
                 }
             }.padding(.horizontal, 16).padding(.bottom, 6)
-        }
+        }.modifier(RillGlassSurface(role: .toolbar, cornerRadius: 0))
     }
     private var topbar: some View {
         HStack {
@@ -417,6 +417,7 @@ struct WorkbenchView: View {
             }.buttonStyle(RillButtonStyle(emphasis: .quiet)).help("Find request (⌘K)")
                 .accessibilityLabel("Find request")
         }.padding(.horizontal, 24).padding(.vertical, 15)
+            .modifier(RillGlassSurface(role: .toolbar, cornerRadius: 0))
     }
 }
 func methodColor(_ method: HTTPMethod) -> Color {
