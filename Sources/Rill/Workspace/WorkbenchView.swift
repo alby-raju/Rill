@@ -4,7 +4,13 @@ import SwiftUI
 private let accent = RillPalette.accent
 struct WorkbenchView: View {
     @EnvironmentObject private var store: WorkbenchStore
-    @SwiftUI.Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @SwiftUI.Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+    private var reduceMotion: Bool {
+        #if DEBUG
+            if RillPreview.accessibleSelector { return true }
+        #endif
+        return systemReduceMotion
+    }
     @ViewState private var launchIntroductionFinished = false
     private var showingLaunch: Bool { store.loading || !launchIntroductionFinished }
     @ViewState private var selector: WorkbenchSelector?
@@ -50,17 +56,25 @@ struct WorkbenchView: View {
             }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .background(RillPalette.canvas)
                 .overlay {
-                    if let selector {
-                        ContainedWorkbenchSelector(dismiss: { self.selector = nil }) {
-                            if selector == .layout {
-                                RequestLayoutSelectionPanel(selection: $requestLayout) {
-                                    self.selector = nil
+                    ZStack {
+                        if let selector {
+                            ContainedWorkbenchSelector(dismiss: { self.selector = nil }) {
+                                if selector == .layout {
+                                    RequestLayoutSelectionPanel(selection: $requestLayout) {
+                                        self.selector = nil
+                                    }
+                                } else {
+                                    EnvironmentSelectionPanel { self.selector = nil }
                                 }
-                            } else {
-                                EnvironmentSelectionPanel { self.selector = nil }
                             }
+                            .transition(
+                                reduceMotion
+                                    ? .identity
+                                    : .opacity.combined(
+                                        with: .scale(scale: 0.98, anchor: .topTrailing)))
                         }
                     }
+                    .animation(reduceMotion ? nil : .smooth(duration: 0.18), value: selector)
                 }
         }
         #if DEBUG
