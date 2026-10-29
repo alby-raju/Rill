@@ -145,5 +145,12 @@ import XCTest
             XCTAssertTrue(diagnostic.contains(expected), diagnostic)
             XCTAssertFalse(diagnostic.contains("private-marker"))
         }
+        // Extra vendor metadata must not misclassify an otherwise valid Postman collection.
+        let postman =
+            #"{"info":{"name":"fixture","schema":"https://schema.getpostman.com/json/collection/v2.1.0/collection.json"},"item":[{"name":"fixture","request":{"method":"GET","url":"http://127.0.0.1:1"}}],"resources":[],"requests":[],"collections":[]}"#
+        try Data(postman.utf8).write(to: file)
+        let valid = try await cli(["preflight", file.path])
+        XCTAssertEqual(valid.status, 0, String(decoding: valid.diagnostics, as: UTF8.self))
+
     }
 }

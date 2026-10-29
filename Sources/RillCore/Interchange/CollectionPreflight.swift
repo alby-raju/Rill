@@ -34,13 +34,13 @@ public struct CollectionPreflight: Encodable, Sendable {
             return value
         }
         let root = try object(collection)
-        if root["resources"] is [[String: Any]] || root["__export_format"] != nil {
-            throw CollectionPreflightInputError.insomnia
-        }
-        if root["requests"] is [[String: Any]], root["collections"] is [[String: Any]] {
-            throw CollectionPreflightInputError.nativeWorkspace
-        }
         guard root["info"] is [String: Any], root["item"] is [[String: Any]] else {
+            if root["resources"] is [[String: Any]] || root["__export_format"] != nil {
+                throw CollectionPreflightInputError.insomnia
+            }
+            if root["requests"] is [[String: Any]], root["collections"] is [[String: Any]] {
+                throw CollectionPreflightInputError.nativeWorkspace
+            }
             throw PostmanImportError.invalid
         }
         var result = Self()
