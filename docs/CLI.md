@@ -42,9 +42,9 @@ Performance reports show throughput, p50/p95/p99 and min/max latency, plus optio
 
 TTY sessions show append-only progress on stderr as each attempt completes. Redirected output and `--json` have no progress; `--quiet` suppresses normal output and progress. Colors are automatic only on a capable TTY, respecting `NO_COLOR` and `TERM=dumb`; override with `--color always|never`. Color is supplementary: every result has a text state. Existing exit codes, cancellation/report flushing and payload export behavior are unchanged.
 
-## Offline collection preflight (unreleased)
+## Offline collection preflight (since 0.4.4)
 
-Available from development source after 0.4.3; it is not included in the published 0.4.3 app. Build `RillCLI`, then inspect a local Postman v2 collection without importing or sending it:
+Included since 0.4.4. Build `RillCLI` from source or use the packaged CLI to inspect a local Postman v2 collection without importing or sending it:
 
 ```sh
 swift run RillCLI preflight ./collection.json \
@@ -57,7 +57,7 @@ swift run RillCLI preflight ./collection.json \
 
 `--env-var` is repeatable; precedence is collection variables, then enabled environment values, then overrides (last override wins). Empty override values are valid. Other run commands reject these new file options rather than silently ignoring them. Native workspace inputs, direct file execution, globals, iteration data and a complete execution plan remain future work.
 
-Preflight blocks nonempty foreign scripts at collection/folder/request scope, unsupported importer representations, omitted transport settings, unresolved/cyclic/over-budget template references, invalid environments and empty collections. Script-produced variables are not inferred. Diagnostics identify JSON locations using indices, without echoing request names, arbitrary keys, URLs, variable values or script text. Terminal output shows the first 20 diagnostics by default; `--detail` expands it. At most 1,000 diagnostic records are retained; the total blocker count remains visible. Static variable analysis is bounded and conservative; it does not evaluate dynamic providers, JavaScript or arbitrary body-file contents.
+Preflight blocks nonempty foreign scripts at collection/folder/request scope, unsupported importer representations, omitted transport settings, unresolved/cyclic/over-budget template references, invalid environments and empty collections. Script-produced variables are not inferred. Diagnostics identify JSON locations using indices, without echoing request names, arbitrary keys, URLs, variable values or script text. Terminal output shows the first 20 diagnostics by default; `--detail` expands it. At most 1,000 diagnostic records are retained; the total blocker count remains visible. Static variable analysis is bounded and conservative; it recognizes the supported `$uuid`, `$timestamp`, `$email` and `$randomInt a b` syntax without generating values. Unsupported dynamic names and malformed arguments remain blockers. It does not evaluate JavaScript or arbitrary body-file contents.
 
 Optional PEM certificate/key inspection uses the fixed system `/usr/bin/openssl` with bounded input/output and deadlines. It checks PEM parsing, public-key pairing and certificate notAfter expiry only. It does not verify notBefore validity, certificate chains, hostname, revocation, server trust or actual mTLS negotiation. Only unencrypted PEM private keys are supported in this increment; encrypted keys, PKCS#12 and CA options remain future work. No private key or password is printed or imported into Keychain.
 

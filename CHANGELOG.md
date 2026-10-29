@@ -2,6 +2,10 @@
 
 ## 0.4.5 (unreleased)
 
+- Show one collection disclosure control, preserving saved collapse state and search expansion.
+- Recognize supported native dynamic templates in offline preflight without generating values; reject unsupported names and malformed arguments.
+- Remove force casts from collection adapters and runner failures, report the current version in the default User-Agent, and clarify invalid OpenAPI input diagnostics.
+
 - Keep request/response tab content inside bounded viewports so switching tabs does not impose new split-view constraints. Reduce the stacked response minimum and add a 420-case native resize regression.
 - Replace the large validation banner and empty Checks presentation with compact status and guidance; keep failures visible with a review action.
 - Omit grouping-only parent containers when importing flattened collections, while preserving intentional empty leaves and mixed parents.

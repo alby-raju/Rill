@@ -141,11 +141,7 @@ struct WorkbenchView: View {
             .padding(.horizontal, 20).padding(.top, 25).padding(.bottom, 8)
             List(selection: $store.selection) {
                 ForEach(store.workspace.collections) { collection in
-                    Section {
-                        if collectionExpansion(collection.id).wrappedValue {
-                            ForEach(filtered(collection.id)) { request in requestRow(request) }
-                        }
-                    } header: {
+                    Group {
                         Button {
                             let expanded = collectionExpansion(collection.id)
                             expanded.wrappedValue.toggle()
@@ -177,6 +173,8 @@ struct WorkbenchView: View {
                                 store.deleteCollection(collection)
                             }
                         }
+                        .font(.headline)
+                        .foregroundStyle(.secondary)
                         .dropDestination(for: String.self) { values, _ in
                             guard let raw = values.first, let id = UUID(uuidString: raw) else {
                                 return false
@@ -188,6 +186,9 @@ struct WorkbenchView: View {
                                 store.error = error.localizedDescription
                                 return false
                             }
+                        }
+                        if collectionExpansion(collection.id).wrappedValue {
+                            ForEach(filtered(collection.id)) { request in requestRow(request) }
                         }
                     }
                 }

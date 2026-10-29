@@ -316,7 +316,7 @@ public enum PostmanImporter {
                     request.contentType = mime
                 }
             case "urlencoded", "formdata":
-                let mode = body["mode"] as! String
+                guard let mode = body["mode"] as? String else { throw PostmanImportError.invalid }
                 guard let rows = body[mode] as? [[String: Any]], rows.count <= 10_000 else {
                     throw PostmanImportError.invalid
                 }

@@ -73,7 +73,7 @@ final class CollectionPreflightTests: XCTestCase {
             })
         XCTAssertThrowsError(try CollectionPreflight.inspect(collection: Data("{}".utf8)))
     }
-    func testEmptyScriptsDoNotBlockButDynamicReferencesDo() throws {
+    func testEmptyScriptsDoNotBlockButUnsupportedDynamicReferencesDo() throws {
         let input = try collection(
             [request("http://127.0.0.1:1")], extra: ["event": [["script": ["exec": ["  "]]]]])
         XCTAssertTrue(try CollectionPreflight.inspect(collection: input).passed)
@@ -82,6 +82,33 @@ final class CollectionPreflightTests: XCTestCase {
                 collection: collection([request("http://127.0.0.1:1/{{$guid}}")])
             ).passed)
     }
+    func testDynamicTemplateSyntaxMatchesRuntimeWithoutGeneratingValues() throws {
+        for key in [
+            "$uuid", "$timestamp", "$email", "$randomInt 1 9", "$randomInt -9 -1", "$randomInt 7 7",
+        ] {
+            XCTAssertTrue(DynamicTemplates.supports(key), key)
+            XCTAssertTrue(
+                try CollectionPreflight.inspect(
+                    collection: collection([request("http://127.0.0.1:1/{{nested}}")]),
+                    overrides: ["nested": "{{" + key + "}}"]
+                ).passed, key)
+            XCTAssertNoThrow(try VariableExpansion.resolve("{{" + key + "}}", values: [:]))
+        }
+        for key in [
+            "$guid", "$uuid extra", "$randomInt", "$randomInt 9 1", "$randomInt x 9",
+            "$randomInt 1 999999999999999999999999", "$timestamp extra",
+        ] {
+            XCTAssertFalse(DynamicTemplates.supports(key), key)
+            XCTAssertFalse(
+                try CollectionPreflight.inspect(
+                    collection: collection([request("http://127.0.0.1:1/{{" + key + "}}")]),
+                    overrides: [key: "must-not-mask-invalid-provider"]
+                ).passed, key)
+            XCTAssertThrowsError(
+                try VariableExpansion.resolve("{{" + key + "}}", values: [key: "ignored"]))
+        }
+    }
+
     func testDiagnosticRetentionAndExpansionBudgetAreBounded() throws {
         let event: [[String: Any]] = [["script": ["exec": ["pm.test('fixture', () => {})"]]]]
         let items = (0..<1100).map { _ -> [String: Any] in

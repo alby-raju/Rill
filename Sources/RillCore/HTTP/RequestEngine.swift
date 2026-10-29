@@ -114,7 +114,7 @@ public enum RequestEngine {
         request.httpMethod = draft.method.rawValue
         request.timeoutInterval = draft.timeout
         request.setValue("application/json, */*;q=0.5", forHTTPHeaderField: "Accept")
-        request.setValue("Rill/0.1", forHTTPHeaderField: "User-Agent")
+        request.setValue("Rill/" + RillVersion.number, forHTTPHeaderField: "User-Agent")
         var headerNames = Set<String>()
         for field in draft.headers where field.enabled && !field.name.isEmpty {
             let name = try expand(field.name)

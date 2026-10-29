@@ -23,6 +23,8 @@ states = [
     ("environment-editor", "light", 1440),
     ("copy-request", "dark", 1440),
     ("collection-transfer", "dark", 1440),
+    ("collections-expanded", "dark", 1050),
+    ("collections-collapsed", "dark", 1050),
     ("move-request", "light", 1440),
     ("empty", "dark", 1440),
     ("empty", "light", 1050),

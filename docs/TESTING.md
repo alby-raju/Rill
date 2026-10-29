@@ -9,7 +9,7 @@ bash scripts/test.sh
 
 The wrapper builds the native CLI and selected protobuf compiler, starts loopback HTTP/TLS/live/MQTT/AMQP fixtures, waits for readiness, runs tests and stops its fixtures. It uses ports 18749–18757; stop optional manual TLS fixtures first if they conflict. Required endpoint cases must not be skipped in CI. A bare `swift test` without fixture variables is only a partial run.
 
-The current suite has **272 tests**, covering persistence/recovery, request fidelity, credentials/TLS, imports/bounds, assertions/hooks/runners, schemas, native protocol sessions, CLI behavior, privacy and bulk-tab safety. Tests are grouped under `Tests/RillCoreTests` by behavior domain. The native Kafka mock bridge is test-only and is not independent production-broker acceptance.
+The current suite has **276 tests**, covering persistence/recovery, request fidelity, credentials/TLS, imports/bounds, assertions/hooks/runners, schemas, native protocol sessions, CLI behavior, privacy and bulk-tab safety. Tests are grouped under `Tests/RillCoreTests` by behavior domain. The native Kafka mock bridge is test-only and is not independent production-broker acceptance.
 
 ## Focus a regression
 
@@ -50,7 +50,7 @@ Optional Python gRPC and generated TLS/mTLS need explicit setup. The core kit in
 bash scripts/render-ui-previews.sh
 ```
 
-A local WindowServer is required. The actual app renders isolated synthetic light/dark, compact/wide, welcome/loading/body/auth/workflow/response states into ignored `dist/ui-review`. The 100-tab diagnostics check bulk-close stability and one native menu build while 30 store updates occur during active menu tracking. Debug arguments are excluded from release builds. These captures are not a substitute for VoiceOver, input/focus or owner acceptance. Run `bash scripts/render-ui-previews.sh --screenshots` to refresh the two tracked README screenshots from the current app build.
+A local WindowServer is required. The actual app renders isolated synthetic light/dark, compact/wide, welcome/loading/body/auth/workflow/response states into ignored `dist/ui-review`. The 100-tab diagnostics check bulk-close stability and one native menu build while 30 store updates occur during active menu tracking. Debug arguments are excluded from release builds. The expanded/collapsed collection captures also check the sidebar disclosure presentation. These captures are not a substitute for VoiceOver, input/focus or owner acceptance. Run `bash scripts/render-ui-previews.sh --screenshots` to refresh the two tracked README screenshots from the current app build.
 
 The Close All interaction fix was retested successfully by the owner in installed 0.3.3. Its live sample traced the stall to repeated active context-menu rebuilding, not the ~1–2 ms tab-state operation. Raw process samples remain private and are not release assets. Detailed historical evidence is linked from the performance PR and capability checklist.
 
