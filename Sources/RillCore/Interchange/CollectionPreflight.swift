@@ -86,6 +86,13 @@ public struct CollectionPreflight: Encodable, Sendable {
                     return
                 }
                 let key = String(text[range]).trimmingCharacters(in: .whitespacesAndNewlines)
+                if key.hasPrefix("$") {
+                    if !DynamicTemplates.supports(key) {
+                        valid = false
+                        stop.pointee = true
+                    }
+                    return
+                }
                 guard !seen.contains(key), let value = variables[key],
                     references(value, seen: seen.union([key]), depth: depth + 1)
                 else {
@@ -106,7 +113,7 @@ public struct CollectionPreflight: Encodable, Sendable {
                 if row["disabled"] as? Bool == true { return }
                 for key in row.keys.sorted() where key != "description" {
                     // Only fixed field names are emitted: never echo arbitrary JSON keys.
-                    fields(row[key]!, path: path)
+                    if let child = row[key] { fields(child, path: path) }
                 }
             }
         }

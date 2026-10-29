@@ -19,6 +19,18 @@ final class RequestEngineTests: XCTestCase {
             [URLQueryItem(name: "existing", value: "1"), URLQueryItem(name: "q", value: "a & b")])
         XCTAssertEqual(prepared.value(forHTTPHeaderField: "X-Test"), "a & b")
     }
+    func testDefaultUserAgentUsesCurrentVersionAndAllowsExplicitOverride() throws {
+        var request = RequestDraft()
+        request.url = "https://example.test"
+        XCTAssertEqual(
+            try RequestEngine.prepare(request, environment: nil).value(
+                forHTTPHeaderField: "User-Agent"), "Rill/" + RillVersion.number)
+        request.headers = [Field(name: "User-Agent", value: "custom-client")]
+        XCTAssertEqual(
+            try RequestEngine.prepare(request, environment: nil).value(
+                forHTTPHeaderField: "User-Agent"), "custom-client")
+    }
+
     func testMissingVariableDoesNotSendLiteralTemplate() {
         var request = RequestDraft()
         request.url = "https://{{unknown}}/"

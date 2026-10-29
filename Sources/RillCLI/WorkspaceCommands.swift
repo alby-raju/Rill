@@ -332,13 +332,28 @@ extension RillCLI {
         }
     }
     static func loadDefinition(_ location: String) async throws -> APIDefinition {
-        if location.hasPrefix("https://") || location.hasPrefix("http://") {
-            return try await APIDefinitionLoader.fetch(location)
+        do {
+            if location.hasPrefix("https://") || location.hasPrefix("http://") {
+                return try await APIDefinitionLoader.fetch(location)
+            }
+            let url = URL(fileURLWithPath: location).standardizedFileURL
+            return try APIDefinitionLoader.parse(
+                BoundedFileInput.read(url, limit: 8 * 1024 * 1024), location: url.path)
+        } catch is SchemaError {
+            throw CLIError.usage(
+                "Invalid or unsupported OpenAPI/Swagger definition. Supply an OpenAPI 3.x or Swagger 2.0 JSON/YAML document within supported limits; source content omitted."
+            )
+        } catch is ComparisonError {
+            throw CLIError.usage(
+                "Could not parse an OpenAPI/Swagger JSON document within supported limits; source content omitted."
+            )
+        } catch is YAMLImportError {
+            throw CLIError.usage(
+                "Could not parse an OpenAPI/Swagger JSON/YAML document within supported limits; source content omitted."
+            )
         }
-        let url = URL(fileURLWithPath: location).standardizedFileURL
-        return try APIDefinitionLoader.parse(
-            BoundedFileInput.read(url, limit: 8 * 1024 * 1024), location: url.path)
     }
+
     static func reports(_ report: RunReport, arguments args: Arguments) async throws {
         var outputs: [String: Data] = [:]
         if let destination = args.value("report") {

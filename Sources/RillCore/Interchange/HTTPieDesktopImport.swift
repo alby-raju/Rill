@@ -128,7 +128,9 @@ public enum HTTPieDesktopImporter {
                         mime)
                 else { throw HTTPieDesktopImportError.unsupported }
                 result["body"] = ["mode": "raw", "raw": value]
-                var headers = result["header"] as! [[String: Any]]
+                guard var headers = result["header"] as? [[String: Any]] else {
+                    throw HTTPieDesktopImportError.invalid
+                }
                 if !headers.contains(where: {
                     ($0["key"] as? String)?.lowercased() == "content-type"
                         && $0["disabled"] as? Bool == false

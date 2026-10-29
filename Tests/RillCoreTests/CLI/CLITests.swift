@@ -228,6 +228,32 @@ import XCTest
             String(decoding: socket.output, as: UTF8.self).contains("private-stream-payload"))
     }
 
+    func testInvalidOpenAPIDocumentsHaveSpecificRedactedDiagnostics() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+            UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let source = directory.appendingPathComponent("api.html")
+        let workspace = directory.appendingPathComponent("workspace.json")
+        try WorkspaceFile.save(Workspace(), to: workspace)
+        let original = try Data(contentsOf: workspace)
+        for text in [
+            "<html>private-document-marker</html>", "{\"private-document-marker\":true}",
+            "openapi: 9.0.0\npaths: {}", "{\"private-document-marker\":",
+
+        ] {
+            try Data(text.utf8).write(to: source)
+            let result = try await cli([
+                "openapi-import", source.path, "--workspace", workspace.path, "--apply",
+            ])
+            XCTAssertEqual(result.status, 2)
+            let output = String(decoding: result.diagnostics, as: UTF8.self)
+            XCTAssertTrue(output.contains("OpenAPI/Swagger"), output)
+            XCTAssertFalse(output.contains("private-document-marker"))
+            XCTAssertEqual(try Data(contentsOf: workspace), original)
+        }
+    }
+
     func testOfflinePreflightDoesNotWriteWorkspaceAndRejectsMisappliedOptions() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
             "rill-preflight-" + UUID().uuidString)

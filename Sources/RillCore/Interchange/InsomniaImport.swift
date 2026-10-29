@@ -197,7 +197,9 @@ public enum InsomniaImporter {
                 } else {
                     throw InsomniaImportError.unsupported
                 }
-                var headers = result["header"] as! [[String: Any]]
+                guard var headers = result["header"] as? [[String: Any]] else {
+                    throw InsomniaImportError.invalid
+                }
                 if !headers.contains(where: {
                     ($0["key"] as? String)?.lowercased() == "content-type"
                         && $0["disabled"] as? Bool == false
@@ -371,11 +373,14 @@ public enum InsomniaImporter {
                 return try (children[id] ?? []).filter {
                     ["request", "request_group", "folder"].contains($0["_type"] as? String ?? "")
                 }.map { row in
+                    guard let rowID = row["_id"] as? String else {
+                        throw InsomniaImportError.invalid
+                    }
                     var copy = row
                     if row["_type"] as? String != "request" {
-                        copy["children"] = try convert(row["_id"] as! String, depth: depth + 1)
+                        copy["children"] = try convert(rowID, depth: depth + 1)
                     } else {
-                        visited.insert(row["_id"] as! String)
+                        visited.insert(rowID)
                     }
                     return copy
                 }
@@ -390,7 +395,7 @@ public enum InsomniaImporter {
             let collection = try convert(rootID, depth: 0)
             for row in resources
             where ["request", "request_group", "folder"].contains(row["_type"] as? String ?? "") {
-                guard visited.contains(row["_id"] as! String) else {
+                guard let rowID = row["_id"] as? String, visited.contains(rowID) else {
                     throw InsomniaImportError.invalid
                 }
             }
@@ -401,7 +406,7 @@ public enum InsomniaImporter {
             result["collection"] = collection
             result["name"] = workspaces[0]["name"] as? String ?? "Insomnia import"
             if var base = bases.first {
-                let baseID = base["_id"] as! String
+                guard let baseID = base["_id"] as? String else { throw InsomniaImportError.invalid }
                 let subs = envs.filter { $0["parentId"] as? String == baseID }
                 guard subs.count + 1 == envs.count else { throw InsomniaImportError.unsupported }
                 base["subEnvironments"] = subs

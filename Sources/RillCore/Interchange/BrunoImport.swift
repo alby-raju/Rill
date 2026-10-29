@@ -329,7 +329,9 @@ public enum BrunoImporter {
                         body == "body:text"
                         ? "text/plain"
                         : (body == "body:xml" ? "application/xml" : "application/json")
-                    var headers = object["header"] as! [[String: Any]]
+                    guard var headers = object["header"] as? [[String: Any]] else {
+                        throw BrunoImportError.invalid
+                    }
                     if !headers.contains(where: {
                         ($0["key"] as? String)?.lowercased() == "content-type"
                             && $0["disabled"] as? Bool == false

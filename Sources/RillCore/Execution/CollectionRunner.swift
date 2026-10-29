@@ -210,9 +210,8 @@ public enum CollectionRunner {
                                 requestID: request.id, started: attemptStarted,
                                 iteration: iteration, attempt: attempt, state: .failed,
                                 duration: ProcessInfo.processInfo.systemUptime - before, checks: [],
-                                failure: error is WorkflowError
-                                    ? (error as! WorkflowError).rawValue
-                                    : DiagnosticFailure.classify(error).rawValue,
+                                failure: (error as? WorkflowError)?.rawValue
+                                    ?? DiagnosticFailure.classify(error).rawValue,
                                 bodyBytes: 0, bodyOmitted: true)
                             report.outcomes.append(outcome)
                             if let progress {

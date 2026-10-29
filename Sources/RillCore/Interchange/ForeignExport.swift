@@ -133,7 +133,9 @@ public enum PostmanExporter {
         case .none: break
         case .text:
             request["body"] = ["mode": "raw", "raw": input.body]
-            var headers = request["header"] as! [[String: Any]]
+            guard var headers = request["header"] as? [[String: Any]] else {
+                throw ForeignExportError.unsupported
+            }
             if !input.headers.contains(where: {
                 $0.enabled && $0.name.lowercased() == "content-type"
             }) {
@@ -181,7 +183,9 @@ public enum PostmanExporter {
                 $0.enabled && $0.name.lowercased() == "content-type"
             })
         {
-            var headers = request["header"] as! [[String: Any]]
+            guard var headers = request["header"] as? [[String: Any]] else {
+                throw ForeignExportError.unsupported
+            }
             headers.append(["key": "Content-Type", "value": input.contentType, "disabled": false])
             request["header"] = headers
         }
