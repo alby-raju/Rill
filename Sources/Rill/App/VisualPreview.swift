@@ -18,6 +18,9 @@ import SwiftUI
         : isRendering ? UserDefaults(suiteName: preferenceDomain)! : .standard
 
     #if DEBUG
+        static var accessibleSelector: Bool {
+            argument("--ui-state")?.hasSuffix("-accessible") == true
+        }
         static let selectors = PassthroughSubject<WorkbenchSelector?, Never>()
         static let responseSections = PassthroughSubject<String, Never>()
         static let requestSections = PassthroughSubject<String, Never>()
@@ -30,7 +33,7 @@ import SwiftUI
                 let store = WorkbenchStore(
                     preview: ["blank", "intro"].contains(state) ? "empty" : state)
                 previewStore = store
-                if state == "selector-environment" {
+                if state.hasPrefix("selector-environment") {
                     store.workspace.environments = (0..<12).map { index in
                         RillCore.Environment(
                             name: "Synthetic environment \(index) with a long descriptive name")
@@ -101,7 +104,7 @@ import SwiftUI
                     try await verifyTabResizing(window)
                 }
                 if let state = argument("--ui-state"), state.hasPrefix("selector-") {
-                    selectors.send(state == "selector-layout" ? .layout : .environment)
+                    selectors.send(state.hasPrefix("selector-layout") ? .layout : .environment)
                     try await Task.sleep(for: .milliseconds(200))
                     do {
                         guard let root = window.contentView else {
@@ -115,10 +118,17 @@ import SwiftUI
                             }
                             return nil
                         }
+                        func settleDismissal() async throws {
+                            for _ in 0..<40 {
+                                root.layoutSubtreeIfNeeded()
+                                if find(root) == nil { return }
+                                try await Task.sleep(for: .milliseconds(25))
+                            }
+                        }
                         guard let panel = find(root) else { throw CocoaError(.coderInvalidValue) }
                         let rect = panel.convert(panel.bounds, to: root)
                         guard rect.width >= 250, rect.height >= 150,
-                            rect.height <= (state == "selector-layout" ? 360 : 600),
+                            rect.height <= (state.hasPrefix("selector-layout") ? 360 : 600),
                             root.bounds.insetBy(dx: -1, dy: -1).contains(rect)
                         else {
                             fputs("Selector escaped workbench: \(rect) in \(root.bounds)\n", stderr)
@@ -129,7 +139,7 @@ import SwiftUI
                         )
                         window.makeKeyAndOrderFront(nil)
                         NSApplication.shared.activate(ignoringOtherApps: true)
-                        try await Task.sleep(for: .milliseconds(150))
+                        try await Task.sleep(for: .milliseconds(350))
                         guard
                             let escape = NSEvent.keyEvent(
                                 with: .keyDown, location: .zero, modifierFlags: [],
@@ -140,13 +150,13 @@ import SwiftUI
                             )
                         else { throw CocoaError(.coderInvalidValue) }
                         if !window.performKeyEquivalent(with: escape) { window.sendEvent(escape) }
-                        try await Task.sleep(for: .milliseconds(150))
+                        try await settleDismissal()
                         guard find(root) == nil else {
                             fputs("Escape did not dismiss selector\n", stderr)
                             throw CocoaError(.coderInvalidValue)
                         }
-                        selectors.send(state == "selector-layout" ? .layout : .environment)
-                        try await Task.sleep(for: .milliseconds(150))
+                        selectors.send(state.hasPrefix("selector-layout") ? .layout : .environment)
+                        try await Task.sleep(for: .milliseconds(350))
                         let outside = root.convert(
                             NSPoint(x: root.bounds.width * 0.4, y: root.bounds.height * 0.5),
                             to: nil)
@@ -162,15 +172,15 @@ import SwiftUI
                             window.sendEvent(event)
                             try await Task.sleep(for: .milliseconds(40))
                         }
-                        try await Task.sleep(for: .milliseconds(150))
+                        try await settleDismissal()
                         guard find(root) == nil else {
                             fputs("Click-away did not dismiss selector\n", stderr)
                             throw CocoaError(.coderInvalidValue)
                         }
-                        if state == "selector-layout" {
+                        if state.hasPrefix("selector-layout") {
                             for value in ["vertical", "horizontal", "automatic"] {
                                 selectors.send(.layout)
-                                try await Task.sleep(for: .milliseconds(150))
+                                try await Task.sleep(for: .milliseconds(350))
                                 guard let choice = find(root, id: "rill.selector.choice." + value)
                                 else {
                                     throw CocoaError(.coderInvalidValue)
@@ -189,7 +199,7 @@ import SwiftUI
                                     window.sendEvent(event)
                                     try await Task.sleep(for: .milliseconds(40))
                                 }
-                                try await Task.sleep(for: .milliseconds(150))
+                                try await settleDismissal()
                                 guard find(root) == nil,
                                     preferences.string(forKey: "requestLayout") == value
                                 else {
@@ -199,8 +209,8 @@ import SwiftUI
                             }
                         }
                         print("RILL_SELECTOR_INTERACTIONS_OK state=\(state)")
-                        selectors.send(state == "selector-layout" ? .layout : .environment)
-                        try await Task.sleep(for: .milliseconds(150))
+                        selectors.send(state.hasPrefix("selector-layout") ? .layout : .environment)
+                        try await Task.sleep(for: .milliseconds(350))
 
                     }
                 }

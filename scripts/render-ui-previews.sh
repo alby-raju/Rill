@@ -19,6 +19,8 @@ executable, root, mode = sys.argv[1], Path(sys.argv[2]), sys.argv[3]
 destination = root / ("docs/images" if mode == "--screenshots" else "dist/ui-review")
 destination.mkdir(parents=True, exist_ok=True)
 states = [
+    ("selector-layout-accessible", "dark", 1050),
+    ("selector-environment-accessible", "light", 1440),
     ("selector-layout", "dark", 1050),
     ("selector-layout", "light", 1440),
     ("selector-environment", "dark", 1050),

@@ -7,6 +7,7 @@ struct SelectionRow: View {
     var detail = ""
     var icon = "folder"
     var selected = false
+    var focusOnAppear = false
     var action: () -> Void
     @FocusState private var focused: Bool
     @ViewState private var hovered = false
@@ -30,7 +31,8 @@ struct SelectionRow: View {
                     in: RoundedRectangle(cornerRadius: 8)
                 )
                 .contentShape(Rectangle())
-        }.buttonStyle(.plain).focused($focused)
+        }.buttonStyle(.plain).focusEffectDisabled().focused($focused)
+            .onAppear { if focusOnAppear { focused = true } }
             .overlay(
                 RoundedRectangle(cornerRadius: 8).strokeBorder(
                     focused ? RillPalette.accent : .clear, lineWidth: 1.5)
@@ -63,6 +65,7 @@ struct EnvironmentSelectionPanel: View {
     @EnvironmentObject var store: WorkbenchStore
     var dismiss: () -> Void
     @ViewState private var search = ""
+    @FocusState private var searchFocused: Bool
     private var matches: [RillCore.Environment] {
         store.workspace.environments.filter {
             search.isEmpty || $0.name.localizedCaseInsensitiveContains(search)
@@ -75,20 +78,26 @@ struct EnvironmentSelectionPanel: View {
                 .foregroundStyle(.secondary)
             if store.workspace.environments.count > 5 {
                 TextField("Find environment", text: $search).textFieldStyle(RillTextFieldStyle())
+                    .focused($searchFocused).onAppear { searchFocused = true }
             }
             ScrollView {
                 LazyVStack(spacing: 3) {
                     SelectionRow(
                         title: "No environment",
                         detail: "Use request values without environment variables",
-                        icon: "circle.slash", selected: store.workspace.selectedEnvironmentID == nil
+                        icon: "circle.slash",
+                        selected: store.workspace.selectedEnvironmentID == nil,
+                        focusOnAppear: store.workspace.selectedEnvironmentID == nil
+                            && store.workspace.environments.count <= 5
                     ) { choose(nil) }
                     ForEach(matches) { environment in
                         SelectionRow(
                             title: environment.name,
                             detail: "\(environment.variables.count) local variables",
                             icon: "square.stack.3d.up",
-                            selected: store.workspace.selectedEnvironmentID == environment.id
+                            selected: store.workspace.selectedEnvironmentID == environment.id,
+                            focusOnAppear: store.workspace.selectedEnvironmentID == environment.id
+                                && store.workspace.environments.count <= 5
                         ) { choose(environment.id) }
                     }
                     if matches.isEmpty && !search.isEmpty {
@@ -138,7 +147,10 @@ struct RequestLayoutSelectionPanel: View {
     private func choice(_ value: String, _ title: String, _ detail: String, _ icon: String)
         -> some View
     {
-        SelectionRow(title: title, detail: detail, icon: icon, selected: selection == value) {
+        SelectionRow(
+            title: title, detail: detail, icon: icon, selected: selection == value,
+            focusOnAppear: selection == value
+        ) {
             selection = value
             dismiss()
         }
@@ -152,7 +164,6 @@ struct RequestLayoutSelectionPanel: View {
 struct ContainedWorkbenchSelector<Content: View>: View {
     var dismiss: () -> Void
     @ViewBuilder var content: () -> Content
-    @FocusState private var focused: Bool
     @ViewState private var contentHeight: CGFloat = 300
     var body: some View {
         GeometryReader { viewport in
@@ -177,8 +188,7 @@ struct ContainedWorkbenchSelector<Content: View>: View {
                 .frame(width: min(360, max(0, viewport.size.width - 32)))
                 .frame(height: min(contentHeight, max(0, viewport.size.height - 88)))
                 .onPreferenceChange(SelectorHeightKey.self) { contentHeight = $0 }
-                .background(RillPalette.canvas, in: RoundedRectangle(cornerRadius: 12))
-                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(RillPalette.line))
+                .modifier(SelectorSurface())
                 .overlay(alignment: .topTrailing) {
                     Button(action: dismiss) { Image(systemName: "xmark") }
                         .buttonStyle(RillButtonStyle(emphasis: .quiet))
@@ -186,13 +196,11 @@ struct ContainedWorkbenchSelector<Content: View>: View {
                         .accessibilityLabel("Close selector")
                         .padding(6)
                 }
-                .shadow(color: .black.opacity(0.22), radius: 12, y: 5)
+                .shadow(color: .black.opacity(0.14), radius: 14, y: 5)
                 #if DEBUG
                     .background(SelectorBoundsProbe())
                 #endif
-                .focusable().focused($focused)
                 .onExitCommand(perform: dismiss)
-                .onAppear { focused = true }
                 .padding(.top, 72).padding(.trailing, 16)
             }
         }
@@ -237,5 +245,39 @@ private struct SelectorDismissBackdrop: NSViewRepresentable {
             return super.hitTest(point)
         }
         override func mouseDown(with event: NSEvent) { dismiss() }
+        // Consume the matching release instead of forwarding it to underlying editors.
+        override func mouseUp(with event: NSEvent) {}
+    }
+}
+
+private struct SelectorSurface: ViewModifier {
+    @SwiftUI.Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @SwiftUI.Environment(\.colorSchemeContrast) private var contrast
+    private var needsOpaqueSurface: Bool {
+        #if DEBUG
+            if RillPreview.accessibleSelector { return true }
+        #endif
+        return reduceTransparency || contrast == .increased
+    }
+    @ViewBuilder func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 12)
+        if needsOpaqueSurface {
+            content.background(RillPalette.canvas, in: shape)
+                .overlay(shape.strokeBorder(Color.primary.opacity(0.25)))
+        } else if #available(macOS 26.0, *) {
+            content.foregroundStyle(.primary)
+                .background {
+                    ZStack {
+                        shape.fill(.clear).glassEffect(.regular, in: shape)
+                        shape.fill(RillPalette.canvas.opacity(0.86))
+                    }
+                }
+                .overlay(shape.strokeBorder(RillPalette.line))
+        } else {
+            content.foregroundStyle(.primary)
+                .background(.regularMaterial, in: shape)
+                .background(shape.fill(RillPalette.canvas.opacity(0.86)))
+                .overlay(shape.strokeBorder(RillPalette.line))
+        }
     }
 }
