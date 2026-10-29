@@ -2,6 +2,8 @@
 
 ## 0.4.5 (unreleased)
 
+- Unify workbench navigation, toolbars, tabs, selectors and secondary controls with shared glass/material styling, rounded contours and motion-aware hover/selection transitions. Keep data editors on solid surfaces and provide opaque accessibility fallbacks.
+
 - Remove whole-panel selector focus rings, focus the selected option/search control, and add native glass/material surfaces with readable backing and soft open/close transitions. Respect reduced motion, reduced transparency and increased contrast.
 
 - Add conservative `run COLLECTION.json` execution through the shared runner: Postman v2 environment/override inputs, transient secret values, offline blockers, whole-input preparation, explicit HTTP 2xx checks, reports/retries/cancellation and protected raw response export. Foreign scripts and unsupported inputs block before traffic; this is not Newman compatibility.

@@ -188,7 +188,7 @@ struct ContainedWorkbenchSelector<Content: View>: View {
                 .frame(width: min(360, max(0, viewport.size.width - 32)))
                 .frame(height: min(contentHeight, max(0, viewport.size.height - 88)))
                 .onPreferenceChange(SelectorHeightKey.self) { contentHeight = $0 }
-                .modifier(SelectorSurface())
+                .modifier(RillGlassSurface())
                 .overlay(alignment: .topTrailing) {
                     Button(action: dismiss) { Image(systemName: "xmark") }
                         .buttonStyle(RillButtonStyle(emphasis: .quiet))
@@ -247,37 +247,5 @@ private struct SelectorDismissBackdrop: NSViewRepresentable {
         override func mouseDown(with event: NSEvent) { dismiss() }
         // Consume the matching release instead of forwarding it to underlying editors.
         override func mouseUp(with event: NSEvent) {}
-    }
-}
-
-private struct SelectorSurface: ViewModifier {
-    @SwiftUI.Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    @SwiftUI.Environment(\.colorSchemeContrast) private var contrast
-    private var needsOpaqueSurface: Bool {
-        #if DEBUG
-            if RillPreview.accessibleSelector { return true }
-        #endif
-        return reduceTransparency || contrast == .increased
-    }
-    @ViewBuilder func body(content: Content) -> some View {
-        let shape = RoundedRectangle(cornerRadius: 12)
-        if needsOpaqueSurface {
-            content.background(RillPalette.canvas, in: shape)
-                .overlay(shape.strokeBorder(Color.primary.opacity(0.25)))
-        } else if #available(macOS 26.0, *) {
-            content.foregroundStyle(.primary)
-                .background {
-                    ZStack {
-                        shape.fill(.clear).glassEffect(.regular, in: shape)
-                        shape.fill(RillPalette.canvas.opacity(0.86))
-                    }
-                }
-                .overlay(shape.strokeBorder(RillPalette.line))
-        } else {
-            content.foregroundStyle(.primary)
-                .background(.regularMaterial, in: shape)
-                .background(shape.fill(RillPalette.canvas.opacity(0.86)))
-                .overlay(shape.strokeBorder(RillPalette.line))
-        }
     }
 }
