@@ -2,6 +2,9 @@
 
 ## 0.4.5 (unreleased)
 
+- Bound runtime variable-template scanning without overlapping whitespace quantifiers or eagerly collecting all matches. Preserve whitespace semantics, stop on cancellation, and enforce the substitution budget during scanning.
+- Set the ad-hoc CLI no-body mode explicitly rather than assigning an optional nil.
+
 - Add ad-hoc `request METHOD URL` with headers/text body inputs, temporary variable overrides, explicit saved environment/auth/TLS selection, redacted summaries and opt-in raw response files.
 - Identify recognizable Insomnia/native workspace preflight inputs with actionable redacted format guidance.
 - Isolate request/response pane hosting constraints from tab content so delayed native sizing updates cannot reset the divider to its minimum.

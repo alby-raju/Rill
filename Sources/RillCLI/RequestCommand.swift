@@ -64,7 +64,7 @@ extension RillCLI {
                     "Could not read a bounded UTF-8 body input; source content omitted.")
             }
         } else {
-            draft.bodyMode = .none
+            draft.bodyMode = RequestBodyMode.none
         }
         var overrides: [String: String] = [:]
         for row in args.values["env-var"] ?? [] {
