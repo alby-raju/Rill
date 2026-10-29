@@ -71,3 +71,5 @@ Packaging and fresh-machine acceptance are described in [RELEASE.md](RELEASE.md)
 ### Split-pane regression
 
 After `zsh scripts/package.sh`, run `python3 scripts/verify-tab-resizing.py`. It builds an isolated debug app using synthetic data and preferences, exercises all 35 request/response tab combinations at two divider positions in each orientation and with empty, failed and passed checks, and rejects layout jumps or constrained resize positions. It does not use the personal workspace. Debug controls are ignored by release builds.
+
+Use `python3 scripts/verify-tab-resizing.py --width 1050 --height 740` to exercise a compact viewport similar to hosted CI. Divider targets are derived from the actual pane size, since WindowServer can clamp the requested window to its display. All tab-switch stability checks remain enabled.

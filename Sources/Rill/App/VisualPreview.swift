@@ -87,7 +87,9 @@ import SwiftUI
                     }), var view = window.contentView
                 else { finish(1) }
                 let compact = argument("--ui-width").flatMap(Double.init) ?? 1440
-                window.setContentSize(NSSize(width: max(1050, compact), height: 920))
+                let previewHeight = argument("--ui-height").flatMap(Double.init) ?? 920
+                window.setContentSize(
+                    NSSize(width: max(1050, compact), height: max(700, previewHeight)))
                 if argument("--ui-state") == "response-resize" {
                     try await verifyTabResizing(window)
                 }

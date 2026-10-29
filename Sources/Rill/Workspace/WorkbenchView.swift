@@ -472,18 +472,22 @@ struct RequestEditor: View {
                     || (requestLayout == "automatic" && geometry.size.width >= 1050)
                 {
                     HSplitView {
-                        composition.frame(minWidth: 350).background(
+                        boundedPane { composition }.frame(minWidth: 350).background(
                             SplitAutosave(name: "rill.request.horizontal", vertical: true))
-                        ResponseView(exchange: store.response, running: store.running).frame(
+                        boundedPane {
+                            ResponseView(exchange: store.response, running: store.running)
+                        }.frame(
                             minWidth: 350)
                     }
                 } else {
                     VSplitView {
-                        composition.frame(
+                        boundedPane { composition }.frame(
                             minHeight: min(140, geometry.size.height * 0.35),
                             idealHeight: geometry.size.height * 0.45
                         ).background(SplitAutosave(name: "rill.request.vertical", vertical: false))
-                        ResponseView(exchange: store.response, running: store.running).frame(
+                        boundedPane {
+                            ResponseView(exchange: store.response, running: store.running)
+                        }.frame(
                             minHeight: min(
                                 180, geometry.size.height * 0.4))
                     }
@@ -494,6 +498,17 @@ struct RequestEditor: View {
         #if DEBUG
             .onReceive(RillPreview.requestSections) { section = $0 }
         #endif
+    }
+    /// Keep the native split item's sizing identity independent of selected tab content.
+    /// macOS 15 can otherwise redistribute space even when nested content is clipped.
+    private func boundedPane<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        let pane = content()
+        return GeometryReader { viewport in
+            pane.frame(
+                width: max(0, viewport.size.width), height: max(0, viewport.size.height),
+                alignment: .topLeading
+            ).clipped()
+        }
     }
     private var composition: some View {
         VStack(alignment: .leading, spacing: 0) {

@@ -1,10 +1,17 @@
 #!/usr/bin/env python3
 """Exercise synthetic request/response tab changes in an isolated debug app."""
 
+import argparse
 import subprocess
 import tempfile
 from pathlib import Path
 
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--width", type=int, default=1440)
+parser.add_argument("--height", type=int, default=920)
+options = parser.parse_args()
+if options.width < 1050 or options.height < 700:
+    parser.error("Use at least the app's minimum content size: 1050 × 700")
 ROOT = Path(__file__).resolve().parent.parent
 subprocess.run(["swift", "build", "--product", "Rill"], cwd=ROOT, check=True)
 products = Path(
@@ -36,6 +43,10 @@ with tempfile.TemporaryDirectory(prefix="rill-tab-resize-") as directory:
                 "response-resize",
                 "--ui-layout",
                 layout,
+                "--ui-width",
+                str(options.width),
+                "--ui-height",
+                str(options.height),
                 "--ui-snapshot",
                 str(folder / (layout + ".png")),
             ],
