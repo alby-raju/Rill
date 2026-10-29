@@ -1,8 +1,29 @@
 # Roadmap: CLI-first API testing
 
-Updated 28 October 2026. **This is a proposed delivery plan, not a list of shipped features or promised dates.** Current behavior is documented in [features and limits](docs/FEATURES.md) and the [CLI guide](docs/CLI.md).
+Updated 29 October 2026. **This is a proposed delivery plan, not a list of shipped features or promised dates.** Current behavior is documented in [features and limits](docs/FEATURES.md) and the [CLI guide](docs/CLI.md).
 
 Rill has reached an MVP development milestone. The next goal is a fast, local API testing workflow that moves from a collection file to a trustworthy CI result with minimal setup. Prioritize reproducibility, useful failure explanations and smooth migration over accumulating protocol names.
+
+## 1.0 scope and release-critical sequence
+
+The owner selected **local API development and CI first** on 29 October 2026. Hosted team collaboration and Linux/Windows desktop applications are outside this first release target. The existing desktop/CLI is macOS-only; portable CLI support requires its own proof before Linux or Windows CI can be advertised. Do not call this unrestricted parity with every Postman/HTTPie product surface.
+
+The [capability audit](docs/1.0-CAPABILITY-AUDIT.md) and its [122-row inventory](docs/1.0-capability-audit.csv) separate implementation starting points from unclosed acceptance. The preserved baseline remains 3 verified, 118 partial and 1 governance deviation; partial is not a count of absent features.
+
+Deliver focused PRs in this order, reusing the shared engines:
+
+| Gate | Concrete outcome | Evidence required before closing |
+| --- | --- | --- |
+| G0 — Daily-workbench reliability | Contained selectors, stable panes, reliable drafts/imports and keyboard flow | Compact/wide light/dark native checks, persisted choices, Escape/click-away, recovery/upgrade and owner accessibility acceptance. Fix regressions before adding more protocols. |
+| G1 — File-based execution | `run collection.json` without desktop setup; explicit unsupported-feature diagnostics | Ordered/nested Postman v2 requests, collection/environment/override precedence, scripts blocked before traffic, no source/workspace/Keychain mutation, cancellation and reports. Then add supported native inputs/folder selection. Reference roadmap CLI-01/02/05 and original CLI/RUN/IO IDs. |
+| G2 — Reproducible headless inputs | Iteration data, process secrets and file-based TLS usable in documented CI environments | JSON/CSV and empty/disabled variable cases, reproducible order, mTLS/custom CA/redirect boundaries, redaction and paths with spaces. Existing RILL_SECRET_ support is reused. CLI-02/03 and AUTH/TLS acceptance apply. |
+| G3 — Workflow compatibility | A published supported script/variable/assertion/chaining subset that behaves as documented | COMPAT-02 architecture decision before a foreign runtime; worker resource/host-access limits if selected; pinned differential corpus for order, mutations, requests and exit status. Unsupported behavior cannot look successful. |
+| G4 — HTTP session and investigation depth | Explicit cookie/login chains, useful offline reports and repeatable comparisons | Domain/path/secure/expiry/isolation tests and no ambient cookie leakage; escaped hostile-content HTML reports; baseline/run drift scenarios; preserve existing reports. Cookie/session work is a new delivery item, not an already completed original capability. |
+| G5 — Acceptance and distribution | Installable, reproducible 1.0 artifacts with an honest capability matrix | Review all original rows with behavior evidence or explicitly approved scope deviations, independent real-service cases, measured 600/5,000-request baselines, installed macOS/CPU coverage, exact-source security gates, provenance and explicit signing status. No version-only promotion. |
+
+Mock discoverability/lifecycle follows the first reliable file-run/compatibility increments, reusing the existing server. Existing GraphQL/gRPC/broker capabilities remain supported acceptance work; this scope does not remove their criteria or promote synthetic fixtures into interoperability evidence. WorkbenchStore decomposition remains a measured maintenance task, not a prerequisite for each user-visible fix.
+
+The next implementation increment is **G1: conservative direct Postman v2 file runs**, followed by data/TLS and compatibility depth. The gates above add a release order to the milestone details below; they do not mark their unchecked tasks shipped. A PR, passing CI and documented behavior establish an increment; release evidence closes shipping status.
 
 ## At a glance
 

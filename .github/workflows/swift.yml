@@ -103,6 +103,8 @@ jobs:
         run: bash scripts/test.sh
       - name: Verify tab resizing with synthetic UI
         run: python3 scripts/verify-tab-resizing.py
+      - name: Verify window-contained workbench selectors
+        run: bash scripts/render-ui-previews.sh --selectors
       - name: Verify manual acceptance kit
         run: python3 verification/verify.py --cli "$(swift build --show-bin-path)/RillCLI"
       - name: Upload synthetic generated programs

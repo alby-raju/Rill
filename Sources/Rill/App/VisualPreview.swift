@@ -18,6 +18,7 @@ import SwiftUI
         : isRendering ? UserDefaults(suiteName: preferenceDomain)! : .standard
 
     #if DEBUG
+        static let selectors = PassthroughSubject<WorkbenchSelector?, Never>()
         static let responseSections = PassthroughSubject<String, Never>()
         static let requestSections = PassthroughSubject<String, Never>()
         private static weak var previewStore: WorkbenchStore?
@@ -29,6 +30,12 @@ import SwiftUI
                 let store = WorkbenchStore(
                     preview: ["blank", "intro"].contains(state) ? "empty" : state)
                 previewStore = store
+                if state == "selector-environment" {
+                    store.workspace.environments = (0..<12).map { index in
+                        RillCore.Environment(
+                            name: "Synthetic environment \(index) with a long descriptive name")
+                    }
+                }
                 if state == "response-resize" {
                     preferences.set(argument("--ui-layout") ?? "vertical", forKey: "requestLayout")
                 }
@@ -92,6 +99,110 @@ import SwiftUI
                     NSSize(width: max(1050, compact), height: max(700, previewHeight)))
                 if argument("--ui-state") == "response-resize" {
                     try await verifyTabResizing(window)
+                }
+                if let state = argument("--ui-state"), state.hasPrefix("selector-") {
+                    selectors.send(state == "selector-layout" ? .layout : .environment)
+                    try await Task.sleep(for: .milliseconds(200))
+                    do {
+                        guard let root = window.contentView else {
+                            throw CocoaError(.coderInvalidValue)
+                        }
+                        root.layoutSubtreeIfNeeded()
+                        func find(_ view: NSView, id: String = "rill.selector.bounds") -> NSView? {
+                            if view.identifier?.rawValue == id { return view }
+                            for child in view.subviews {
+                                if let match = find(child, id: id) { return match }
+                            }
+                            return nil
+                        }
+                        guard let panel = find(root) else { throw CocoaError(.coderInvalidValue) }
+                        let rect = panel.convert(panel.bounds, to: root)
+                        guard rect.width >= 250, rect.height >= 150,
+                            rect.height <= (state == "selector-layout" ? 360 : 600),
+                            root.bounds.insetBy(dx: -1, dy: -1).contains(rect)
+                        else {
+                            fputs("Selector escaped workbench: \(rect) in \(root.bounds)\n", stderr)
+                            throw CocoaError(.coderInvalidValue)
+                        }
+                        print(
+                            "RILL_SELECTOR_CONTAINED state=\(state) rect=\(rect) window=\(root.bounds)"
+                        )
+                        window.makeKeyAndOrderFront(nil)
+                        NSApplication.shared.activate(ignoringOtherApps: true)
+                        try await Task.sleep(for: .milliseconds(150))
+                        guard
+                            let escape = NSEvent.keyEvent(
+                                with: .keyDown, location: .zero, modifierFlags: [],
+                                timestamp: ProcessInfo.processInfo.systemUptime,
+                                windowNumber: window.windowNumber, context: nil,
+                                characters: "\u{1b}", charactersIgnoringModifiers: "\u{1b}",
+                                isARepeat: false, keyCode: 53
+                            )
+                        else { throw CocoaError(.coderInvalidValue) }
+                        if !window.performKeyEquivalent(with: escape) { window.sendEvent(escape) }
+                        try await Task.sleep(for: .milliseconds(150))
+                        guard find(root) == nil else {
+                            fputs("Escape did not dismiss selector\n", stderr)
+                            throw CocoaError(.coderInvalidValue)
+                        }
+                        selectors.send(state == "selector-layout" ? .layout : .environment)
+                        try await Task.sleep(for: .milliseconds(150))
+                        let outside = root.convert(
+                            NSPoint(x: root.bounds.width * 0.4, y: root.bounds.height * 0.5),
+                            to: nil)
+                        for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+                            guard
+                                let event = NSEvent.mouseEvent(
+                                    with: type, location: outside, modifierFlags: [],
+                                    timestamp: ProcessInfo.processInfo.systemUptime,
+                                    windowNumber: window.windowNumber, context: nil,
+                                    eventNumber: 1, clickCount: 1, pressure: 1
+                                )
+                            else { throw CocoaError(.coderInvalidValue) }
+                            window.sendEvent(event)
+                            try await Task.sleep(for: .milliseconds(40))
+                        }
+                        try await Task.sleep(for: .milliseconds(150))
+                        guard find(root) == nil else {
+                            fputs("Click-away did not dismiss selector\n", stderr)
+                            throw CocoaError(.coderInvalidValue)
+                        }
+                        if state == "selector-layout" {
+                            for value in ["vertical", "horizontal", "automatic"] {
+                                selectors.send(.layout)
+                                try await Task.sleep(for: .milliseconds(150))
+                                guard let choice = find(root, id: "rill.selector.choice." + value)
+                                else {
+                                    throw CocoaError(.coderInvalidValue)
+                                }
+                                let point = choice.convert(
+                                    NSPoint(x: choice.bounds.midX, y: choice.bounds.midY), to: nil)
+                                for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+                                    guard
+                                        let event = NSEvent.mouseEvent(
+                                            with: type, location: point, modifierFlags: [],
+                                            timestamp: ProcessInfo.processInfo.systemUptime,
+                                            windowNumber: window.windowNumber, context: nil,
+                                            eventNumber: 1, clickCount: 1, pressure: 1
+                                        )
+                                    else { throw CocoaError(.coderInvalidValue) }
+                                    window.sendEvent(event)
+                                    try await Task.sleep(for: .milliseconds(40))
+                                }
+                                try await Task.sleep(for: .milliseconds(150))
+                                guard find(root) == nil,
+                                    preferences.string(forKey: "requestLayout") == value
+                                else {
+                                    fputs("Layout choice failed: \(value)\n", stderr)
+                                    throw CocoaError(.coderInvalidValue)
+                                }
+                            }
+                        }
+                        print("RILL_SELECTOR_INTERACTIONS_OK state=\(state)")
+                        selectors.send(state == "selector-layout" ? .layout : .environment)
+                        try await Task.sleep(for: .milliseconds(150))
+
+                    }
                 }
 
                 func showSurface(_ host: NSView, size: NSSize) {

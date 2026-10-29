@@ -4,8 +4,8 @@ set -euo pipefail
 RILL_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$RILL_ROOT"
 RILL_MODE="${1:-}"
-if [[ "$RILL_MODE" != "" && "$RILL_MODE" != "--screenshots" ]]; then
-  echo 'Usage: bash scripts/render-ui-previews.sh [--screenshots]' >&2
+if [[ "$RILL_MODE" != "" && "$RILL_MODE" != "--screenshots" && "$RILL_MODE" != "--selectors" ]]; then
+  echo 'Usage: bash scripts/render-ui-previews.sh [--screenshots|--selectors]' >&2
   exit 2
 fi
 swift build --product Rill
@@ -19,6 +19,10 @@ executable, root, mode = sys.argv[1], Path(sys.argv[2]), sys.argv[3]
 destination = root / ("docs/images" if mode == "--screenshots" else "dist/ui-review")
 destination.mkdir(parents=True, exist_ok=True)
 states = [
+    ("selector-layout", "dark", 1050),
+    ("selector-layout", "light", 1440),
+    ("selector-environment", "dark", 1050),
+    ("selector-environment", "light", 1440),
     ("environment-empty", "dark", 1440),
     ("environment-editor", "light", 1440),
     ("copy-request", "dark", 1440),
@@ -42,6 +46,8 @@ states = [
 ]
 if mode == "--screenshots":
     states = [("response-passed", "dark", 1440), ("empty", "light", 1050)]
+elif mode == "--selectors":
+    states = [state for state in states if state[0].startswith("selector-")]
 for state, theme, width in states:
     name = (
         {"response-passed": "workbench-dark", "empty": "welcome-light"}[state]
@@ -58,6 +64,8 @@ for state, theme, width in states:
             theme,
             "--ui-width",
             str(width),
+            "--ui-height",
+            "700" if state.startswith("selector-") else "920",
             "--ui-snapshot",
             str(target),
         ],
