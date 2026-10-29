@@ -48,7 +48,12 @@ with tempfile.TemporaryDirectory(prefix="rill-tab-resize-") as directory:
             or expected not in output.read_text()
             or not (folder / (layout + ".png")).exists()
         ):
+            if output.exists():
+                print(output.read_text()[:8192])
             if error.exists():
                 print(error.read_text()[:8192])
             raise SystemExit("Synthetic tab resize check failed: " + layout)
+        for line in output.read_text().splitlines():
+            if line.startswith("RILL_TAB_RESIZE_VIEWPORT"):
+                print(line)
         print(expected)

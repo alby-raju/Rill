@@ -309,7 +309,22 @@ import SwiftUI
                 vertical
                     ? split.arrangedSubviews[0].frame.width : split.arrangedSubviews[0].frame.height
             }
-            let targets: [CGFloat] = vertical ? [400, 500] : [180, 260]
+            // WindowServer may clamp the requested window to the runner's display.
+            // Choose two legal positions from the actual viewport using the app's
+            // documented pane minima, not a developer Mac's absolute coordinates.
+            let extent = vertical ? split.bounds.width : split.bounds.height
+            let minimum: CGFloat = vertical ? 350 : min(140, extent * 0.35)
+            let responseMinimum: CGFloat = vertical ? 350 : min(180, extent * 0.4)
+            let maximum = extent - split.dividerThickness - responseMinimum
+            guard maximum - minimum >= 10 else {
+                fputs("Resize fixture viewport too small: \(split.bounds.size)\n", stderr)
+                throw CocoaError(.coderInvalidValue)
+            }
+            let targets = [
+                minimum + (maximum - minimum) * 0.3,
+                minimum + (maximum - minimum) * 0.7,
+            ]
+            print("RILL_TAB_RESIZE_VIEWPORT size=\(split.bounds.size) targets=\(targets)")
             var count = 0
             guard let store = previewStore, let request = store.selected else {
                 throw CocoaError(.coderInvalidValue)
