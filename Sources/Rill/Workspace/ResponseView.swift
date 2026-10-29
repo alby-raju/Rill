@@ -37,108 +37,130 @@ struct ResponseView: View {
                     selection: $section
                 )
                 .padding(.horizontal, 15).accessibilityLabel("Response section")
-                if section == "Body" {
-                    HStack {
-                        Toggle("Pretty JSON", isOn: $pretty).toggleStyle(.checkbox)
-                        Spacer()
-                        Button {
-                            NSPasteboard.general.clearContents()
-                            NSPasteboard.general.setString(
-                                exchange.previewIsTruncated
-                                    ? exchange.text : pretty ? exchange.prettyText : exchange.text,
-                                forType: .string)
-                        } label: {
-                            Label("Copy", systemImage: "doc.on.doc")
-                        }.help("Copy response body")
-                        Button {
-                            export(exchange)
-                        } label: {
-                            Label("Export", systemImage: "square.and.arrow.up")
-                        }.help("Export response")
-                    }.font(.caption).padding(.horizontal, 20).padding(.vertical, 8)
-                }
-                if section == "Body" {
-                    if exchange.previewIsTruncated {
-                        Text(
-                            "Preview limited to \(ByteCountFormatter.string(fromByteCount: Int64(exchange.previewByteLimit), countStyle: .file)). Export or copy retained bytes to inspect more."
-                        )
-                        .font(.caption).foregroundStyle(.secondary).padding(.horizontal, 20)
-                    }
-                    ResponseBodyPreview(exchange: exchange, pretty: pretty, fontSize: fontSize).id(
-                        exchange.id)
-                } else if section == "Headers" {
-                    List(exchange.headers) { field in
-                        HStack(alignment: .top) {
-                            Text(field.name).fontWeight(.medium).frame(
-                                width: 190, alignment: .leading)
-                            Text(field.value).textSelection(.enabled).frame(
-                                maxWidth: .infinity, alignment: .leading)
-                            Button {
-                                NSPasteboard.general.clearContents()
-                                NSPasteboard.general.setString(field.value, forType: .string)
-                            } label: {
-                                Image(systemName: "doc.on.doc")
-                            }.buttonStyle(.plain).help("Copy header value")
-                        }.font(.system(size: 11, design: .monospaced))
-                    }
-                } else if section == "Timeline" {
-                    VStack(alignment: .leading, spacing: 12) {
-                        ForEach(exchange.events ?? []) { event in
+                GeometryReader { _ in
+                    VStack(spacing: 0) {
+                        if section == "Body" {
                             HStack {
-                                Text(String(format: "%.1f ms", event.elapsed * 1000)).frame(
-                                    width: 100, alignment: .leading)
-                                Text(event.title)
+                                Toggle("Pretty JSON", isOn: $pretty).toggleStyle(.checkbox)
+                                Spacer()
+                                Button {
+                                    NSPasteboard.general.clearContents()
+                                    NSPasteboard.general.setString(
+                                        exchange.previewIsTruncated
+                                            ? exchange.text
+                                            : pretty ? exchange.prettyText : exchange.text,
+                                        forType: .string)
+                                } label: {
+                                    Label("Copy", systemImage: "doc.on.doc")
+                                }.help("Copy response body")
+                                Button {
+                                    export(exchange)
+                                } label: {
+                                    Label("Export", systemImage: "square.and.arrow.up")
+                                }.help("Export response")
+                            }.font(.caption).padding(.horizontal, 20).padding(.vertical, 8)
+                        }
+                        if section == "Body" {
+                            if exchange.previewIsTruncated {
+                                Text(
+                                    "Preview limited to \(ByteCountFormatter.string(fromByteCount: Int64(exchange.previewByteLimit), countStyle: .file)). Export or copy retained bytes to inspect more."
+                                )
+                                .font(.caption).foregroundStyle(.secondary).padding(.horizontal, 20)
+                            }
+                            ResponseBodyPreview(
+                                exchange: exchange, pretty: pretty, fontSize: fontSize
+                            ).id(
+                                exchange.id)
+                        } else if section == "Headers" {
+                            List(exchange.headers) { field in
+                                HStack(alignment: .top) {
+                                    Text(field.name).fontWeight(.medium).frame(
+                                        width: 190, alignment: .leading)
+                                    Text(field.value).textSelection(.enabled).frame(
+                                        maxWidth: .infinity, alignment: .leading)
+                                    Button {
+                                        NSPasteboard.general.clearContents()
+                                        NSPasteboard.general.setString(
+                                            field.value, forType: .string)
+                                    } label: {
+                                        Image(systemName: "doc.on.doc")
+                                    }.buttonStyle(.plain).help("Copy header value")
+                                }.font(.system(size: 11, design: .monospaced))
+                            }
+                        } else if section == "Timeline" {
+                            ScrollView {
+                                VStack(alignment: .leading, spacing: 12) {
+                                    ForEach(exchange.events ?? []) { event in
+                                        HStack {
+                                            Text(String(format: "%.1f ms", event.elapsed * 1000))
+                                                .frame(
+                                                    width: 100, alignment: .leading)
+                                            Text(event.title)
+                                        }
+                                    }
+                                    Text(
+                                        "Monotonic elapsed transport milestones. Local preparation precedes this timeline; DNS, connection and TLS phases are not separately measured."
+                                    ).font(.caption).foregroundStyle(.secondary)
+                                }.font(.system(size: fontSize, design: .monospaced)).frame(
+                                    maxWidth: .infinity, maxHeight: .infinity,
+                                    alignment: .topLeading
+                                ).padding(20)
+                            }
+                        } else if section == "Request" {
+                            ScrollView {
+                                VStack(alignment: .leading, spacing: 12) {
+                                    Text("Effective response URL: " + exchange.url).textSelection(
+                                        .enabled)
+                                    if let summary = exchange.preparedRequest {
+                                        Text(summary.method + " " + summary.url).textSelection(
+                                            .enabled)
+                                        Text("TLS: " + (summary.tlsPolicy ?? "System trust"))
+                                        if let limit = exchange.downloadLimit {
+                                            Text(
+                                                "Download budget: "
+                                                    + ByteCountFormatter.string(
+                                                        fromByteCount: Int64(limit),
+                                                        countStyle: .file))
+                                        }
+                                        Button("Export redacted prepared request…") {
+                                            exportPrepared(summary)
+                                        }
+                                        Text(
+                                            "Prepared body: \(summary.bodyBytes.map { String($0) + " bytes" } ?? "none")"
+                                        )
+                                        ForEach(summary.headers) { field in
+                                            Text(field.name + ": " + field.value).textSelection(
+                                                .enabled)
+                                        }
+                                    }
+                                    Text(
+                                        "Initial prepared request before redirects and transport-added headers. Query values and custom header values are masked; URL paths and response URLs may still contain sensitive data. Timing is total elapsed time; DNS/connect/TLS phases are not measured."
+                                    ).foregroundStyle(.secondary)
+                                }.font(.system(size: fontSize, design: .monospaced)).frame(
+                                    maxWidth: .infinity, alignment: .leading
+                                ).padding(20)
+                            }
+                        } else if exchange.checks.isEmpty {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Label("Add response checks", systemImage: "checkmark.seal").font(
+                                    .callout.weight(.medium))
+                                Text(
+                                    "Set an expected status or body match in the request’s Checks tab."
+                                )
+                                .font(.caption).foregroundStyle(.secondary)
+                            }.frame(maxWidth: .infinity, alignment: .leading).padding(20)
+                        } else {
+                            List(exchange.checks) { check in
+                                Label(
+                                    check.title,
+                                    systemImage: check.passed
+                                        ? "checkmark.circle.fill" : "xmark.circle.fill"
+                                ).foregroundStyle(check.passed ? Color.green : Color.red)
                             }
                         }
-                        Text(
-                            "Monotonic elapsed transport milestones. Local preparation precedes this timeline; DNS, connection and TLS phases are not separately measured."
-                        ).font(.caption).foregroundStyle(.secondary)
-                    }.font(.system(size: fontSize, design: .monospaced)).frame(
-                        maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading
-                    ).padding(20)
-                } else if section == "Request" {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Effective response URL: " + exchange.url).textSelection(.enabled)
-                            if let summary = exchange.preparedRequest {
-                                Text(summary.method + " " + summary.url).textSelection(.enabled)
-                                Text("TLS: " + (summary.tlsPolicy ?? "System trust"))
-                                if let limit = exchange.downloadLimit {
-                                    Text(
-                                        "Download budget: "
-                                            + ByteCountFormatter.string(
-                                                fromByteCount: Int64(limit), countStyle: .file))
-                                }
-                                Button("Export redacted prepared request…") {
-                                    exportPrepared(summary)
-                                }
-                                Text(
-                                    "Prepared body: \(summary.bodyBytes.map { String($0) + " bytes" } ?? "none")"
-                                )
-                                ForEach(summary.headers) { field in
-                                    Text(field.name + ": " + field.value).textSelection(.enabled)
-                                }
-                            }
-                            Text(
-                                "Initial prepared request before redirects and transport-added headers. Query values and custom header values are masked; URL paths and response URLs may still contain sensitive data. Timing is total elapsed time; DNS/connect/TLS phases are not measured."
-                            ).foregroundStyle(.secondary)
-                        }.font(.system(size: fontSize, design: .monospaced)).frame(
-                            maxWidth: .infinity, alignment: .leading
-                        ).padding(20)
-                    }
-                } else if exchange.checks.isEmpty {
-                    ContentUnavailableView(
-                        "No checks configured", systemImage: "checkmark.seal",
-                        description: Text("Add an expected status or body match in Checks."))
-                } else {
-                    List(exchange.checks) { check in
-                        Label(
-                            check.title,
-                            systemImage: check.passed
-                                ? "checkmark.circle.fill" : "xmark.circle.fill"
-                        ).foregroundStyle(check.passed ? Color.green : Color.red)
-                    }
-                }
+                    }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                }.clipped()
+
             } else {
                 VStack(spacing: 12) {
                     Image(systemName: "arrow.up.right.circle").font(
@@ -159,45 +181,41 @@ struct ResponseView: View {
                 }.frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+        #if DEBUG
+            .onReceive(RillPreview.responseSections) { section = $0 }
+        #endif
     }
     private func validationBanner(_ exchange: Exchange) -> some View {
         let failed = exchange.checks.filter { !$0.passed }.count
-        let checkNoun = exchange.checks.count == 1 ? "check" : "checks"
         let color: Color = failed > 0 ? .red : exchange.checks.isEmpty ? .secondary : .green
-        return HStack(alignment: .top, spacing: 12) {
+        let title =
+            failed > 0
+            ? "\(failed) of \(exchange.checks.count) checks failed"
+            : exchange.checks.isEmpty
+                ? "No checks configured" : "\(exchange.checks.count) checks passed"
+        return HStack(spacing: 8) {
             Image(
                 systemName: failed > 0
-                    ? "xmark.octagon.fill"
-                    : exchange.checks.isEmpty ? "info.circle" : "checkmark.seal.fill"
+                    ? "xmark.circle.fill"
+                    : exchange.checks.isEmpty ? "info.circle" : "checkmark.circle.fill"
             )
-            .foregroundStyle(color).padding(.top, 2)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(
-                    failed > 0
-                        ? "\(failed) of \(exchange.checks.count) \(checkNoun) failed"
-                        : exchange.checks.isEmpty
-                            ? "No checks configured"
-                            : exchange.checks.count == 1
-                                ? "1 check passed" : "All \(exchange.checks.count) checks passed"
-                )
-                .font(.callout.weight(.semibold)).foregroundStyle(color)
-                Text(
-                    failed > 0
-                        ? "HTTP \(exchange.status) was received, but the response did not satisfy the configured checks."
-                        : exchange.checks.isEmpty
-                            ? "The HTTP status describes the response. Add checks to validate the result."
-                            : "The response satisfied every configured check."
-                )
-                .font(.caption).foregroundStyle(.secondary).fixedSize(
-                    horizontal: false, vertical: true)
-            }.frame(maxWidth: .infinity, alignment: .leading)
-            if !exchange.checks.isEmpty {
-                Button("Review checks") { section = "Checks" }.font(.caption).help(
-                    "Show individual response check results")
+            .foregroundStyle(color)
+            Text(title).font(.caption.weight(.semibold)).foregroundStyle(color).lineLimit(1)
+            Spacer(minLength: 6)
+            if !exchange.checks.isEmpty && section != "Checks" {
+                Button("Review checks") { section = "Checks" }.font(.caption)
             }
-        }.padding(12).background(color.opacity(0.07), in: RoundedRectangle(cornerRadius: 8))
-            .overlay(RoundedRectangle(cornerRadius: 8).stroke(color.opacity(0.2), lineWidth: 1))
-            .padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 5)
+        }
+        .help(
+            failed > 0
+                ? "HTTP \(exchange.status) was received, but configured validation failed. Review individual checks for details."
+                : exchange.checks.isEmpty
+                    ? "HTTP status alone does not validate the result. Configure request checks to validate responses."
+                    : "The response satisfied every configured check."
+        )
+        .padding(.horizontal, 10).padding(.vertical, 6)
+        .background(color.opacity(0.07), in: RoundedRectangle(cornerRadius: 6))
+        .padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 4)
     }
 
     private func exportPrepared(_ summary: PreparedRequestSummary) {

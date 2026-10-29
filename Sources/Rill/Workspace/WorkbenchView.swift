@@ -472,25 +472,43 @@ struct RequestEditor: View {
                     || (requestLayout == "automatic" && geometry.size.width >= 1050)
                 {
                     HSplitView {
-                        composition.frame(minWidth: 350).background(
+                        boundedPane { composition }.frame(minWidth: 350).background(
                             SplitAutosave(name: "rill.request.horizontal", vertical: true))
-                        ResponseView(exchange: store.response, running: store.running).frame(
+                        boundedPane {
+                            ResponseView(exchange: store.response, running: store.running)
+                        }.frame(
                             minWidth: 350)
                     }
                 } else {
                     VSplitView {
-                        composition.frame(
+                        boundedPane { composition }.frame(
                             minHeight: min(140, geometry.size.height * 0.35),
-                            idealHeight: geometry.size.height * (store.response == nil ? 0.58 : 0.4)
+                            idealHeight: geometry.size.height * 0.45
                         ).background(SplitAutosave(name: "rill.request.vertical", vertical: false))
-                        ResponseView(exchange: store.response, running: store.running).frame(
+                        boundedPane {
+                            ResponseView(exchange: store.response, running: store.running)
+                        }.frame(
                             minHeight: min(
-                                store.response == nil ? 180 : 340, geometry.size.height * 0.65))
+                                180, geometry.size.height * 0.4))
                     }
                 }
             }
         }
         .onChange(of: store.selection) { _, _ in store.response = nil }
+        #if DEBUG
+            .onReceive(RillPreview.requestSections) { section = $0 }
+        #endif
+    }
+    /// Keep the native split item's sizing identity independent of selected tab content.
+    /// macOS 15 can otherwise redistribute space even when nested content is clipped.
+    private func boundedPane<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        let pane = content()
+        return GeometryReader { viewport in
+            pane.frame(
+                width: max(0, viewport.size.width), height: max(0, viewport.size.height),
+                alignment: .topLeading
+            ).clipped()
+        }
     }
     private var composition: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -499,40 +517,45 @@ struct RequestEditor: View {
                 selection: $section
             ).padding(.horizontal, 14).padding(.bottom, 4)
             Divider()
-            Group {
-                switch section {
-                case "Parameters": FieldEditor(fields: $request.parameters, noun: "parameter")
-                case "Headers": FieldEditor(fields: $request.headers, noun: "header")
-                case "Body": BodyComposer(request: $request)
-                case "Auth":
-                    AuthenticationComposer(request: $request)
-                case "GraphQL": GraphQLComposer(request: $request)
-                case "Workflow": WorkflowEditor(request: $request)
-                default:
-                    ScrollView {
-                        RillSection(
-                            title: "Response checks",
-                            subtitle: "Validate the result each time you send this request.",
-                            icon: "checkmark.seal"
-                        ) {
-                            TextField("Expected status · e.g. 200", text: $request.expectedStatus)
-                            TextField("Response body contains", text: $request.bodyContains)
-                            HStack {
-                                Text("Timeout")
-                                Spacer()
-                                TextField("Seconds", value: $request.timeout, format: .number)
-                                    .frame(width: 90)
-                                Text("seconds · 1–300").font(.caption).foregroundStyle(.secondary)
-                            }
-                            RillNotice(
-                                text:
-                                    "Leave a check empty to skip it. For JSON and header rules, open Workflow."
-                            )
-                        }.padding(20).frame(maxWidth: 740, alignment: .leading)
+            GeometryReader { _ in
+                Group {
+                    switch section {
+                    case "Parameters": FieldEditor(fields: $request.parameters, noun: "parameter")
+                    case "Headers": FieldEditor(fields: $request.headers, noun: "header")
+                    case "Body": BodyComposer(request: $request)
+                    case "Auth":
+                        AuthenticationComposer(request: $request)
+                    case "GraphQL": GraphQLComposer(request: $request)
+                    case "Workflow": WorkflowEditor(request: $request)
+                    default:
+                        ScrollView {
+                            RillSection(
+                                title: "Response checks",
+                                subtitle: "Validate the result each time you send this request.",
+                                icon: "checkmark.seal"
+                            ) {
+                                TextField(
+                                    "Expected status · e.g. 200", text: $request.expectedStatus)
+                                TextField("Response body contains", text: $request.bodyContains)
+                                HStack {
+                                    Text("Timeout")
+                                    Spacer()
+                                    TextField("Seconds", value: $request.timeout, format: .number)
+                                        .frame(width: 90)
+                                    Text("seconds · 1–300").font(.caption).foregroundStyle(
+                                        .secondary)
+                                }
+                                RillNotice(
+                                    text:
+                                        "Leave a check empty to skip it. For JSON and header rules, open Workflow."
+                                )
+                            }.padding(20).frame(maxWidth: 740, alignment: .leading)
+                        }
                     }
-                }
 
-            }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            }.clipped()
+
         }
     }
     private func formatBody() {

@@ -1,6 +1,12 @@
 # Changelog
 
-## 0.4.4 (unreleased)
+## 0.4.5 (unreleased)
+
+- Keep request/response tab content inside bounded viewports so switching tabs does not impose new split-view constraints. Reduce the stacked response minimum and add a 420-case native resize regression.
+- Replace the large validation banner and empty Checks presentation with compact status and guidance; keep failures visible with a review action.
+- Omit grouping-only parent containers when importing flattened collections, while preserving intentional empty leaves and mixed parents.
+
+## 0.4.4
 
 - Import explicitly empty GET/HEAD raw bodies as no body, with a warning, in Postman and HTTPie Desktop collections. Nonempty/structured payloads remain rejected with a collection-specific explanation.
 - Restore collapsible collection headers with saved expansion state and temporary search expansion.

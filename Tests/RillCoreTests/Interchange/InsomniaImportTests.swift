@@ -34,7 +34,7 @@ final class InsomniaImportTests: XCTestCase {
         ]
         let result = try InsomniaImporter.parse(
             legacy([workspace, folder, request(parent: "fld_1"), base, child]))
-        XCTAssertEqual(result.workspace.collections.map(\.name), ["API", "API / Folder"])
+        XCTAssertEqual(result.workspace.collections.map(\.name), ["API / Folder"])
         XCTAssertEqual(result.workspace.requests[0].credential, "PRIVATE_AUTH")
         XCTAssertEqual(result.workspace.requests[0].auth, .bearer)
         XCTAssertEqual(

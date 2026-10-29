@@ -9,7 +9,7 @@ bash scripts/test.sh
 
 The wrapper builds the native CLI and selected protobuf compiler, starts loopback HTTP/TLS/live/MQTT/AMQP fixtures, waits for readiness, runs tests and stops its fixtures. It uses ports 18749–18757; stop optional manual TLS fixtures first if they conflict. Required endpoint cases must not be skipped in CI. A bare `swift test` without fixture variables is only a partial run.
 
-The current suite has **271 tests**, covering persistence/recovery, request fidelity, credentials/TLS, imports/bounds, assertions/hooks/runners, schemas, native protocol sessions, CLI behavior, privacy and bulk-tab safety. Tests are grouped under `Tests/RillCoreTests` by behavior domain. The native Kafka mock bridge is test-only and is not independent production-broker acceptance.
+The current suite has **272 tests**, covering persistence/recovery, request fidelity, credentials/TLS, imports/bounds, assertions/hooks/runners, schemas, native protocol sessions, CLI behavior, privacy and bulk-tab safety. Tests are grouped under `Tests/RillCoreTests` by behavior domain. The native Kafka mock bridge is test-only and is not independent production-broker acceptance.
 
 ## Focus a regression
 
@@ -67,3 +67,9 @@ Generated-client validation uses the stable Ubuntu 24.04 image and selects an in
 The old cold Intel job took about 32 minutes (15-minute release build, 5-minute compiler/package stage, 12-minute debug/test build), versus 14–16 minutes on Apple Silicon, with client validation waiting behind the matrix. The routine path removes Intel from the per-PR critical path; full compatibility runs remain available on demand. Timing depends on queue load, cache availability and toolchain/dependency changes.
 
 Packaging and fresh-machine acceptance are described in [RELEASE.md](RELEASE.md). Record exact commit/artifact hash, OS/CPU and service versions for manual outcomes. MVP does not automatically mark partial capabilities verified.
+
+### Split-pane regression
+
+After `zsh scripts/package.sh`, run `python3 scripts/verify-tab-resizing.py`. It builds an isolated debug app using synthetic data and preferences, exercises all 35 request/response tab combinations at two divider positions in each orientation and with empty, failed and passed checks, and rejects layout jumps or constrained resize positions. It does not use the personal workspace. Debug controls are ignored by release builds.
+
+Use `python3 scripts/verify-tab-resizing.py --width 1050 --height 740` to exercise a compact viewport similar to hosted CI. Divider targets are derived from the actual pane size, since WindowServer can clamp the requested window to its display. All tab-switch stability checks remain enabled.

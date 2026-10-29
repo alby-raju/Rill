@@ -44,9 +44,9 @@ import XCTest
                 ], "event": [["listen": "test", "script": ["exec": ["throw Error('never run')"]]]],
             ])
         let result = try PostmanImporter.parse(Data([0xef, 0xbb, 0xbf]) + data)
-        XCTAssertEqual(result.workspace.collections.map(\.name), ["API", "API / Folder"])
+        XCTAssertEqual(result.workspace.collections.map(\.name), ["API / Folder"])
         XCTAssertEqual(
-            result.workspace.requests[0].collectionID, result.workspace.collections[1].id)
+            result.workspace.requests[0].collectionID, result.workspace.collections[0].id)
         XCTAssertEqual(result.workspace.requests[0].auth, .bearer)
         XCTAssertEqual(result.workspace.requests[0].credential, "PRIVATE_TOKEN")
         XCTAssertEqual(result.workspace.requests[0].url, "https://example.test/?x=%2f&x=2")
@@ -360,6 +360,23 @@ import XCTest
                 }
             }
         }
+    }
+
+    func testGroupingOnlyParentsAreSkippedButEmptyLeavesAndMixedParentsRemain() throws {
+        let request = item(["method": "GET", "url": "https://example.test"])
+        let grouped = try PostmanImporter.parse(
+            collection([["name": "Group", "item": [["name": "Leaf", "item": [request]]]]]))
+        XCTAssertEqual(grouped.workspace.collections.map(\.name), ["API / Group / Leaf"])
+        XCTAssertEqual(
+            grouped.workspace.requests.first?.collectionID, grouped.workspace.collections.first?.id)
+        let empty = try PostmanImporter.parse(collection([["name": "Empty", "item": []]]))
+        XCTAssertEqual(empty.workspace.collections.map(\.name), ["API / Empty"])
+        let mixed = try PostmanImporter.parse(
+            collection([request, ["name": "Leaf", "item": [request]]]))
+        XCTAssertEqual(mixed.workspace.collections.map(\.name), ["API", "API / Leaf"])
+        XCTAssertEqual(
+            mixed.workspace.requests.map(\.collectionID),
+            mixed.workspace.collections.map { Optional($0.id) })
     }
 
 }
