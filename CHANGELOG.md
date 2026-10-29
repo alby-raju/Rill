@@ -2,6 +2,8 @@
 
 ## 0.4.5 (unreleased)
 
+- Isolate request/response pane hosting constraints from tab content so delayed native sizing updates cannot reset the divider to its minimum.
+
 - Show one collection disclosure control, preserving saved collapse state and search expansion.
 - Recognize supported native dynamic templates in offline preflight without generating values; reject unsupported names and malformed arguments.
 - Remove force casts from collection adapters and runner failures, report the current version in the default User-Agent, and clarify invalid OpenAPI input diagnostics.
