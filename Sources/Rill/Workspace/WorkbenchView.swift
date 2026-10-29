@@ -7,6 +7,7 @@ struct WorkbenchView: View {
     @SwiftUI.Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ViewState private var launchIntroductionFinished = false
     private var showingLaunch: Bool { store.loading || !launchIntroductionFinished }
+    @ViewState private var selector: WorkbenchSelector?
     @ViewState private var requestTransfer: RequestTransfer?
     @AppStorage("collapsedCollectionIDs") private var collapsedCollectionIDs = ""
     @ViewState private var collapsedSearchCollections: Set<UUID> = []
@@ -48,7 +49,23 @@ struct WorkbenchView: View {
                     .vertical, 9)
             }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .background(RillPalette.canvas)
+                .overlay {
+                    if let selector {
+                        ContainedWorkbenchSelector(dismiss: { self.selector = nil }) {
+                            if selector == .layout {
+                                RequestLayoutSelectionPanel(selection: $requestLayout) {
+                                    self.selector = nil
+                                }
+                            } else {
+                                EnvironmentSelectionPanel { self.selector = nil }
+                            }
+                        }
+                    }
+                }
         }
+        #if DEBUG
+            .onReceive(RillPreview.selectors) { selector = $0 }
+        #endif
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .buttonStyle(RillButtonStyle())
         .textFieldStyle(RillTextFieldStyle())
@@ -377,8 +394,8 @@ struct WorkbenchView: View {
             Image(systemName: "square.split.2x2").foregroundStyle(.secondary)
             Text("Workbench").font(.callout.weight(.medium))
             Spacer()
-            EnvironmentSwitcher()
-            RequestLayoutSelector(selection: $requestLayout)
+            EnvironmentSwitcher { selector = selector == .environment ? nil : .environment }
+            RequestLayoutSelector { selector = selector == .layout ? nil : .layout }
             Button {
                 store.showPalette = true
             } label: {
