@@ -56,3 +56,7 @@ Developer ID signing/notarization are deferred. Fresh supported-Mac installs, up
 Explicitly empty GET/HEAD raw bodies in Postman and HTTPie Desktop JSON imports become explicit no-body requests, with an import warning. Nonempty or structured GET/HEAD bodies are rejected; payloads are not silently discarded. The current HTTP transport still does not send GET/HEAD bodies.
 
 Sidebar collection headers can be collapsed and expanded. Their state is saved locally; search temporarily expands collections without overwriting the saved state. Selection and the open request editor remain independent of sidebar expansion.
+
+### Grouping-only import containers (0.4.5 development)
+
+Flattened imports omit parent containers that contain only subfolders; child collections retain their breadcrumb names and inherited authentication. Intentional empty leaf folders and parents with their own requests remain. Existing saved collections are not automatically deleted; the change applies to new imports.

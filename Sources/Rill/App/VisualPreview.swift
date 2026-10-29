@@ -1,3 +1,4 @@
+import Combine
 import RillCore
 import SwiftUI
 
@@ -17,6 +18,8 @@ import SwiftUI
         : isRendering ? UserDefaults(suiteName: preferenceDomain)! : .standard
 
     #if DEBUG
+        static let responseSections = PassthroughSubject<String, Never>()
+        static let requestSections = PassthroughSubject<String, Never>()
         private static weak var previewStore: WorkbenchStore?
     #endif
     static func makeStore() -> WorkbenchStore {
@@ -26,6 +29,9 @@ import SwiftUI
                 let store = WorkbenchStore(
                     preview: ["blank", "intro"].contains(state) ? "empty" : state)
                 previewStore = store
+                if state == "response-resize" {
+                    preferences.set(argument("--ui-layout") ?? "vertical", forKey: "requestLayout")
+                }
                 if ["collections-expanded", "collections-collapsed"].contains(state) {
                     let collection = RequestCollection(name: "Sample collection")
                     store.workspace.collections = [collection]
@@ -82,6 +88,10 @@ import SwiftUI
                 else { finish(1) }
                 let compact = argument("--ui-width").flatMap(Double.init) ?? 1440
                 window.setContentSize(NSSize(width: max(1050, compact), height: 920))
+                if argument("--ui-state") == "response-resize" {
+                    try await verifyTabResizing(window)
+                }
+
                 func showSurface(_ host: NSView, size: NSSize) {
                     let panel = NSWindow(
                         contentRect: NSRect(origin: .zero, size: size), styleMask: [.borderless],
@@ -218,7 +228,10 @@ import SwiftUI
                 }
                 try data.write(to: URL(fileURLWithPath: path), options: .atomic)
                 finish(0)
-            } catch { finish(1) }
+            } catch {
+                fputs("Visual QA failed: \(error)\n", stderr)
+                finish(1)
+            }
         #endif
     }
     #if DEBUG
@@ -276,6 +289,61 @@ import SwiftUI
                 requestID: request.id, requestName: request.name, method: request.method,
                 url: request.url, checks: checks)
             return try! JSONDecoder().decode(Exchange.self, from: JSONEncoder().encode(fixture))
+        }
+        private static func verifyTabResizing(_ window: NSWindow) async throws {
+            let vertical = argument("--ui-layout") == "horizontal"
+            func find(_ view: NSView) -> NSSplitView? {
+                for child in view.subviews { if let found = find(child) { return found } }
+                if let split = view as? NSSplitView {
+                    if split.isVertical == vertical {
+                        return split
+                    }
+                }
+                return nil
+            }
+            try await Task.sleep(for: .milliseconds(150))
+            guard let root = window.contentView, let split = find(root) else {
+                throw CocoaError(.coderInvalidValue)
+            }
+            func position() -> CGFloat {
+                vertical
+                    ? split.arrangedSubviews[0].frame.width : split.arrangedSubviews[0].frame.height
+            }
+            let targets: [CGFloat] = vertical ? [400, 500] : [180, 260]
+            var count = 0
+            for requestTab in [
+                "Parameters", "Headers", "Body", "GraphQL", "Auth", "Checks", "Workflow",
+            ] {
+                requestSections.send(requestTab)
+                try await Task.sleep(for: .milliseconds(60))
+                for target in targets {
+                    split.setPosition(target, ofDividerAt: 0)
+                    try await Task.sleep(for: .milliseconds(60))
+                    root.layoutSubtreeIfNeeded()
+                    guard abs(position() - target) <= 3 else {
+                        fputs(
+                            "Resize rejected in request tab \(requestTab): \(position()) vs \(target)\n",
+                            stderr)
+                        throw CocoaError(.coderInvalidValue)
+                    }
+                    for responseTab in ["Body", "Headers", "Checks", "Request", "Timeline"] {
+                        responseSections.send(responseTab)
+                        try await Task.sleep(for: .milliseconds(60))
+                        root.layoutSubtreeIfNeeded()
+                        guard abs(position() - target) <= 3 else {
+                            fputs(
+                                "Divider shifted in \(requestTab)/\(responseTab): \(position()) vs \(target)\n",
+                                stderr)
+                            throw CocoaError(.coderInvalidValue)
+                        }
+                        count += 1
+                    }
+                }
+            }
+            responseSections.send("Checks")
+            print(
+                "RILL_TAB_RESIZE_OK orientation=\(vertical ? "horizontal" : "vertical") cases=\(count)"
+            )
         }
         private static func finish(_ status: Int32) -> Never {
             UserDefaults.standard.removePersistentDomain(forName: preferenceDomain)

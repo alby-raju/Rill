@@ -113,7 +113,11 @@ public enum PostmanImporter {
             let breadcrumb = path.joined(separator: " / ")
             guard breadcrumb.utf8.count <= 4096 else { throw PostmanImportError.invalid }
             let collection = RequestCollection(name: breadcrumb)
-            workspace.collections.append(collection)
+            // Preserve intentionally empty leaves, but do not materialize
+            // grouping-only parents in Rill's flat collection model.
+            if items.isEmpty || items.contains(where: { $0["item"] == nil }) {
+                workspace.collections.append(collection)
+            }
             guard workspace.collections.count <= 1_000 else { throw PostmanImportError.invalid }
             for item in items {
                 try Task.checkCancellation()
@@ -140,7 +144,7 @@ public enum PostmanImporter {
                 }
             }
             warnings.insert(
-                "Nested folders become collection breadcrumbs. Supported inherited auth is flattened onto each request; future parent edits do not propagate."
+                "Nested folders become collection breadcrumbs; grouping-only parents are omitted. Supported inherited auth is flattened onto each request; future parent edits do not propagate."
             )
         }
         func request(_ value: Any?, inherited: [String: Any]?) throws -> RequestDraft {
