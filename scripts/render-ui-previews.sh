@@ -19,6 +19,10 @@ executable, root, mode = sys.argv[1], Path(sys.argv[2]), sys.argv[3]
 destination = root / ("docs/images" if mode == "--screenshots" else "dist/ui-review")
 destination.mkdir(parents=True, exist_ok=True)
 states = [
+    ("selector-layout", "dark", 1050),
+    ("selector-layout", "light", 1440),
+    ("selector-environment", "dark", 1050),
+    ("selector-environment", "light", 1440),
     ("environment-empty", "dark", 1440),
     ("environment-editor", "light", 1440),
     ("copy-request", "dark", 1440),
@@ -58,6 +62,8 @@ for state, theme, width in states:
             theme,
             "--ui-width",
             str(width),
+            "--ui-height",
+            "700" if state.startswith("selector-") else "920",
             "--ui-snapshot",
             str(target),
         ],

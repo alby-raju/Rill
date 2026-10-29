@@ -2,6 +2,8 @@
 
 ## 0.4.5 (unreleased)
 
+- Keep layout/environment selectors inside the workbench window, size them to content, and support close/Escape/click-away dismissal. Add compact-window containment and native Escape regressions.
+
 - Add ad-hoc `request METHOD URL` with headers/text body inputs, temporary variable overrides, explicit saved environment/auth/TLS selection, redacted summaries and opt-in raw response files.
 - Identify recognizable Insomnia/native workspace preflight inputs with actionable redacted format guidance.
 - Isolate request/response pane hosting constraints from tab content so delayed native sizing updates cannot reset the divider to its minimum.
