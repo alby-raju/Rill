@@ -126,6 +126,45 @@ actor ConcurrencyProbe {
                 hook, request: RequestDraft(),
                 variables: ["large": String(repeating: "x", count: 17_000)]))
     }
+    func testWhitespaceHeavyUnterminatedTemplatesRemainLiteral() throws {
+        let literal = "{{" + String(repeating: " ", count: 100_000) + "literal"
+        XCTAssertEqual(try VariableExpansion.resolve(literal, values: [:]), literal)
+        XCTAssertEqual(
+            try VariableExpansion.resolve("{{   value   }}", values: ["value": "fixture"]),
+            "fixture")
+        XCTAssertEqual(
+            try VariableExpansion.resolve("{{value}}/{{ value }}", values: ["value": "fixture"]),
+            "fixture/fixture")
+    }
+
+    func testTemplateSubstitutionBudgetAndWhitespaceSemantics() throws {
+        XCTAssertEqual(
+            try VariableExpansion.resolve("{{\n value \n}}", values: ["value": "fixture"]),
+            "fixture")
+        XCTAssertEqual(
+            try VariableExpansion.resolve(
+                String(repeating: "{{x}}", count: 10_000), values: ["x": ""]), "")
+        XCTAssertThrowsError(
+            try VariableExpansion.resolve(
+                String(repeating: "{{x}}", count: 10_001), values: ["x": ""])
+        ) { error in
+            guard case EditingError.expansionLimit = error else {
+                return XCTFail("Unexpected error")
+            }
+        }
+    }
+
+    func testCancelledTemplateExpansionStopsBeforeScanning() async throws {
+        let task = Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            return try VariableExpansion.resolve("{{fixture}}", values: ["fixture": "value"])
+        }
+        do {
+            _ = try await task.value
+            XCTFail("Cancelled expansion succeeded")
+        } catch is CancellationError {}
+    }
+
     func testDynamicTemplatesAreIndependentInsideNestedVariables() throws {
         let text = try VariableExpansion.resolve(
             "{{nested}} {{nested}}", values: ["nested": "{{$uuid}}"])

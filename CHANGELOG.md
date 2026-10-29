@@ -2,6 +2,8 @@
 
 ## 0.4.5 (unreleased)
 
+- Bound runtime variable-template scanning without overlapping whitespace quantifiers or eagerly collecting all matches. Preserve whitespace semantics, stop on cancellation, and enforce the substitution budget during scanning.
+- Set the ad-hoc CLI no-body mode explicitly rather than assigning an optional nil.
 - Keep layout/environment selectors inside the workbench window, size them to content, and support close/Escape/click-away dismissal. Add compact-window containment and native Escape regressions.
 
 - Add ad-hoc `request METHOD URL` with headers/text body inputs, temporary variable overrides, explicit saved environment/auth/TLS selection, redacted summaries and opt-in raw response files.
