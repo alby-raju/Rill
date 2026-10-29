@@ -117,31 +117,7 @@ extension RillCLI {
                         report, requests: requests, title: runTitle,
                         detail: args.flags.contains("detail"), color: args.color))
             }
-            if report.cancelled || Task.isCancelled { throw CancellationError() }
-            if !report.passed {
-                let executed = report.outcomes.filter { $0.state != .notRun }
-                for (index, outcome) in executed.enumerated() where outcome.state == .failed {
-                    if index + 1 < executed.count {
-                        let next = executed[index + 1]
-                        if next.requestID == outcome.requestID
-                            && next.iteration == outcome.iteration
-                            && next.attempt == outcome.attempt + 1
-                        {
-                            continue
-                        }
-                    }
-                    if let failure = outcome.failure {
-                        if [
-                            "invalidRequest", "invalidConfiguration", "invalidSelector",
-                            "invalidBranch",
-                        ].contains(failure) {
-                            throw CLIError.usage("Invalid saved request/workflow configuration.")
-                        }
-                        throw CLIError.runtime
-                    }
-                }
-                throw CLIError.assertion
-            }
+            try requireSuccessfulRun(report)
         case "perf":
             let request = try args.request(args.operand(), in: workspace)
             var config = LoadConfiguration()

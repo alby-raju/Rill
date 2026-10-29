@@ -20,6 +20,10 @@ Default bounds include a 32 MiB workspace, 16 MiB HTTP response, 512 KiB preview
 
 Development source supports `rill request METHOD URL` with no workspace setup, repeated header options, UTF-8 body text/files, temporary variable overrides, and explicit raw response export. Saved environments/auth/TLS profiles require an explicit workspace. The shared HTTP engine retains TLS verification, redirect rules, response bounds and unsupported GET/HEAD-body/repeated-header checks. Summaries omit payloads and credentials. See the [CLI guide](CLI.md).
 
+## Direct collection-file execution
+
+Development source supports `rill run COLLECTION.json` for a conservative Postman v2 JSON subset. It prepares the whole input before traffic, uses transient credentials and the shared collection/workflow engines, and supports environment files, temporary overrides, retries, reports and cancellation. Every request has an explicit HTTP 2xx check; scripts, unsupported transport representations and multipart/file bodies block. No personal workspace or Keychain import is required. This is not script compatibility or a native/CSV/folder/TLS-file runner. See the [CLI guide](CLI.md).
+
 ## Runs, contracts and interchange
 
 - **Workflow:** status/header/body/JSON assertions, transactional extraction, iterations/pacing/retries, same-collection branching/stop, environment matrix isolation and bounded load metrics. Recovered retries pass the final visit while earlier failed attempts remain visible.

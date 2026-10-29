@@ -23,6 +23,35 @@ Extensions are versioned JSON manifests, not executable code. Discovery lists st
 
 The CLI is intentionally explicit: it does not install itself, push Git changes, refresh tokens automatically or execute foreign scripts. gRPC sends one supplied message then half-closes; desktop supports interactive streaming. MQTT/AMQP/Kafka remain desktop workbenches. See [features and limits](FEATURES.md) and [release acceptance](RELEASE.md).
 
+## Direct Postman v2 file runs (development source)
+
+```sh
+rill run ./collection.json --environment-file ./environment.json \
+  --env-var baseUrl=http://127.0.0.1:8080 --env-var optionalValue= \
+  --report ./results.json --report-format json --json
+```
+
+This first file-run increment executes the supported Postman v2/v2.1 JSON subset through RillCore, in depth-first source order, without creating a desktop workspace or importing credentials into Keychain. Collection variables are overridden by enabled environment-file values, then repeatable `--env-var` options (last occurrence wins; empty values are valid). Secret-typed input values stay in a transient in-memory credential provider. Ambient process-secret fallback and personal Keychain credentials are not read by this file-run path.
+
+Before any request, the entire collection/environment is checked for static blockers and every supported request is prepared to validate expanded URLs, headers, credentials and resource limits. Nonempty foreign scripts, missing/cyclic variables, unsupported transport/import representations and multipart/binary/upload bodies block the run. Referenced upload files are never opened. Supported native dynamic templates may be generated during preparation and again at execution; no deterministic-seed promise is made.
+
+**Success policy: HTTP 2xx checks, not Postman assertions.** Every executed request receives an explicit 2xx status check. A file containing scripts is rejected rather than executing without its tests. A passed run does not establish Newman or full Postman compatibility. Status-check failures exit **4**, transport/runtime failures **3**, invalid/blocked inputs **2**, and cancellation **130**; successful runs exit **0**.
+
+Options reuse `--iterations`, `--delay`/`--retry-delay` (milliseconds), `--retries`, `--continue-on-failure`, `--timeout` (1–300 seconds), `--report`/`--report-format json|markdown|junit`, `--allure`, `--detail`, `--quiet` and `--json`. Limits remain 10,000 planned/executed steps with bounded retries, variables and response retention. JSON summaries have `schemaVersion: 1`, `passed`, `cancelled`, `exhausted` and executed `attempts`; static blockers return versioned redacted preflight checks with `sendsRequests: false`. Argument, file and preparation errors use stderr and exit 2. Ctrl+C flushes an explicitly requested unsuccessful report before exit when possible.
+
+Ordinary reports omit payloads/credentials. `--output FILE` explicitly exports the last received response if retained; unavailable retention is an error, not a silently omitted artifact. Outputs are exclusive unless `--overwrite` is supplied and cannot replace collection/environment inputs or the desktop workspace. Inputs remain unchanged. Multipart/file bodies, native workspace files, folder selection, globals/CSV/JSON iteration data and file-based TLS are future increments; their options are not silently ignored. Saved-workspace commands remain available separately.
+
+For macOS CI after checkout and Xcode setup:
+
+```sh
+swift build --product RillCLI
+products="$(swift build --show-bin-path)"
+"$products/RillCLI" run ./fixtures/collection.json \
+  --environment-file ./fixtures/environment.json --report ./results.json --json
+```
+
+Use sanitized fixtures and explicitly supplied protected environment files for CI credentials. This example requires macOS; it does not establish Linux/Windows support.
+
 ## Ad-hoc HTTP requests (development source)
 
 ```sh
@@ -71,7 +100,7 @@ swift run RillCLI preflight ./collection.json \
   --json
 ```
 
-`--env-var` is repeatable; precedence is collection variables, then enabled environment values, then overrides (last override wins). Empty override values are valid. Other run commands reject these new file options rather than silently ignoring them. Native workspace inputs, direct file execution, globals, iteration data and a complete execution plan remain future work.
+`--env-var` is repeatable; precedence is collection variables, then enabled environment values, then overrides (last override wins). Empty override values are valid. Other run commands reject these new file options rather than silently ignoring them. Native workspace inputs, globals, iteration data and a complete execution plan remain future work. Development source now provides the conservative Postman v2 `run` command described above.
 
 Preflight blocks nonempty foreign scripts at collection/folder/request scope, unsupported importer representations, omitted transport settings, unresolved/cyclic/over-budget template references, invalid environments and empty collections. Script-produced variables are not inferred. Diagnostics identify JSON locations using indices, without echoing request names, arbitrary keys, URLs, variable values or script text. Terminal output shows the first 20 diagnostics by default; `--detail` expands it. At most 1,000 diagnostic records are retained; the total blocker count remains visible. Static variable analysis is bounded and conservative; it recognizes the supported `$uuid`, `$timestamp`, `$email` and `$randomInt a b` syntax without generating values. Unsupported dynamic names and malformed arguments remain blockers. It does not evaluate JavaScript or arbitrary body-file contents.
 

@@ -17,6 +17,13 @@ import RillCore
             } catch CLIError.usage(let text) {
                 try? FileHandle.standardError.write(contentsOf: Data((text + "\n").utf8))
                 return 2
+            } catch CLIError.runtime {
+                if Task.isCancelled { return 130 }
+                try? FileHandle.standardError.write(
+                    contentsOf: Data(
+                        "Execution failed. Check the redacted result summary and endpoint; runtime content omitted.\n"
+                            .utf8))
+                return 3
             } catch {
                 if Task.isCancelled { return 130 }
                 try? FileHandle.standardError.write(
@@ -43,6 +50,7 @@ import RillCore
         case "help": try args.text(usage)
         case "preflight": try await preflight(args)
         case "request": try await request(args)
+        case "run": try await runFile(args)
         case "version": try args.text(RillVersion.number)
         case "init":
             guard !FileManager.default.fileExists(atPath: args.workspaceURL.path) else {
