@@ -1,5 +1,9 @@
 import Foundation
 
+public enum CollectionPreflightInputError: Error {
+    case insomnia, nativeWorkspace
+}
+
 /// Offline input inspection. Passing this check is not a claim of Newman equivalence.
 public struct CollectionPreflight: Encodable, Sendable {
     public struct Issue: Codable, Sendable {
@@ -30,6 +34,12 @@ public struct CollectionPreflight: Encodable, Sendable {
             return value
         }
         let root = try object(collection)
+        if root["resources"] is [[String: Any]] || root["__export_format"] != nil {
+            throw CollectionPreflightInputError.insomnia
+        }
+        if root["requests"] is [[String: Any]], root["collections"] is [[String: Any]] {
+            throw CollectionPreflightInputError.nativeWorkspace
+        }
         guard root["info"] is [String: Any], root["item"] is [[String: Any]] else {
             throw PostmanImportError.invalid
         }

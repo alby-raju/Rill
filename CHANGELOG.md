@@ -2,6 +2,9 @@
 
 ## 0.4.5 (unreleased)
 
+- Add ad-hoc `request METHOD URL` with headers/text body inputs, temporary variable overrides, explicit saved environment/auth/TLS selection, redacted summaries and opt-in raw response files.
+- Identify recognizable Insomnia/native workspace preflight inputs with actionable redacted format guidance.
+
 - Show one collection disclosure control, preserving saved collapse state and search expansion.
 - Recognize supported native dynamic templates in offline preflight without generating values; reject unsupported names and malformed arguments.
 - Remove force casts from collection adapters and runner failures, report the current version in the default User-Agent, and clarify invalid OpenAPI input diagnostics.

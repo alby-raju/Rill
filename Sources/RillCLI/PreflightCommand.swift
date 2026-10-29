@@ -29,6 +29,14 @@ extension RillCLI {
             }
             report = try CollectionPreflight.inspect(
                 collection: data, environment: environment, overrides: overrides)
+        } catch CollectionPreflightInputError.insomnia {
+            throw CLIError.usage(
+                "This looks like an Insomnia export. Preflight accepts Postman v2 JSON; use collection-import --format insomnia for an import preview. No requests sent; source content omitted."
+            )
+        } catch CollectionPreflightInputError.nativeWorkspace {
+            throw CLIError.usage(
+                "This looks like a native Rill workspace. Preflight accepts Postman v2 JSON; use list or run-request with --workspace for saved entries. No requests sent; source content omitted."
+            )
         } catch let error as CLIError { throw error } catch is CancellationError {
             throw CancellationError()
         } catch {

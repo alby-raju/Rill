@@ -25,6 +25,8 @@ Milestones are delivery groups, not a promise to fit each into one PR. Use indep
 - [ ] **CLI-04 — CLI installation and discoverability.** Shell completion, permanent install guidance, `doctor`, useful per-command help, actionable errors and CI-friendly exit codes. Provide a CLI-only macOS archive; evaluate Homebrew after reproducible standalone packaging works.
 - [ ] **CLI-05 — Explain before sending.** Add a validation/dry-run mode that reports unsupported imports/scripts, unresolved inputs, selected environment and redacted execution plan without sending requests. Unsupported behavior must not produce a misleading success.
 
+Ad-hoc development-source increment: `rill request METHOD URL` sends a single request through the shared HTTP engine, with temporary variable overrides and explicit optional saved profile selection. This addresses one-off calls without fulfilling CLI-01 direct collection-file execution.
+
 First CLI-05 increment: development source provides offline Postman `preflight` with redacted script/variable/import diagnostics and optional unencrypted PEM pairing/expiry inspection. It does not send requests, produce a full execution plan or establish Newman compatibility. Direct file runs and other milestone items remain open.
 
 Acceptance: a sanitized suite shaped like the owner's 600-request collection runs from collection/environment files with four temporary variable overrides, mTLS and a simultaneous terminal/JSON report. Test from paths with spaces, without the desktop app running, and verify input files and personal workspace remain unchanged. Never publish the owner's collection, internal endpoints, environment or certificates as fixtures.

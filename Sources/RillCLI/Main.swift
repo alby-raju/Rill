@@ -42,6 +42,7 @@ import RillCore
         switch args.command {
         case "help": try args.text(usage)
         case "preflight": try await preflight(args)
+        case "request": try await request(args)
         case "version": try args.text(RillVersion.number)
         case "init":
             guard !FileManager.default.fileExists(atPath: args.workspaceURL.path) else {

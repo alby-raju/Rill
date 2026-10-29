@@ -27,7 +27,7 @@ struct Arguments: Sendable {
         var index = 0
         var foundCommand = false
         while index < input.count {
-            let item = input[index]
+            let item = ["-H": "--header", "-d": "--data"][input[index]] ?? input[index]
             if item.hasPrefix("--") {
                 let name = String(item.dropFirst(2))
                 if boolean.contains(name) {
@@ -60,9 +60,10 @@ struct Arguments: Sendable {
         let preflightOnly: Set<String> = [
             "environment-file", "env-var", "ssl-client-cert", "ssl-client-key",
         ]
-        if command != "preflight", !preflightOnly.isDisjoint(with: values.keys) {
+        let fileOnly = command == "request" ? preflightOnly.subtracting(["env-var"]) : preflightOnly
+        if command != "preflight", !fileOnly.isDisjoint(with: values.keys) {
             throw CLIError.usage(
-                "File environment/variable/certificate options currently require preflight; direct file execution is not implemented."
+                "File environment/certificate options require preflight; --env-var is also supported by request. Direct file execution is not implemented."
             )
         }
         if let color = value("color"), !["auto", "always", "never"].contains(color) {
@@ -225,6 +226,13 @@ let usage = """
           --environment-file FILE --env-var key=value (repeatable)
           --ssl-client-cert FILE --ssl-client-key FILE (unencrypted PEM key)
           --json                   Structured diagnostics; exit 2 for blocked inputs
+      request METHOD URL           Ad-hoc HTTP request; no workspace required
+          -H, --header name:value   Repeatable request headers
+          -d, --data TEXT           UTF-8 text body; or --data-file FILE (1 MiB)
+          --env-var key=value       Temporary overrides (repeatable); --timeout SECONDS
+          --output FILE            Explicit raw response export; --overwrite permits replacement
+          --json                   Redacted status/timing/byte summary; non-2xx exits 3
+          --workspace FILE         Explicit saved --environment/--auth-profile/--tls selection
       init                         Create a new empty workspace (never overwrites)
       list | search TEXT           List saved IDs/names; search metadata
       run-request NAME_OR_ID       Run one saved request through shared workflow engine
