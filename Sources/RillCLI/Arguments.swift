@@ -251,6 +251,7 @@ let usage = """
           --environment-file FILE --env-var key=value (repeatable)
           --iterations N --delay MS --retries N --retry-delay MS --continue-on-failure
           --report FILE --report-format json|markdown|junit --allure DIR
+          --output FILE --timeout SECONDS   Explicit last-response export and request timeout
           --json | --detail        Unsupported scripts/inputs block before traffic
       request METHOD URL           Ad-hoc HTTP request; no workspace required
           -H, --header name:value   Repeatable request headers

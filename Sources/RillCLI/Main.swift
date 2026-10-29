@@ -17,6 +17,13 @@ import RillCore
             } catch CLIError.usage(let text) {
                 try? FileHandle.standardError.write(contentsOf: Data((text + "\n").utf8))
                 return 2
+            } catch CLIError.runtime {
+                if Task.isCancelled { return 130 }
+                try? FileHandle.standardError.write(
+                    contentsOf: Data(
+                        "Execution failed. Check the redacted result summary and endpoint; runtime content omitted.\n"
+                            .utf8))
+                return 3
             } catch {
                 if Task.isCancelled { return 130 }
                 try? FileHandle.standardError.write(

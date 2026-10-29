@@ -2,6 +2,9 @@
 
 ## 0.4.5 (unreleased)
 
+- Add conservative `run COLLECTION.json` execution through the shared runner: Postman v2 environment/override inputs, transient secret values, offline blockers, whole-input preparation, explicit HTTP 2xx checks, reports/retries/cancellation and protected raw response export. Foreign scripts and unsupported inputs block before traffic; this is not Newman compatibility.
+- Report known execution failures without classifying the CLI's runtime failure sentinel as an unknown error.
+
 - Bound runtime variable-template scanning without overlapping whitespace quantifiers or eagerly collecting all matches. Preserve whitespace semantics, stop on cancellation, and enforce the substitution budget during scanning.
 - Set the ad-hoc CLI no-body mode explicitly rather than assigning an optional nil.
 - Keep layout/environment selectors inside the workbench window, size them to content, and support close/Escape/click-away dismissal. Add compact-window containment and native Escape regressions.

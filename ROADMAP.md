@@ -23,13 +23,13 @@ Deliver focused PRs in this order, reusing the shared engines:
 
 Mock discoverability/lifecycle follows the first reliable file-run/compatibility increments, reusing the existing server. Existing GraphQL/gRPC/broker capabilities remain supported acceptance work; this scope does not remove their criteria or promote synthetic fixtures into interoperability evidence. WorkbenchStore decomposition remains a measured maintenance task, not a prerequisite for each user-visible fix.
 
-The next implementation increment is **G1: conservative direct Postman v2 file runs**, followed by data/TLS and compatibility depth. The gates above add a release order to the milestone details below; they do not mark their unchecked tasks shipped. A PR, passing CI and documented behavior establish an increment; release evidence closes shipping status.
+Development source now implements the first **G1 conservative direct Postman v2 file-run** increment with whole-input preparation, explicit HTTP 2xx checks, transient secrets, environments/overrides, reports and cancellation. Scripts and unsupported inputs block before traffic. G1 remains open for native inputs/folder selection and complete acceptance; data/TLS and compatibility depth follow. The gates above add a release order to the milestone details below; they do not mark their unchecked tasks shipped. A PR, passing CI and documented behavior establish an increment; release evidence closes shipping status.
 
 ## At a glance
 
 | Order | Milestone | User outcome | Status |
 | --- | --- | --- | --- |
-| 1 | CLI file runner and migration diagnostics | Run collection/environment files without importing into a desktop workspace | In progress: offline preflight |
+| 1 | CLI file runner and migration diagnostics | Run collection/environment files without importing into a desktop workspace | In progress: preflight and conservative Postman file runs |
 | 2 | Workflow compatibility and trustworthy reports | Understand which scripts work and why a run passed or failed | Planned |
 | 3 | First-class mock workbench | Find, edit and run local mocks directly from the app or CLI | Planned |
 | 4 | Performance and failure investigation | Keep large workspaces responsive and compare repeatable runs | Planned |
@@ -48,11 +48,13 @@ Milestones are delivery groups, not a promise to fit each into one PR. Use indep
 
 Ad-hoc development-source increment: `rill request METHOD URL` sends a single request through the shared HTTP engine, with temporary variable overrides and explicit optional saved profile selection. This addresses one-off calls without fulfilling CLI-01 direct collection-file execution.
 
-First CLI-05 increment: development source provides offline Postman `preflight` with redacted script/variable/import diagnostics and optional unencrypted PEM pairing/expiry inspection. It does not send requests, produce a full execution plan or establish Newman compatibility. Direct file runs and other milestone items remain open.
+First CLI-01/02 increment: development source provides conservative Postman v2 `run` with environment files, overrides, whole-input preparation, explicit HTTP 2xx checks, reports and cancellation. Multipart/file bodies and foreign scripts block; native inputs, folder selection, data and headless TLS remain open.
+
+First CLI-05 increment: development source provides offline Postman `preflight` with redacted script/variable/import diagnostics and optional unencrypted PEM pairing/expiry inspection. It does not send requests, produce a full execution plan or establish Newman compatibility. The complete file-run milestone and other items remain open.
 
 Acceptance: a sanitized suite shaped like the owner's 600-request collection runs from collection/environment files with four temporary variable overrides, mTLS and a simultaneous terminal/JSON report. Test from paths with spaces, without the desktop app running, and verify input files and personal workspace remain unchanged. Never publish the owner's collection, internal endpoints, environment or certificates as fixtures.
 
-### Proposed command shape — not supported by 0.4.3
+### Full target command shape — not yet supported
 
 ```sh
 rill run ./collection.json   --environment-file ./environment.json   --ssl-client-cert ./client.crt   --ssl-client-key ./client.key   --insecure   --env-var runLinks=true   --env-var runDelivery=true   --env-var runManagementExtras=true   --env-var runCleanup=true   --detail   --report ./results.json --report-format json

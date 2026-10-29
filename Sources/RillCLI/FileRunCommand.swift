@@ -37,10 +37,12 @@ extension RillCLI {
         let normalized = destinations.map { URL(fileURLWithPath: $0).resolvingSymlinksInPath() }
         let inputs = ([args.operands[0]] + [args.value("environment-file")].compactMap { $0 })
             .map { URL(fileURLWithPath: $0).resolvingSymlinksInPath() }
-        guard Set(normalized).count == normalized.count, Set(normalized).isDisjoint(with: inputs)
+        guard Set(normalized).count == normalized.count, Set(normalized).isDisjoint(with: inputs),
+            !normalized.contains(args.workspaceURL.resolvingSymlinksInPath())
         else {
             throw CLIError.usage(
-                "Outputs must be distinct and cannot replace collection/environment inputs.")
+                "Outputs must be distinct and cannot replace collection/environment inputs or the desktop workspace."
+            )
         }
         for destination in destinations
         where FileManager.default.fileExists(atPath: destination)
@@ -51,6 +53,8 @@ extension RillCLI {
         if let directory = args.value("allure") {
             var isDirectory: ObjCBool = false
             guard !inputs.contains(URL(fileURLWithPath: directory).resolvingSymlinksInPath()),
+                URL(fileURLWithPath: directory).resolvingSymlinksInPath()
+                    != args.workspaceURL.resolvingSymlinksInPath(),
                 !FileManager.default.fileExists(atPath: directory, isDirectory: &isDirectory)
                     || isDirectory.boolValue
             else {
@@ -102,10 +106,22 @@ extension RillCLI {
         guard requests.count * config.iterations <= 10_000 else {
             throw CLIError.usage("Requested run exceeds the execution limit; no requests sent.")
         }
+        if !args.flags.contains("json") {
+            try args.text(
+                "Rill file run · \(requests.count) requests · HTTP 2xx checks · Postman scripts are not executed"
+            )
+        }
         let report = try await plan.run(
             configuration: config, timeout: args.value("timeout") == nil ? nil : timeout)
         try await reports(report, arguments: args)
-        if let output = args.value("output"), let body = report.outcomes.last?.retainedBody {
+        if let output = args.value("output") {
+            guard let body = report.outcomes.last(where: { $0.status != nil })?.retainedBody else {
+                try? FileHandle.standardError.write(
+                    contentsOf: Data(
+                        "Raw response export unavailable: the last response was not retained. No raw output written.\n"
+                            .utf8))
+                throw CLIError.runtime
+            }
             try args.write(body, to: output)
         }
         if args.flags.contains("json") {
@@ -119,7 +135,7 @@ extension RillCLI {
             try args.json(
                 Summary(
                     passed: report.passed, cancelled: report.cancelled, exhausted: report.exhausted,
-                    attempts: report.outcomes.count))
+                    attempts: report.outcomes.filter { $0.state != .notRun }.count))
         } else {
             try args.text(
                 RunConsole.render(
