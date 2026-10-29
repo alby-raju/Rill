@@ -16,6 +16,10 @@ This describes the MVP's implemented scope. Automated tests and an implemented c
 
 Default bounds include a 32 MiB workspace, 16 MiB HTTP response, 512 KiB preview, 32 MiB/50-entry session history and bounded durable snapshots. Preview and retention limits are distinct from transport acceptance; truncation must remain visible. Explicit raw exports can contain sensitive data.
 
+## Ad-hoc CLI requests
+
+Development source supports `rill request METHOD URL` with no workspace setup, repeated header options, UTF-8 body text/files, temporary variable overrides, and explicit raw response export. Saved environments/auth/TLS profiles require an explicit workspace. The shared HTTP engine retains TLS verification, redirect rules, response bounds and unsupported GET/HEAD-body/repeated-header checks. Summaries omit payloads and credentials. See the [CLI guide](CLI.md).
+
 ## Runs, contracts and interchange
 
 - **Workflow:** status/header/body/JSON assertions, transactional extraction, iterations/pacing/retries, same-collection branching/stop, environment matrix isolation and bounded load metrics. Recovered retries pass the final visit while earlier failed attempts remain visible.

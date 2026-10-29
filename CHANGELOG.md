@@ -2,6 +2,8 @@
 
 ## 0.4.5 (unreleased)
 
+- Add ad-hoc `request METHOD URL` with headers/text body inputs, temporary variable overrides, explicit saved environment/auth/TLS selection, redacted summaries and opt-in raw response files.
+- Identify recognizable Insomnia/native workspace preflight inputs with actionable redacted format guidance.
 - Isolate request/response pane hosting constraints from tab content so delayed native sizing updates cannot reset the divider to its minimum.
 
 - Show one collection disclosure control, preserving saved collapse state and search expansion.

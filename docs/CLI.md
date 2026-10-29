@@ -1,6 +1,6 @@
 # Native CLI
 
-Requires macOS 15+. Build with `swift build --product RillCLI`; run `.build/debug/RillCLI --help`. The packaged app includes `Rill.app/Contents/Helpers/rill`. Use that path directly or create a personal shell alias. The build product uses a distinct name because macOS filesystems commonly ignore filename case.
+Requires macOS 15+. Build with `swift build --product RillCLI`; discover the executable directory with `swift build --show-bin-path`, then run its `RillCLI --help`. The packaged app includes `Rill.app/Contents/Helpers/rill`. Use that path directly or create a personal shell alias. The build product uses a distinct name because macOS filesystems commonly ignore filename case.
 
 ```
 rill init --workspace ./workspace.json
@@ -13,7 +13,7 @@ rill share-serve --workspace ./workspace.json --token-file ./share.token
 rill share-pull http://127.0.0.1:PORT/workspace --token-file ./share.token --destination ./received.json
 ```
 
-`--help` is the authoritative complete command/option list. `--workspace` defaults to the desktop workspace. Use a copy for automation. Selection by name must be unambiguous; IDs avoid duplicate names. Environment inheritance, named secrets, authentication, TLS and runners use RillCore. Insecure TLS profiles additionally require `--allow-insecure` on each invocation. Read-only metadata commands do not need Keychain; execution and credential-bearing imports may prompt through macOS.
+`--help` is the authoritative complete command/option list. `--workspace` defaults to the desktop workspace for saved-workspace commands; ad-hoc `request` only reads an explicitly supplied workspace. Use a copy for automation. Selection by name must be unambiguous; IDs avoid duplicate names. Environment inheritance, named secrets, authentication, TLS and runners use RillCore. Insecure TLS profiles additionally require `--allow-insecure` on each invocation. Read-only metadata commands do not need Keychain; execution and credential-bearing imports may prompt through macOS.
 
 Exit codes: 0 success; 2 usage/configuration; 3 runtime/transport; 4 failed checks; 130 cancellation. Ctrl+C cancels owned work; report flush uses a separate bounded task. Reports support JSON, Markdown, JUnit and Allure directories. Retry attempts are retained, while recovered retries do not make the final run fail. `--quiet` suppresses normal output. Payloads stay out of ordinary summaries; `--show-messages` explicitly displays stream content and `--output` explicitly saves raw output. Output files are exclusive unless `--overwrite` is supplied; the active workspace cannot be replaced by an output flag.
 
@@ -22,6 +22,22 @@ Imports and API refresh preview by default; `--apply` persists reviewed results.
 Extensions are versioned JSON manifests, not executable code. Discovery lists stable IDs and services; enable approves an exact manifest/content hash. Changes invalidate approval. Templates import with fresh IDs, detached profiles and disabled hooks. Mock-route services export validated JSON for the existing mock server. A manifest contains `apiVersion: 1`, `id`, `name`, `version`, and `services` with `id`, `kind` (`requestTemplate` or `mockRoutes`) and a JSON basename in `file`. The service files use Rill's RequestDraft or MockRouteFile encoding. Do not put secrets in extension files.
 
 The CLI is intentionally explicit: it does not install itself, push Git changes, refresh tokens automatically or execute foreign scripts. gRPC sends one supplied message then half-closes; desktop supports interactive streaming. MQTT/AMQP/Kafka remain desktop workbenches. See [features and limits](FEATURES.md) and [release acceptance](RELEASE.md).
+
+## Ad-hoc HTTP requests (development source)
+
+```sh
+rill request GET https://example.test/health --json
+rill request POST 'https://example.test/items' -H 'Content-Type: application/json' \
+  -d '{"name":"{{name}}"}' --env-var name=fixture --output ./response.json
+rill request GET '{{base}}/health' --workspace ./workspace.json \
+  --environment Local --auth-profile Service --tls Corporate
+```
+
+`request METHOD URL` uses the shared HTTP engine without creating a request or reading the desktop workspace. It accepts GET, POST, PUT, PATCH, DELETE, HEAD and OPTIONS (case-insensitive). Saved environments/authentication/TLS profiles require an explicit `--workspace`; only metadata is loaded, with named credentials resolved by the existing credential provider when needed. Nothing is saved back.
+
+Use repeatable `-H`/`--header name:value`, `-d`/`--data TEXT` or `--data-file FILE` (UTF-8, at most 1 MiB). Body options are mutually exclusive; GET/HEAD bodies and repeated header names remain rejected. Temporary `--env-var key=value` overrides saved environment values; the last occurrence wins and empty values are valid. `--timeout` is 1–300 seconds. Insecure profiles still require `--allow-insecure`; certificate/environment file flags are not supported here.
+
+Normal output is a redacted HTTP status/timing/response-byte summary. `--json` emits `schemaVersion: 1`, `status`, `duration` (seconds) and `bodyBytes`; it never includes URLs, headers or payloads. `--quiet` suppresses it. Raw response bytes require `--output FILE`, with `--overwrite` for existing files; workspace and body input paths are protected. Response downloads retain the shared 16 MiB limit. HTTP non-2xx and transport failures exit 3; invalid configuration exits 2; cancellation exits 130. This command does not run saved hooks/assertions or produce collection reports. No cookie jar or foreign script runtime is introduced.
 
 ## Terminal run experience
 
