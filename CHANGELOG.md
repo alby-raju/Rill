@@ -2,7 +2,7 @@
 
 ## 0.4.5 (unreleased)
 
-- Keep request/response tab content inside bounded viewports so switching tabs does not impose new split-view constraints. Reduce the stacked response minimum and add a 140-case native resize regression.
+- Keep request/response tab content inside bounded viewports so switching tabs does not impose new split-view constraints. Reduce the stacked response minimum and add a 420-case native resize regression.
 - Replace the large validation banner and empty Checks presentation with compact status and guidance; keep failures visible with a review action.
 - Omit grouping-only parent containers when importing flattened collections, while preserving intentional empty leaves and mixed parents.
 

@@ -42,7 +42,7 @@ with tempfile.TemporaryDirectory(prefix="rill-tab-resize-") as directory:
             check=True,
             timeout=45,
         )
-        expected = "RILL_TAB_RESIZE_OK orientation=" + layout + " cases=70"
+        expected = "RILL_TAB_RESIZE_OK orientation=" + layout + " cases=210"
         if (
             not output.exists()
             or expected not in output.read_text()

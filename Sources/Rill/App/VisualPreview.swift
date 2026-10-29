@@ -311,35 +311,42 @@ import SwiftUI
             }
             let targets: [CGFloat] = vertical ? [400, 500] : [180, 260]
             var count = 0
-            for requestTab in [
-                "Parameters", "Headers", "Body", "GraphQL", "Auth", "Checks", "Workflow",
-            ] {
-                requestSections.send(requestTab)
-                try await Task.sleep(for: .milliseconds(60))
-                for target in targets {
-                    split.setPosition(target, ofDividerAt: 0)
+            guard let store = previewStore, let request = store.selected else {
+                throw CocoaError(.coderInvalidValue)
+            }
+            for validation in ["response-unchecked", "response-failed", "response-passed"] {
+                store.response = response(for: request, state: validation)
+                for requestTab in [
+                    "Parameters", "Headers", "Body", "GraphQL", "Auth", "Checks", "Workflow",
+                ] {
+                    requestSections.send(requestTab)
                     try await Task.sleep(for: .milliseconds(60))
-                    root.layoutSubtreeIfNeeded()
-                    guard abs(position() - target) <= 3 else {
-                        fputs(
-                            "Resize rejected in request tab \(requestTab): \(position()) vs \(target)\n",
-                            stderr)
-                        throw CocoaError(.coderInvalidValue)
-                    }
-                    for responseTab in ["Body", "Headers", "Checks", "Request", "Timeline"] {
-                        responseSections.send(responseTab)
+                    for target in targets {
+                        split.setPosition(target, ofDividerAt: 0)
                         try await Task.sleep(for: .milliseconds(60))
                         root.layoutSubtreeIfNeeded()
                         guard abs(position() - target) <= 3 else {
                             fputs(
-                                "Divider shifted in \(requestTab)/\(responseTab): \(position()) vs \(target)\n",
+                                "Resize rejected in request tab \(requestTab): \(position()) vs \(target)\n",
                                 stderr)
                             throw CocoaError(.coderInvalidValue)
                         }
-                        count += 1
+                        for responseTab in ["Body", "Headers", "Checks", "Request", "Timeline"] {
+                            responseSections.send(responseTab)
+                            try await Task.sleep(for: .milliseconds(60))
+                            root.layoutSubtreeIfNeeded()
+                            guard abs(position() - target) <= 3 else {
+                                fputs(
+                                    "Divider shifted in \(requestTab)/\(responseTab): \(position()) vs \(target)\n",
+                                    stderr)
+                                throw CocoaError(.coderInvalidValue)
+                            }
+                            count += 1
+                        }
                     }
                 }
             }
+            store.response = response(for: request, state: "response-failed")
             responseSections.send("Checks")
             print(
                 "RILL_TAB_RESIZE_OK orientation=\(vertical ? "horizontal" : "vertical") cases=\(count)"
