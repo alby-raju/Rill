@@ -469,30 +469,20 @@ struct RequestEditor: View {
                     urlFocused ? accent : RillPalette.line, lineWidth: urlFocused ? 1.5 : 1)
             ).padding(.horizontal, 24).padding(.bottom, 16)
             GeometryReader { geometry in
-                if requestLayout == "horizontal"
+                let horizontal =
+                    requestLayout == "horizontal"
                     || (requestLayout == "automatic" && geometry.size.width >= 1050)
-                {
-                    HSplitView {
-                        boundedPane { composition }.frame(minWidth: 350).background(
-                            SplitAutosave(name: "rill.request.horizontal", vertical: true))
+                RequestSplitView(
+                    vertical: horizontal,
+                    leadingMinimum: horizontal ? 350 : min(140, geometry.size.height * 0.35),
+                    trailingMinimum: horizontal ? 350 : min(180, geometry.size.height * 0.4),
+                    leading: paneStyle(boundedPane { composition }),
+                    trailing: paneStyle(
                         boundedPane {
                             ResponseView(exchange: store.response, running: store.running)
-                        }.frame(
-                            minWidth: 350)
-                    }
-                } else {
-                    VSplitView {
-                        boundedPane { composition }.frame(
-                            minHeight: min(140, geometry.size.height * 0.35),
-                            idealHeight: geometry.size.height * 0.45
-                        ).background(SplitAutosave(name: "rill.request.vertical", vertical: false))
-                        boundedPane {
-                            ResponseView(exchange: store.response, running: store.running)
-                        }.frame(
-                            minHeight: min(
-                                180, geometry.size.height * 0.4))
-                    }
-                }
+                        })
+                ).id(horizontal)
+
             }
         }
         .onChange(of: store.selection) { _, _ in store.response = nil }
@@ -500,6 +490,14 @@ struct RequestEditor: View {
             .onReceive(RillPreview.requestSections) { section = $0 }
         #endif
     }
+    private func paneStyle<Content: View>(_ content: Content) -> some View {
+        content.environmentObject(store)
+            .disabled(store.loading || store.importing || store.closing)
+            .defaultAppStorage(RillPreview.preferences)
+            .buttonStyle(RillButtonStyle())
+            .textFieldStyle(RillTextFieldStyle())
+    }
+
     /// Keep the native split item's sizing identity independent of selected tab content.
     /// macOS 15 can otherwise redistribute space even when nested content is clipped.
     private func boundedPane<Content: View>(@ViewBuilder content: () -> Content) -> some View {
