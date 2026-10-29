@@ -60,10 +60,13 @@ struct Arguments: Sendable {
         let preflightOnly: Set<String> = [
             "environment-file", "env-var", "ssl-client-cert", "ssl-client-key",
         ]
-        let fileOnly = command == "request" ? preflightOnly.subtracting(["env-var"]) : preflightOnly
+        let allowedInputs: Set<String> =
+            command == "run"
+            ? ["env-var", "environment-file"] : command == "request" ? ["env-var"] : []
+        let fileOnly = preflightOnly.subtracting(allowedInputs)
         if command != "preflight", !fileOnly.isDisjoint(with: values.keys) {
             throw CLIError.usage(
-                "File environment/certificate options require preflight; --env-var is also supported by request. Direct file execution is not implemented."
+                "File certificate options require preflight; environment/variable inputs are supported by run, and request also accepts --env-var."
             )
         }
         if let color = value("color"), !["auto", "always", "never"].contains(color) {
@@ -102,6 +105,17 @@ struct Arguments: Sendable {
             throw CLIError.usage("Expected a bounded duration.")
         }
         return number
+    }
+    func variableOverrides() throws -> [String: String] {
+        var overrides: [String: String] = [:]
+        for row in values["env-var"] ?? [] {
+            guard let split = row.firstIndex(of: "="), split != row.startIndex else {
+                throw CLIError.usage(
+                    "--env-var expects a nonempty key=value; values are never printed.")
+            }
+            overrides[String(row[..<split])] = String(row[row.index(after: split)...])
+        }
+        return overrides
     }
     func fields(_ name: String) throws -> [Field] {
         try (values[name] ?? []).map { row in
@@ -145,6 +159,13 @@ struct Arguments: Sendable {
     }
     func write(_ data: Data, to path: String) throws {
         let destination = URL(fileURLWithPath: path)
+        if command == "run" {
+            let inputs = (operands + [value("environment-file")].compactMap { $0 })
+                .map { URL(fileURLWithPath: $0).resolvingSymlinksInPath() }
+            guard !inputs.contains(destination.resolvingSymlinksInPath()) else {
+                throw CLIError.usage("Output cannot replace collection/environment inputs.")
+            }
+        }
         guard destination.resolvingSymlinksInPath() != workspaceURL.resolvingSymlinksInPath() else {
             throw CLIError.usage("Output cannot replace the active workspace.")
         }
@@ -226,6 +247,11 @@ let usage = """
           --environment-file FILE --env-var key=value (repeatable)
           --ssl-client-cert FILE --ssl-client-key FILE (unencrypted PEM key)
           --json                   Structured diagnostics; exit 2 for blocked inputs
+      run COLLECTION.json          Run supported Postman v2 inputs without a saved workspace
+          --environment-file FILE --env-var key=value (repeatable)
+          --iterations N --delay MS --retries N --retry-delay MS --continue-on-failure
+          --report FILE --report-format json|markdown|junit --allure DIR
+          --json | --detail        Unsupported scripts/inputs block before traffic
       request METHOD URL           Ad-hoc HTTP request; no workspace required
           -H, --header name:value   Repeatable request headers
           -d, --data TEXT           UTF-8 text body; or --data-file FILE (1 MiB)
