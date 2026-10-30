@@ -7,13 +7,28 @@ extension RillCLI {
             Set(args.values.keys).isSubset(of: [
                 "environment-file", "env-var", "iterations", "delay", "retries", "retry-delay",
                 "report", "report-format", "allure", "output", "timeout", "color", "folder",
+                "format", "collection", "environment",
             ]),
-            args.flags.isSubset(of: ["json", "quiet", "detail", "continue-on-failure", "overwrite"]
+            args.flags.isSubset(of: [
+                "json", "quiet", "detail", "continue-on-failure", "overwrite", "allow-insecure",
+            ]
             ),
             args.value("report-format") == nil || args.value("report") != nil
         else {
             throw CLIError.usage(
-                "Use run COLLECTION.json with Postman v2 --folder, environment/variable, pacing/retry and report options. Saved workspace, TLS-file and iteration-data options are not supported in this increment."
+                "Use run FILE with --format postman|native, supported selection/environment options, pacing/retry and reports. Saved workspace, TLS-file and iteration-data options are not supported."
+            )
+        }
+        let format = args.value("format") ?? "postman"
+        guard ["postman", "native"].contains(format),
+            format != "postman"
+                || (args.value("collection") == nil && args.value("environment") == nil
+                    && !args.flags.contains("allow-insecure")),
+            format != "native"
+                || (args.value("folder") == nil && args.value("environment-file") == nil)
+        else {
+            throw CLIError.usage(
+                "Postman runs use --folder/--environment-file; native runs use --collection/--environment and optional --allow-insecure. Choose --format postman|native explicitly; no requests sent."
             )
         }
         var config = RunConfiguration()
@@ -61,16 +76,44 @@ extension RillCLI {
                 throw CLIError.usage("Allure output must be a directory distinct from input files.")
             }
         }
-        let plan: PostmanFileRun
+        let plan: FileRunPlan
         do {
-            plan = try PostmanFileRun.prepare(
-                collection: BoundedFileInput.read(
-                    URL(fileURLWithPath: args.operands[0]), limit: ResourceLimits.workspaceBytes),
-                environment: try args.value("environment-file").map {
-                    try BoundedFileInput.read(
-                        URL(fileURLWithPath: $0), limit: ResourceLimits.workspaceBytes)
-                },
-                overrides: args.variableOverrides(), folder: args.value("folder"))
+            let data = try BoundedFileInput.read(
+                URL(fileURLWithPath: args.operands[0]), limit: ResourceLimits.workspaceBytes)
+            if format == "native" {
+                plan = .native(
+                    try NativeFileRun.prepare(
+                        workspace: data, collection: args.value("collection"),
+                        environment: args.value("environment"),
+                        overrides: args.variableOverrides(),
+                        processEnvironment: ProcessInfo.processInfo.environment,
+                        allowInsecure: args.flags.contains("allow-insecure")))
+            } else {
+                plan = .postman(
+                    try PostmanFileRun.prepare(
+                        collection: data,
+                        environment: try args.value("environment-file").map {
+                            try BoundedFileInput.read(
+                                URL(fileURLWithPath: $0), limit: ResourceLimits.workspaceBytes)
+                        }, overrides: args.variableOverrides(), folder: args.value("folder")))
+            }
+        } catch let error as NativeFileRunError {
+            let reason: String
+            switch error {
+            case .invalidSelection:
+                reason = "Native collection/environment is missing or ambiguous."
+            case .emptySelection: reason = "Native selection is empty or exceeds the request limit."
+            case .unsupportedScripts:
+                reason =
+                    "Native file contains foreign script source; only native JSON operations are supported."
+            case .unsupportedUpload:
+                reason = "Native file runs reject multipart/binary/upload references."
+            case .unsupportedIdentity:
+                reason = "Native file runs cannot use saved Keychain client identities."
+            case .insecureNotAllowed:
+                reason = "Native insecure TLS profiles require explicit --allow-insecure."
+            }
+            throw CLIError.usage(reason + " No requests sent; source content omitted.")
         } catch let error as PostmanFolderSelectionError {
             throw folderSelectionUsage(error)
         } catch PostmanFileRunError.blocked(let preflight) {
@@ -98,7 +141,7 @@ extension RillCLI {
             throw error
         } catch {
             throw CLIError.usage(
-                "Could not prepare bounded Postman v2 collection/environment JSON inputs; no requests sent; source content omitted."
+                "Could not prepare bounded collection/environment JSON inputs for the selected format; no requests sent; source content omitted."
             )
         }
         var requests = plan.requests
@@ -110,7 +153,7 @@ extension RillCLI {
         }
         if !args.flags.contains("json") {
             try args.text(
-                "Rill file run · \(args.value("folder") == nil ? "entire collection" : "selected folder") · \(requests.count) requests · HTTP 2xx checks · Postman scripts are not executed"
+                "Rill file run · \(format) · \(args.value("folder") != nil ? "selected folder" : args.value("collection") != nil ? "selected collection" : "entire file") · \(requests.count) requests · \(plan.policy)"
             )
         }
         let report = try await plan.run(
@@ -134,18 +177,21 @@ extension RillCLI {
                 let exhausted: Bool
                 let attempts: Int
                 let folderSelected: Bool
+                let collectionSelected: Bool
+                let inputFormat: String
             }
             try args.json(
                 Summary(
                     passed: report.passed, cancelled: report.cancelled, exhausted: report.exhausted,
                     attempts: report.outcomes.filter { $0.state != .notRun }.count,
-                    folderSelected: args.value("folder") != nil))
+                    folderSelected: args.value("folder") != nil,
+                    collectionSelected: args.value("collection") != nil, inputFormat: format))
         } else {
             try args.text(
                 RunConsole.render(
                     report, requests: requests,
                     title:
-                        "\(args.value("folder") == nil ? "Collection file" : "Selected folder") (HTTP 2xx checks; no Postman scripts)",
+                        "File run (\(format); \(plan.policy))",
                     detail: args.flags.contains("detail"), color: args.color))
         }
         try requireSuccessfulRun(report)
@@ -189,6 +235,29 @@ extension RillCLI {
                 }
             }
             throw CLIError.assertion
+        }
+    }
+}
+
+private enum FileRunPlan {
+    case postman(PostmanFileRun)
+    case native(NativeFileRun)
+    var requests: [RequestDraft] {
+        switch self {
+        case .postman(let plan): plan.requests
+        case .native(let plan): plan.requests
+        }
+    }
+    var policy: String {
+        switch self {
+        case .postman: "HTTP 2xx checks; no Postman scripts"
+        case .native: "native checks; unchecked responses require HTTP 2xx"
+        }
+    }
+    func run(configuration: RunConfiguration, timeout: Double?) async throws -> RunReport {
+        switch self {
+        case .postman(let plan): try await plan.run(configuration: configuration, timeout: timeout)
+        case .native(let plan): try await plan.run(configuration: configuration, timeout: timeout)
         }
     }
 }

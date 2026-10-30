@@ -21,7 +21,7 @@ struct Arguments: Sendable {
             "proto", "descriptor", "method", "data", "data-file", "count", "concurrency", "ramp",
             "port", "routes", "repo", "message", "token-file", "destination", "client-id",
             "client-secret-name", "scope", "save-secret", "plugins-dir", "trust-file", "plugin",
-            "service", "wait", "send", "auth-profile", "proto-include",
+            "service", "wait", "send", "auth-profile", "proto-include", "collection",
             "environment-file", "env-var", "ssl-client-cert", "ssl-client-key", "folder",
         ]
         var index = 0
@@ -68,6 +68,9 @@ struct Arguments: Sendable {
             throw CLIError.usage(
                 "File certificate options require preflight; folder/environment/variable inputs are supported by run and preflight, and request also accepts --env-var."
             )
+        }
+        if value("collection") != nil && command != "run" {
+            throw CLIError.usage("--collection is supported only by native file runs.")
         }
         if let color = value("color"), !["auto", "always", "never"].contains(color) {
             throw CLIError.usage("--color expects auto, always or never.")
@@ -248,8 +251,11 @@ let usage = """
           --environment-file FILE --env-var key=value (repeatable)
           --ssl-client-cert FILE --ssl-client-key FILE (unencrypted PEM key)
           --json                   Structured diagnostics; exit 2 for blocked inputs
-      run COLLECTION.json          Run supported Postman v2 inputs without a saved workspace
+      run COLLECTION.json          Run Postman v2 (default) or native inputs without desktop setup
           --folder /Parent/Child   Selected subtree; inherited scripts/settings still checked
+          --format native          Read a native Rill workspace file without opening Keychain
+          --collection NAME_OR_ID --environment NAME_OR_ID   Native selection
+          --allow-insecure         Native insecure profiles require explicit opt-in
           --environment-file FILE --env-var key=value (repeatable)
           --iterations N --delay MS --retries N --retry-delay MS --continue-on-failure
           --report FILE --report-format json|markdown|junit --allure DIR
