@@ -14,7 +14,7 @@ public struct PostmanFileRun: Sendable {
 
     public static func prepare(
         collection: Data, environment inputEnvironment: Data? = nil,
-        overrides: [String: String] = [:]
+        overrides: [String: String] = [:], folder: String? = nil
     ) throws -> Self {
         try Task.checkCancellation()
         guard overrides.count <= 10_000,
@@ -24,10 +24,11 @@ public struct PostmanFileRun: Sendable {
             overrides.reduce(0, { $0 + $1.key.utf8.count + $1.value.utf8.count })
                 <= ResourceLimits.workspaceBytes
         else { throw PostmanFileRunError.invalidOverrides }
+        let selection = try PostmanFolderSelection.prepare(collection, folder: folder)
         let preflight = try CollectionPreflight.inspect(
-            collection: collection, environment: inputEnvironment, overrides: overrides)
+            selection, environment: inputEnvironment, overrides: overrides)
         guard preflight.passed else { throw PostmanFileRunError.blocked(preflight) }
-        let imported = try PostmanImporter.parse(collection)
+        let imported = try PostmanImporter.parse(selection.data)
         // Referenced upload files must not be silently opened or converted into empty bodies.
         guard
             imported.workspace.requests.allSatisfy({

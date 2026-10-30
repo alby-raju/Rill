@@ -61,6 +61,164 @@ final class PostmanFileRunTests: XCTestCase {
         XCTAssertTrue(plan.environment.variables[0].value.hasPrefix("{{secret:"))
         XCTAssertThrowsError(try plan.secrets.resolve("unrelated-native-secret"))
     }
+    func testFolderSelectionPreservesDescendantOrderAndInheritedAuthentication() throws {
+        var outside = item("outside", "{{unresolved-outside}}")
+        outside["event"] = [["script": ["exec": ["private-excluded-script"]]]]
+        var overridden = item("second", "http://127.0.0.1:1/second")
+        overridden["request"] = [
+            "method": "POST", "url": "http://127.0.0.1:1/second", "auth": ["type": "noauth"],
+        ]
+        let input = try collection(
+            [
+                outside,
+                [
+                    "name": "Parent",
+                    "auth": [
+                        "type": "bearer", "bearer": [["key": "token", "value": "{{token}}"]],
+                    ],
+                    "item": [
+                        outside,
+                        [
+                            "name": "Selected",
+                            "item": [
+                                item("first", "http://127.0.0.1:1/first"),
+                                ["name": "Nested", "item": [overridden]],
+                                item("third", "http://127.0.0.1:1/third"),
+                            ],
+                        ],
+                    ],
+                ],
+            ], variables: [["key": "token", "value": "fixture-parent-token"]])
+        let plan = try PostmanFileRun.prepare(collection: input, folder: "/Parent/Selected")
+        XCTAssertEqual(plan.requests.map(\.name), ["first", "second", "third"])
+        let first = try RequestEngine.prepare(
+            plan.requests[0], environment: plan.environment, secrets: plan.secrets)
+        XCTAssertEqual(
+            first.value(forHTTPHeaderField: "Authorization"), "Bearer fixture-parent-token")
+        let second = try RequestEngine.prepare(
+            plan.requests[1], environment: plan.environment, secrets: plan.secrets)
+        XCTAssertNil(second.value(forHTTPHeaderField: "Authorization"))
+        XCTAssertThrowsError(try PostmanFileRun.prepare(collection: input))
+        let preflight = try CollectionPreflight.inspect(
+            collection: input, folder: "/Parent/Selected")
+        XCTAssertTrue(preflight.passed)
+        XCTAssertTrue(preflight.folderSelected)
+        XCTAssertEqual(preflight.requests, 3)
+    }
+    func testFolderScriptsAtEveryInheritedScopeRemainBlockedWithOriginalLocations() throws {
+        let event: [[String: Any]] = [["script": ["exec": ["private-selected-script"]]]]
+        for (scope, location) in [
+            (0, "/event/0"), (1, "/item/1/event/0"),
+            (2, "/item/1/item/1/event/0"), (3, "/item/1/item/1/item/0/event/0"),
+        ] {
+            var request = item("private-request", "http://127.0.0.1:1")
+            if scope == 3 { request["event"] = event }
+            var chosen: [String: Any] = ["name": "Selected", "item": [request]]
+            if scope == 2 { chosen["event"] = event }
+            var parent: [String: Any] = [
+                "name": "Parent", "item": [["name": "excluded", "item": []], chosen],
+            ]
+            if scope == 1 { parent["event"] = event }
+            let input = try collection([["name": "excluded", "item": []], parent])
+            var root = try XCTUnwrap(JSONSerialization.jsonObject(with: input) as? [String: Any])
+            if scope == 0 { root["event"] = event }
+            let bytes = try JSONSerialization.data(withJSONObject: root)
+            let report = try CollectionPreflight.inspect(
+                collection: bytes, folder: "/Parent/Selected")
+            XCTAssertFalse(report.passed)
+            XCTAssertEqual(report.scripts, 1)
+            XCTAssertTrue(
+                report.issues.contains {
+                    $0.code == "scripts.unsupported" && $0.location == location
+                })
+            let diagnostics = try JSONEncoder().encode(report)
+            XCTAssertFalse(String(decoding: diagnostics, as: UTF8.self).contains("private-"))
+            XCTAssertThrowsError(
+                try PostmanFileRun.prepare(collection: bytes, folder: "/Parent/Selected"))
+        }
+    }
+    func testFolderPathsAreExactEscapedAndUnambiguous() throws {
+        let leaf = item("fixture", "http://127.0.0.1:1")
+        let input = try collection([
+            ["name": "A/B~", "item": [["name": "日本語", "item": [leaf]]]],
+            ["name": "duplicate", "item": [leaf]], ["name": "duplicate", "item": [leaf]],
+            ["name": "empty", "item": []], leaf,
+        ])
+        let bom = Data([0xef, 0xbb, 0xbf]) + input
+        XCTAssertEqual(
+            try PostmanFileRun.prepare(collection: bom, folder: "/A~1B~0/日本語").requests.count, 1)
+        for path in [
+            "", "A/B~", "/A~2B", "/A~", "/A~́", "/" + String(repeating: "x", count: 4096),
+            String(repeating: "/a", count: 33),
+        ] {
+            XCTAssertThrowsError(try PostmanFileRun.prepare(collection: input, folder: path)) {
+                guard case PostmanFolderSelectionError.invalidPath = $0 else {
+                    return XCTFail("Expected invalid path")
+                }
+            }
+        }
+        for path in ["/missing", "/duplicate", "/fixture", "/a~1B~0/日本語", "/A~1B~0/missing"] {
+            XCTAssertThrowsError(try PostmanFileRun.prepare(collection: input, folder: path)) {
+                guard case PostmanFolderSelectionError.missingOrAmbiguous = $0 else {
+                    return XCTFail("Expected missing or ambiguous folder")
+                }
+            }
+        }
+        let empty = try CollectionPreflight.inspect(collection: input, folder: "/empty")
+        XCTAssertFalse(empty.passed)
+        XCTAssertTrue(empty.issues.contains { $0.code == "collection.empty" })
+        let literal = try collection([["name": "~1", "item": [leaf]]])
+        XCTAssertEqual(
+            try PostmanFileRun.prepare(collection: literal, folder: "/~01").requests.count, 1)
+        var nested = leaf
+        for _ in 0..<32 { nested = ["name": "a", "item": [nested]] }
+        XCTAssertEqual(
+            try PostmanFileRun.prepare(
+                collection: collection([nested]), folder: String(repeating: "/a", count: 32)
+            ).requests.count, 1)
+    }
+    func testSelectedFolderRetainsAncestorTransportAndVariableBlockers() throws {
+        for setting in ["protocolProfileBehavior", "proxy", "certificate", "variable"] {
+            var parent: [String: Any] = [
+                "name": "Parent",
+                "item": [["name": "Selected", "item": [item("leaf", "http://127.0.0.1:1")]]],
+            ]
+            parent[setting] = setting == "variable" ? [["key": "x", "value": "y"]] : [:]
+            let input = try collection([["name": "excluded", "item": []], parent])
+            let checked = try CollectionPreflight.inspect(
+                collection: input, folder: "/Parent/Selected")
+            XCTAssertFalse(checked.passed)
+            if setting != "variable" {
+                XCTAssertTrue(
+                    checked.issues.contains {
+                        $0.code == "transport.settings_not_applied"
+                            && $0.location == "/item/1/" + setting
+                    })
+            }
+            XCTAssertThrowsError(
+                try PostmanFileRun.prepare(collection: input, folder: "/Parent/Selected"))
+        }
+    }
+    func testSelectedFolderStillValidatesAllSelectedRequestsBeforeRunning() throws {
+        let input = try collection([
+            [
+                "name": "folder",
+                "item": [
+                    item("first", "http://127.0.0.1:1"), item("later", "{{bad}}"),
+                ],
+            ]
+        ])
+        XCTAssertThrowsError(
+            try PostmanFileRun.prepare(
+                collection: input, overrides: ["bad": "file:///private/fixture"], folder: "/folder")
+        )
+        let unresolved = try CollectionPreflight.inspect(collection: input, folder: "/folder")
+        XCTAssertTrue(
+            unresolved.issues.contains {
+                $0.code == "variables.unresolved_cyclic_or_limit"
+                    && $0.location == "/item/0/item/1/request"
+            })
+    }
     func testScriptsAndMultipartInputsAreBlockedBeforeExecution() throws {
         var scripted = item("script", "http://127.0.0.1:1")
         scripted["event"] = [["script": ["exec": ["pm.test('fixture', () => {})"]]]]

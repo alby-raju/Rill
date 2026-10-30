@@ -6,14 +6,14 @@ extension RillCLI {
         guard args.operands.count == 1,
             Set(args.values.keys).isSubset(of: [
                 "environment-file", "env-var", "iterations", "delay", "retries", "retry-delay",
-                "report", "report-format", "allure", "output", "timeout", "color",
+                "report", "report-format", "allure", "output", "timeout", "color", "folder",
             ]),
             args.flags.isSubset(of: ["json", "quiet", "detail", "continue-on-failure", "overwrite"]
             ),
             args.value("report-format") == nil || args.value("report") != nil
         else {
             throw CLIError.usage(
-                "Use run COLLECTION.json with Postman v2 environment/variable, pacing/retry and report options. Saved workspace, folder, TLS-file and iteration-data options are not supported in this increment."
+                "Use run COLLECTION.json with Postman v2 --folder, environment/variable, pacing/retry and report options. Saved workspace, TLS-file and iteration-data options are not supported in this increment."
             )
         }
         var config = RunConfiguration()
@@ -70,7 +70,9 @@ extension RillCLI {
                     try BoundedFileInput.read(
                         URL(fileURLWithPath: $0), limit: ResourceLimits.workspaceBytes)
                 },
-                overrides: args.variableOverrides())
+                overrides: args.variableOverrides(), folder: args.value("folder"))
+        } catch let error as PostmanFolderSelectionError {
+            throw folderSelectionUsage(error)
         } catch PostmanFileRunError.blocked(let preflight) {
             if args.flags.contains("json") {
                 struct Blocked: Encodable {
@@ -108,7 +110,7 @@ extension RillCLI {
         }
         if !args.flags.contains("json") {
             try args.text(
-                "Rill file run · \(requests.count) requests · HTTP 2xx checks · Postman scripts are not executed"
+                "Rill file run · \(args.value("folder") == nil ? "entire collection" : "selected folder") · \(requests.count) requests · HTTP 2xx checks · Postman scripts are not executed"
             )
         }
         let report = try await plan.run(
@@ -131,19 +133,35 @@ extension RillCLI {
                 let cancelled: Bool
                 let exhausted: Bool
                 let attempts: Int
+                let folderSelected: Bool
             }
             try args.json(
                 Summary(
                     passed: report.passed, cancelled: report.cancelled, exhausted: report.exhausted,
-                    attempts: report.outcomes.filter { $0.state != .notRun }.count))
+                    attempts: report.outcomes.filter { $0.state != .notRun }.count,
+                    folderSelected: args.value("folder") != nil))
         } else {
             try args.text(
                 RunConsole.render(
                     report, requests: requests,
-                    title: "Collection file (HTTP 2xx checks; no Postman scripts)",
+                    title:
+                        "\(args.value("folder") == nil ? "Collection file" : "Selected folder") (HTTP 2xx checks; no Postman scripts)",
                     detail: args.flags.contains("detail"), color: args.color))
         }
         try requireSuccessfulRun(report)
+    }
+
+    static func folderSelectionUsage(_ error: PostmanFolderSelectionError) -> CLIError {
+        switch error {
+        case .invalidPath:
+            .usage(
+                "--folder requires an absolute, case-sensitive folder path such as /Parent/Child (escape ~ as ~0 and / as ~1), up to 32 levels and 4096 UTF-8 bytes. No requests sent; path omitted."
+            )
+        case .missingOrAmbiguous:
+            .usage(
+                "Folder path is missing, ambiguous or not a folder. Each segment must match exactly one sibling folder. No requests sent; path omitted."
+            )
+        }
     }
 
     static func requireSuccessfulRun(_ report: RunReport) throws {

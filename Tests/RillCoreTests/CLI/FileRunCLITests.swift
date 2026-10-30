@@ -119,6 +119,96 @@ import XCTest
         XCTAssertTrue(invalid.output.isEmpty)
         XCTAssertFalse(FileManager.default.fileExists(atPath: report.path))
     }
+    func testSelectedFolderRunAndPreflightAgreeWithoutTouchingExcludedInputs() async throws {
+        guard let base = ProcessInfo.processInfo.environment["RILL_TEST_BASE_URL"] else {
+            throw XCTSkip("Fixture required")
+        }
+        let root = try directory()
+        let source = root.appendingPathComponent("folders with spaces.json")
+        let report = root.appendingPathComponent("results.json")
+        let output = root.appendingPathComponent("raw.json")
+        var outside = request("outside-private", "{{missing-outside}}")
+        outside["event"] = [["script": ["exec": ["private-script-source"]]]]
+        var last = request("last", base + "/echo")
+        last["request"] = [
+            "method": "POST", "url": base + "/echo",
+            "body": ["mode": "raw", "raw": "selected-last"],
+        ]
+        let input = try collection([
+            outside,
+            [
+                "name": "Parent/One",
+                "item": [
+                    outside,
+                    [
+                        "name": "Child~Two",
+                        "item": [
+                            request("first", base + "/echo"), ["name": "nested", "item": [last]],
+                        ],
+                    ],
+                ],
+            ],
+        ])
+        try input.write(to: source)
+        let folder = "/Parent~1One/Child~0Two"
+        let preflight = try await cli(["preflight", source.path, "--folder", folder, "--json"])
+        XCTAssertEqual(preflight.status, 0, String(decoding: preflight.diagnostics, as: UTF8.self))
+        let checked = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: preflight.output) as? [String: Any])
+        let checks = try XCTUnwrap(checked["checks"] as? [String: Any])
+        XCTAssertEqual(checks["requests"] as? Int, 2)
+        XCTAssertEqual(checks["folderSelected"] as? Bool, true)
+        let run = try await cli([
+            "run", source.path, "--folder", folder, "--report", report.path, "--output",
+            output.path,
+            "--json",
+        ])
+        XCTAssertEqual(run.status, 0, String(decoding: run.diagnostics, as: UTF8.self))
+        let summary = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: run.output) as? [String: Any])
+        XCTAssertEqual(summary["attempts"] as? Int, 2)
+        XCTAssertEqual(summary["folderSelected"] as? Bool, true)
+        let raw = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: Data(contentsOf: output)) as? [String: Any])
+        XCTAssertEqual(raw["body"] as? String, Data("selected-last".utf8).base64EncodedString())
+        let ordinary =
+            try run.output + run.diagnostics + preflight.output + Data(contentsOf: report)
+        XCTAssertFalse(String(decoding: ordinary, as: UTF8.self).contains("outside-private"))
+        XCTAssertFalse(String(decoding: ordinary, as: UTF8.self).contains("private-script-source"))
+        XCTAssertEqual(try Data(contentsOf: source), input)
+        let whole = try await cli(["preflight", source.path, "--json"])
+        XCTAssertEqual(whole.status, 2)
+    }
+    func testFolderErrorsAreRedactedAndNeverProduceRunArtifacts() async throws {
+        let root = try directory()
+        let source = root.appendingPathComponent("collection.json")
+        let report = root.appendingPathComponent("report.json")
+        let input = try collection([
+            ["name": "duplicate", "item": []], ["name": "duplicate", "item": []],
+            ["name": "empty", "item": []], request("request", "http://127.0.0.1:1"),
+        ])
+        try input.write(to: source)
+        for command in ["run", "preflight"] {
+            for folder in [
+                "private-relative", "/private-missing", "/duplicate", "/request", "/empty",
+                "/bad~2",
+            ] {
+                var arguments = [command, source.path, "--folder", folder, "--json"]
+                if command == "run" { arguments += ["--report", report.path] }
+                let result = try await cli(arguments)
+                XCTAssertEqual(result.status, 2)
+                XCTAssertFalse(FileManager.default.fileExists(atPath: report.path))
+                XCTAssertFalse(
+                    String(decoding: result.output + result.diagnostics, as: UTF8.self).contains(
+                        "private-"))
+            }
+        }
+        let unrelated = try await cli([
+            "request", "POST", "http://127.0.0.1:1", "--folder", "/private-missing",
+        ])
+        XCTAssertEqual(unrelated.status, 2)
+        XCTAssertEqual(try Data(contentsOf: source), input)
+    }
     func testInvalidFlagsLimitsAndOutputCollisionsPreserveSource() async throws {
         let root = try directory()
         let source = root.appendingPathComponent("input.json")

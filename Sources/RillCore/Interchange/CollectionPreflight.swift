@@ -17,15 +17,24 @@ public struct CollectionPreflight: Encodable, Sendable {
     public let schemaVersion = 1
     public let scope = "static-postman-input"
     public var requests = 0
+    public var folderSelected = false
     public var scripts = 0
     public var issueCount = 0
     public var issues: [Issue] = []
     public var passed: Bool { requests > 0 && issues.isEmpty }
 
     public static func inspect(
-        collection: Data, environment: Data? = nil, overrides: [String: String] = [:]
+        collection: Data, environment: Data? = nil, overrides: [String: String] = [:],
+        folder: String? = nil
     ) throws -> Self {
-        try WorkspaceFile.checkJSONBounds(collection)
+        try inspect(
+            PostmanFolderSelection.prepare(collection, folder: folder),
+            environment: environment, overrides: overrides)
+    }
+
+    static func inspect(
+        _ selection: PostmanFolderSelection, environment: Data?, overrides: [String: String]
+    ) throws -> Self {
         func object(_ data: Data) throws -> [String: Any] {
             try WorkspaceFile.checkJSONBounds(data)
             let bytes = data.starts(with: [0xef, 0xbb, 0xbf]) ? Data(data.dropFirst(3)) : data
@@ -33,7 +42,7 @@ public struct CollectionPreflight: Encodable, Sendable {
             else { throw PostmanImportError.invalid }
             return value
         }
-        let root = try object(collection)
+        let root = selection.root
         guard root["info"] is [String: Any], root["item"] is [[String: Any]] else {
             if root["resources"] is [[String: Any]] || root["__export_format"] != nil {
                 throw CollectionPreflightInputError.insomnia
@@ -44,12 +53,13 @@ public struct CollectionPreflight: Encodable, Sendable {
             throw PostmanImportError.invalid
         }
         var result = Self()
+        result.folderSelected = !selection.originalIndices.isEmpty
         func issue(_ code: String, _ path: String) {
             result.issueCount += 1
             if result.issues.count < 1000 { result.issues.append(Issue(code, path)) }
         }
         // Never hydrate imported credentials or apply this workspace.
-        do { _ = try PostmanImporter.parse(collection) } catch {
+        do { _ = try PostmanImporter.parse(selection.data) } catch {
             issue("collection.unsupported_representation", "/")
         }
         var variables: [String: String] = [:]
@@ -129,7 +139,8 @@ public struct CollectionPreflight: Encodable, Sendable {
         }
         func walk(_ row: [String: Any], path: String, depth: Int) throws {
             try Task.checkCancellation()
-            guard depth <= 32 else { throw PostmanImportError.invalid }
+            // Importer permits 32 folder levels; their request leaves occupy one more row level.
+            guard depth <= 33 else { throw PostmanImportError.invalid }
             if let events = row["event"] as? [[String: Any]] {
                 for (i, event) in events.enumerated() {
                     let script = event["script"] as? [String: Any]
@@ -159,7 +170,10 @@ public struct CollectionPreflight: Encodable, Sendable {
             }
             if let children = row["item"] as? [[String: Any]] {
                 for (i, child) in children.enumerated() {
-                    try walk(child, path: path + "/item/\(i)", depth: depth + 1)
+                    let original =
+                        selection.originalIndices.indices.contains(depth)
+                        ? selection.originalIndices[depth] : i
+                    try walk(child, path: path + "/item/\(original)", depth: depth + 1)
                 }
             }
         }
