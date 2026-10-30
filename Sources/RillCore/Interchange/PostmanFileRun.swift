@@ -96,7 +96,7 @@ public struct PostmanFileRun: Sendable {
 
 }
 
-private struct TransientCredentials: CredentialStore {
+struct TransientCredentials: CredentialStore {
     let values: [UUID: String]
     func read(_ id: UUID) throws -> String { values[id] ?? "" }
     func write(_ value: String, id: UUID) throws { throw CocoaError(.featureUnsupported) }
