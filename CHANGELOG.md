@@ -2,6 +2,8 @@
 
 ## 0.4.5 (unreleased)
 
+- Add exact nested Postman `--folder` selection to file runs and offline preflight. Preserve source order, inherited auth/script/transport checks and original diagnostic indices; reject missing/ambiguous paths before traffic and label selected scope.
+
 - Unify workbench navigation, toolbars, tabs, selectors and secondary controls with shared glass/material styling, rounded contours and motion-aware hover/selection transitions. Keep data editors on solid surfaces and provide opaque accessibility fallbacks.
 
 - Remove whole-panel selector focus rings, focus the selected option/search control, and add native glass/material surfaces with readable backing and soft open/close transitions. Respect reduced motion, reduced transparency and increased contrast.

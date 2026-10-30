@@ -6,10 +6,11 @@ extension RillCLI {
         guard args.operands.count == 1,
             Set(args.values.keys).isSubset(of: [
                 "environment-file", "env-var", "ssl-client-cert", "ssl-client-key", "color",
+                "folder",
             ]), args.flags.isSubset(of: ["json", "quiet", "detail"])
         else {
             throw CLIError.usage(
-                "Use preflight FILE with --environment-file, --env-var, a PEM certificate/key pair, --json or --quiet."
+                "Use preflight FILE with --folder, --environment-file, --env-var, a PEM certificate/key pair, --json or --quiet."
             )
         }
         var report: CollectionPreflight
@@ -28,7 +29,10 @@ extension RillCLI {
                 try BoundedFileInput.read(URL(fileURLWithPath: $0), limit: 32 * 1024 * 1024)
             }
             report = try CollectionPreflight.inspect(
-                collection: data, environment: environment, overrides: overrides)
+                collection: data, environment: environment, overrides: overrides,
+                folder: args.value("folder"))
+        } catch let error as PostmanFolderSelectionError {
+            throw folderSelectionUsage(error)
         } catch CollectionPreflightInputError.insomnia {
             throw CLIError.usage(
                 "This looks like an Insomnia export. Preflight accepts Postman v2 JSON; use collection-import --format insomnia for an import preview. No requests sent; source content omitted."
@@ -81,6 +85,11 @@ extension RillCLI {
             try args.json(Output(passed: report.passed, checks: report))
         } else {
             try args.text("Rill preflight — offline Postman input inspection")
+            if report.folderSelected {
+                try args.text(
+                    "Scope: selected folder and inherited settings; excluded folders are not checked."
+                )
+            }
             try args.text(
                 "Requests: \(report.requests) · Script blocks: \(report.scripts) · Blockers: \(report.issueCount)"
             )

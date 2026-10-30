@@ -22,7 +22,7 @@ struct Arguments: Sendable {
             "port", "routes", "repo", "message", "token-file", "destination", "client-id",
             "client-secret-name", "scope", "save-secret", "plugins-dir", "trust-file", "plugin",
             "service", "wait", "send", "auth-profile", "proto-include",
-            "environment-file", "env-var", "ssl-client-cert", "ssl-client-key",
+            "environment-file", "env-var", "ssl-client-cert", "ssl-client-key", "folder",
         ]
         var index = 0
         var foundCommand = false
@@ -58,15 +58,15 @@ struct Arguments: Sendable {
             index += 1
         }
         let preflightOnly: Set<String> = [
-            "environment-file", "env-var", "ssl-client-cert", "ssl-client-key",
+            "environment-file", "env-var", "ssl-client-cert", "ssl-client-key", "folder",
         ]
         let allowedInputs: Set<String> =
             command == "run"
-            ? ["env-var", "environment-file"] : command == "request" ? ["env-var"] : []
+            ? ["env-var", "environment-file", "folder"] : command == "request" ? ["env-var"] : []
         let fileOnly = preflightOnly.subtracting(allowedInputs)
         if command != "preflight", !fileOnly.isDisjoint(with: values.keys) {
             throw CLIError.usage(
-                "File certificate options require preflight; environment/variable inputs are supported by run, and request also accepts --env-var."
+                "File certificate options require preflight; folder/environment/variable inputs are supported by run and preflight, and request also accepts --env-var."
             )
         }
         if let color = value("color"), !["auto", "always", "never"].contains(color) {
@@ -244,10 +244,12 @@ let usage = """
     Usage: rill COMMAND [input] [--workspace PATH] [options]
 
       preflight FILE               Offline Postman v2 collection inspection; sends no requests
+          --folder /Parent/Child   Exact folder names; escape ~ as ~0 and / as ~1
           --environment-file FILE --env-var key=value (repeatable)
           --ssl-client-cert FILE --ssl-client-key FILE (unencrypted PEM key)
           --json                   Structured diagnostics; exit 2 for blocked inputs
       run COLLECTION.json          Run supported Postman v2 inputs without a saved workspace
+          --folder /Parent/Child   Selected subtree; inherited scripts/settings still checked
           --environment-file FILE --env-var key=value (repeatable)
           --iterations N --delay MS --retries N --retry-delay MS --continue-on-failure
           --report FILE --report-format json|markdown|junit --allure DIR
