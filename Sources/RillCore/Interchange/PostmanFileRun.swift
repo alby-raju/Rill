@@ -11,10 +11,13 @@ public struct PostmanFileRun: Sendable {
     public let requests: [RequestDraft]
     public let environment: Environment
     public let secrets: NamedSecretResolver
+    private let iterationData: IterationData?
+    private let iterationOverrides: [String: String]
 
     public static func prepare(
         collection: Data, environment inputEnvironment: Data? = nil,
-        overrides: [String: String] = [:], folder: String? = nil
+        overrides: [String: String] = [:], folder: String? = nil,
+        iterationData: IterationData? = nil
     ) throws -> Self {
         try Task.checkCancellation()
         guard overrides.count <= 10_000,
@@ -25,10 +28,15 @@ public struct PostmanFileRun: Sendable {
                 <= ResourceLimits.workspaceBytes
         else { throw PostmanFileRunError.invalidOverrides }
         let selection = try PostmanFolderSelection.prepare(collection, folder: folder)
+        var preflightOverrides = iterationData?.rows.first ?? [:]
+        preflightOverrides.merge(overrides) { _, override in override }
         let preflight = try CollectionPreflight.inspect(
-            selection, environment: inputEnvironment, overrides: overrides)
+            selection, environment: inputEnvironment, overrides: preflightOverrides)
         guard preflight.passed else { throw PostmanFileRunError.blocked(preflight) }
         let imported = try PostmanImporter.parse(selection.data)
+        guard imported.workspace.requests.count * (iterationData?.rows.count ?? 1) <= 10_000 else {
+            throw WorkflowError.invalidConfiguration
+        }
         // Referenced upload files must not be silently opened or converted into empty bodies.
         guard
             imported.workspace.requests.allSatisfy({
@@ -61,12 +69,23 @@ public struct PostmanFileRun: Sendable {
         let secrets = NamedSecretResolver(
             catalog: catalog, credentials: TransientCredentials(values: secretValues),
             processEnvironment: [:])
-        for request in imported.workspace.requests {
-            try Task.checkCancellation()
-            _ = try RequestEngine.prepare(request, environment: environment, secrets: secrets)
+        let baseVariables = WorkflowEngine.variables(in: environment)
+        for index in 0..<(iterationData?.rows.count ?? 1) {
+            let values =
+                try iterationData?.variables(at: index, base: baseVariables, overrides: overrides)
+                ?? baseVariables
+            let rowEnvironment =
+                iterationData == nil ? environment : WorkflowEngine.environment(values)
+            for request in imported.workspace.requests {
+                try Task.checkCancellation()
+                _ = try RequestEngine.prepare(
+                    request, environment: rowEnvironment, secrets: secrets)
+            }
         }
         return Self(
-            requests: imported.workspace.requests, environment: environment, secrets: secrets)
+            requests: imported.workspace.requests, environment: environment, secrets: secrets,
+            iterationData: iterationData, iterationOverrides: iterationData == nil ? [:] : overrides
+        )
     }
 
     /// File-run success explicitly requires HTTP 2xx, not unexecuted Postman assertions.
@@ -83,6 +102,7 @@ public struct PostmanFileRun: Sendable {
         let secrets = self.secrets
         return try await CollectionRunner.run(
             requests: requests, environment: environment, configuration: configuration,
+            iterationData: iterationData, iterationOverrides: iterationOverrides,
             executor: { request, variables in
                 var result = try await WorkflowEngine.execute(
                     request, variables: variables, secrets: secrets)

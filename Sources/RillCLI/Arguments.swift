@@ -23,6 +23,7 @@ struct Arguments: Sendable {
             "client-secret-name", "scope", "save-secret", "plugins-dir", "trust-file", "plugin",
             "service", "wait", "send", "auth-profile", "proto-include", "collection",
             "environment-file", "env-var", "ssl-client-cert", "ssl-client-key", "folder",
+            "iteration-data", "iteration-data-format",
         ]
         var index = 0
         var foundCommand = false
@@ -71,6 +72,10 @@ struct Arguments: Sendable {
         }
         if value("collection") != nil && command != "run" {
             throw CLIError.usage("--collection is supported only by native file runs.")
+        }
+        if command != "run", value("iteration-data") != nil || value("iteration-data-format") != nil
+        {
+            throw CLIError.usage("Iteration-data options are supported only by file runs.")
         }
         if let color = value("color"), !["auto", "always", "never"].contains(color) {
             throw CLIError.usage("--color expects auto, always or never.")
@@ -163,10 +168,12 @@ struct Arguments: Sendable {
     func write(_ data: Data, to path: String) throws {
         let destination = URL(fileURLWithPath: path)
         if command == "run" {
-            let inputs = (operands + [value("environment-file")].compactMap { $0 })
+            let inputs =
+                (operands + [value("environment-file"), value("iteration-data")].compactMap { $0 })
                 .map { URL(fileURLWithPath: $0).resolvingSymlinksInPath() }
             guard !inputs.contains(destination.resolvingSymlinksInPath()) else {
-                throw CLIError.usage("Output cannot replace collection/environment inputs.")
+                throw CLIError.usage(
+                    "Output cannot replace collection/environment/iteration-data inputs.")
             }
         }
         guard destination.resolvingSymlinksInPath() != workspaceURL.resolvingSymlinksInPath() else {
@@ -257,6 +264,8 @@ let usage = """
           --collection NAME_OR_ID --environment NAME_OR_ID   Native selection
           --allow-insecure         Native insecure profiles require explicit opt-in
           --environment-file FILE --env-var key=value (repeatable)
+          --iteration-data FILE    JSON/CSV rows; sets iteration count (cannot use --iterations)
+          --iteration-data-format json|csv   Optional override for the file extension
           --iterations N --delay MS --retries N --retry-delay MS --continue-on-failure
           --report FILE --report-format json|markdown|junit --allure DIR
           --output FILE --timeout SECONDS   Explicit last-response export and request timeout

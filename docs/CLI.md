@@ -37,9 +37,9 @@ Before any request, the entire selected collection/folder and supplied environme
 
 **Success policy: HTTP 2xx checks, not Postman assertions.** Every executed request receives an explicit 2xx status check. Scripts in the selected subtree or its ancestors reject the run rather than executing without their tests. A passed run does not establish Newman or full Postman compatibility. Status-check failures exit **4**, transport/runtime failures **3**, invalid/blocked inputs **2**, and cancellation **130**; successful runs exit **0**.
 
-Options reuse `--iterations`, `--delay`/`--retry-delay` (milliseconds), `--retries`, `--continue-on-failure`, `--timeout` (1–300 seconds), `--report`/`--report-format json|markdown|junit`, `--allure`, `--detail`, `--quiet` and `--json`. Limits remain 10,000 planned/executed steps with bounded retries, variables and response retention. JSON summaries have `schemaVersion: 1`, `passed`, `cancelled`, `exhausted`, executed `attempts`, `folderSelected`, `collectionSelected` and `inputFormat`; static blockers return versioned redacted preflight checks with `sendsRequests: false`. Argument, file and preparation errors use stderr and exit 2. Ctrl+C flushes an explicitly requested unsuccessful report before exit when possible.
+Options reuse `--iterations`, `--delay`/`--retry-delay` (milliseconds), `--retries`, `--continue-on-failure`, `--timeout` (1–300 seconds), `--report`/`--report-format json|markdown|junit`, `--allure`, `--detail`, `--quiet` and `--json`. Limits remain 10,000 planned/executed steps with bounded retries, variables and response retention. JSON summaries have `schemaVersion: 1`, `passed`, `cancelled`, `exhausted`, executed `attempts`, `folderSelected`, `collectionSelected`, `inputFormat` and optional `iterationDataRows`; static blockers return versioned redacted preflight checks with `sendsRequests: false`. Argument, file and preparation errors use stderr and exit 2. Ctrl+C flushes an explicitly requested unsuccessful report before exit when possible.
 
-Ordinary reports omit payloads/credentials. `--output FILE` explicitly exports the last received response if retained; unavailable retention is an error, not a silently omitted artifact. Outputs are exclusive unless `--overwrite` is supplied and cannot replace collection/environment inputs or the desktop workspace. Inputs remain unchanged. Multipart/file bodies, globals/CSV/JSON iteration data and file-based TLS are future increments; their options are not silently ignored. Saved-workspace commands remain available separately.
+Ordinary reports omit payloads/credentials. `--output FILE` explicitly exports the last received response if retained; unavailable retention is an error, not a silently omitted artifact. Outputs are exclusive unless `--overwrite` is supplied and cannot replace collection/environment/iteration-data inputs or the desktop workspace. Inputs remain unchanged. Multipart/file bodies, globals, final-environment export and file-based TLS are future increments; their options are not silently ignored. Saved-workspace commands remain available separately.
 
 ### Run one Postman folder
 
@@ -66,7 +66,34 @@ Native input is opt-in with `--format native`; the default remains Postman v2 (`
 
 Selected native assertions, extraction, GraphQL/contracts and enabled finite `json-operations-v1` hooks use the shared workflow engine. Foreign script source blocks the selected run; JavaScript is not executed. Configured checks retain their meaning, including an explicitly expected non-2xx status. If an executed response has no native checks, the runner adds an explicit HTTP 2xx check. The terminal labels this policy; it does not claim Postman assertion compatibility.
 
-Before traffic, the complete native file schema and selected hook/profile/contract/TLS configuration are validated. Multipart/binary bodies and file references block without opening referenced files. Saved Keychain client-identity references are rejected. System trust and embedded custom anchors are supported; an insecure selected profile requires `--allow-insecure` on this invocation. TLS-file and iteration-data options remain unsupported. Unlike static Postman preparation, native request expansion occurs per step so response-derived variables, extraction and hook mutations can drive later requests. Later expansion/configuration errors can therefore occur after earlier requests have run; reports retain partial outcomes. The same execution budgets, retries, cancellation, redaction, protected output paths and exit codes apply. Offline `preflight` remains Postman-only.
+Before traffic, the complete native file schema and selected hook/profile/contract/TLS configuration are validated. Multipart/binary bodies and file references block without opening referenced files. Saved Keychain client-identity references are rejected. System trust and embedded custom anchors are supported; an insecure selected profile requires `--allow-insecure` on this invocation. TLS-file options remain unsupported. Unlike static Postman preparation, native request expansion occurs per step so response-derived variables, extraction and hook mutations can drive later requests. Later expansion/configuration errors can therefore occur after earlier requests have run; reports retain partial outcomes. The same execution budgets, retries, cancellation, redaction, protected output paths and exit codes apply. Offline `preflight` remains Postman-only.
+
+### JSON/CSV iteration data
+
+```sh
+rill run ./collection.json --iteration-data ./cases.json --env-var region=local --json
+rill run ./workspace.json --format native --collection Smoke \
+  --iteration-data ./cases.csv --report ./results.json --json
+```
+
+`--iteration-data FILE` accepts UTF-8 JSON or CSV, including an optional UTF-8 BOM. The `.json`/`.csv` extension selects the parser; `--iteration-data-format json|csv` overrides it. Every data row is one iteration in file order. Data files determine the count and cannot be combined with `--iterations`; a format override requires a data file. Empty datasets block rather than passing an empty suite.
+
+JSON must be a nonempty array of objects. Values become string variables: strings retain their text, numbers retain their exact spelling/precision, booleans become `true`/`false`, null becomes the text `null`, and objects/arrays become compact JSON with sorted object keys. These are template values, not a JavaScript or Postman iteration-data API. For example:
+
+```json
+[
+  {"userId": 123, "tag": "first", "optional": ""},
+  {"userId": 456, "tag": "second"}
+]
+```
+
+CSV requires one header record with unique nonempty variable names and the same number of cells in every subsequent record. LF/CRLF record endings, quoted commas, doubled quotes and quoted multiline text are supported. Values and spaces are preserved; headers are not trimmed. A trailing record ending does not add an extra row. Blank records are not skipped: for one column they represent an empty value; otherwise they fail column-count validation. Unterminated quotes, unexpected text after a closing quote, bare CR endings, duplicate headers and malformed JSON block without echoing data content.
+
+Data keys/headers use 1–128 ASCII letters, digits, underscores, dots or hyphens. Limits are 4 MiB of input and total decoded key/value text across rows, 10,000 rows, 1,024 variables per row/effective snapshot, 1 MiB per value, and 10,000 planned/executed request steps across the run. CSV parsing also caps all cells (including headers) at 100,000; JSON retains the existing bounded parser's depth/node/number limits. Merged variable size/count limits for every row are checked before traffic.
+
+Initial precedence is collection/inherited environment values, then the current row, then explicit `--env-var` overrides (last override wins). Empty data values override environment values; a missing JSON key falls back to the environment. Each row starts from the same base snapshot, so extraction/hook changes from another row cannot leak in. Native workflow changes still flow between requests within the row, and failed-attempt updates remain rolled back. Retries and branches stay on the current row and share the run's execution/retention budgets. Runs without a data file keep their existing iteration-state behavior.
+
+Postman runs prepare every selected request for every row before sending, so even a later row with an invalid expanded URL blocks the whole run. Native runs retain per-step expansion for response-derived variables/hooks; later errors can follow earlier traffic and are recorded in partial reports. Reports use the existing one-based `iteration` number, and JSON summaries include `iterationDataRows` when data is supplied. Normal output omits row values; explicit raw response export may contain them. Data files are read-only and protected from report/raw-output overwrite. Offline `preflight` does not yet accept iteration-data options.
 
 For macOS CI after checkout and Xcode setup:
 
@@ -127,7 +154,7 @@ swift run RillCLI preflight ./collection.json \
   --json
 ```
 
-`--env-var` is repeatable; precedence is collection variables, then enabled environment values, then overrides (last override wins). Empty override values are valid. Other run commands reject these new file options rather than silently ignoring them. Native workspace inputs, globals, iteration data and a complete execution plan remain future work. Development source now provides the conservative Postman v2 `run` command described above.
+`--env-var` is repeatable; precedence is collection variables, then enabled environment values, then overrides (last override wins). Empty override values are valid. Other run commands reject these new file options rather than silently ignoring them. Globals, data-aware offline preflight and a complete execution plan remain future work. Development source provides Postman v2 and explicit native v1 file runs with JSON/CSV data as described above.
 
 Preflight blocks nonempty foreign scripts at collection/folder/request scope, unsupported importer representations, omitted transport settings, unresolved/cyclic/over-budget template references, invalid environments and empty collections. Script-produced variables are not inferred. Diagnostics identify JSON locations using indices, without echoing request names, arbitrary keys, URLs, variable values or script text. Terminal output shows the first 20 diagnostics by default; `--detail` expands it. At most 1,000 diagnostic records are retained; the total blocker count remains visible. Static variable analysis is bounded and conservative; it recognizes the supported `$uuid`, `$timestamp`, `$email` and `$randomInt a b` syntax without generating values. Unsupported dynamic names and malformed arguments remain blockers. It does not evaluate JavaScript or arbitrary body-file contents.
 

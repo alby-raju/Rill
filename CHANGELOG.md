@@ -2,6 +2,8 @@
 
 ## 0.4.5 (unreleased)
 
+- Add bounded JSON/CSV iteration data to Postman/native file runs with explicit precedence, row isolation, preserved numeric spelling, data-aware step limits and input overwrite protection. Validate every Postman row before traffic; preserve native chaining, retries, cancellation and partial-run reporting.
+
 - Add explicit native v1 file runs with collection/environment selection, process-only named secrets, shared assertions/extraction/finite hooks, selected TLS safety checks and protected reports. Preserve configured native check semantics; unchecked responses require HTTP 2xx. Uploads, foreign scripts and Keychain identities block.
 
 - Add exact nested Postman `--folder` selection to file runs and offline preflight. Preserve source order, inherited auth/script/transport checks and original diagnostic indices; reject missing/ambiguous paths before traffic and label selected scope.

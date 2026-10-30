@@ -78,6 +78,7 @@ public enum CollectionRunner {
         requests: [RequestDraft], environment: Environment?, configuration: RunConfiguration,
         profiles: [AuthenticationProfile] = [], secrets: NamedSecretResolver? = nil,
         tlsProfiles: [TLSProfile] = [], definitions: [APIDefinitionSource] = [],
+        iterationData: IterationData? = nil, iterationOverrides: [String: String] = [:],
         progress: (@Sendable (RunProgress) async -> Void)? = nil, executor: Executor? = nil
     ) async throws -> RunReport {
         try configuration.validate()
@@ -88,6 +89,19 @@ public enum CollectionRunner {
         var report = RunReport(requestedSteps: requests.count * configuration.iterations)
         report.cancelled = Task.isCancelled
         var variables = WorkflowEngine.variables(in: environment)
+        let baseVariables = variables
+        if let iterationData {
+            guard iterationData.rows.count == configuration.iterations else {
+                throw WorkflowError.invalidConfiguration
+            }
+            for index in iterationData.rows.indices {
+                try Task.checkCancellation()
+                _ = try iterationData.variables(
+                    at: index, base: baseVariables, overrides: iterationOverrides)
+            }
+        } else if !iterationOverrides.isEmpty {
+            throw WorkflowError.invalidConfiguration
+        }
         var retained = 0
         var retainedChecks = 0
         try WorkflowEngine.validateVariables(variables)
@@ -117,6 +131,10 @@ public enum CollectionRunner {
             return matches[0]
         }
         loop: for iteration in 1...configuration.iterations {
+            if let iterationData {
+                variables = try iterationData.variables(
+                    at: iteration - 1, base: baseVariables, overrides: iterationOverrides)
+            }
             var index = 0
             while index < requests.count {
                 let request = requests[index]

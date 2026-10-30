@@ -17,11 +17,13 @@ public struct NativeFileRun: Sendable {
     private let profiles: [AuthenticationProfile]
     private let tlsProfiles: [TLSProfile]
     private let definitions: [APIDefinitionSource]
+    private let iterationData: IterationData?
+    private let iterationOverrides: [String: String]
 
     public static func prepare(
         workspace data: Data, collection: String? = nil, environment selection: String? = nil,
         overrides: [String: String] = [:], processEnvironment: [String: String] = [:],
-        allowInsecure: Bool = false
+        allowInsecure: Bool = false, iterationData: IterationData? = nil
     ) throws -> Self {
         try Task.checkCancellation()
         let workspace = try WorkspaceFile.decode(data)
@@ -45,6 +47,9 @@ public struct NativeFileRun: Sendable {
         guard !requests.isEmpty, requests.count <= 10_000 else {
             throw NativeFileRunError.emptySelection
         }
+        guard requests.count * (iterationData?.rows.count ?? 1) <= 10_000 else {
+            throw WorkflowError.invalidConfiguration
+        }
         let environmentID =
             try selection.map {
                 try selectedID($0, in: workspace.environments, name: { $0.name })
@@ -58,6 +63,12 @@ public struct NativeFileRun: Sendable {
             variables[name] = value
         }
         try WorkflowEngine.validateVariables(variables)
+        if let iterationData {
+            for index in iterationData.rows.indices {
+                try Task.checkCancellation()
+                _ = try iterationData.variables(at: index, base: variables, overrides: overrides)
+            }
+        }
         let profiles = workspace.authProfiles ?? []
         let tlsProfiles = workspace.tlsProfiles ?? []
         let definitions = workspace.apiDefinitions ?? []
@@ -101,7 +112,9 @@ public struct NativeFileRun: Sendable {
         return Self(
             requests: requests, environment: WorkflowEngine.environment(variables),
             secrets: secrets,
-            profiles: profiles, tlsProfiles: tlsProfiles, definitions: definitions)
+            profiles: profiles, tlsProfiles: tlsProfiles, definitions: definitions,
+            iterationData: iterationData, iterationOverrides: iterationData == nil ? [:] : overrides
+        )
     }
 
     /// Native checks retain their semantics; unchecked responses receive an explicit 2xx check.
@@ -121,6 +134,7 @@ public struct NativeFileRun: Sendable {
         let definitions = self.definitions
         return try await CollectionRunner.run(
             requests: requests, environment: environment, configuration: configuration,
+            iterationData: iterationData, iterationOverrides: iterationOverrides,
             executor: { request, variables in
                 var result: WorkflowStepResult
                 do {
