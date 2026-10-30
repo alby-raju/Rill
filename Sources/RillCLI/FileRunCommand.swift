@@ -8,6 +8,7 @@ extension RillCLI {
                 "environment-file", "env-var", "iterations", "delay", "retries", "retry-delay",
                 "report", "report-format", "allure", "output", "timeout", "color", "folder",
                 "format", "collection", "environment",
+                "iteration-data", "iteration-data-format",
             ]),
             args.flags.isSubset(of: [
                 "json", "quiet", "detail", "continue-on-failure", "overwrite", "allow-insecure",
@@ -16,7 +17,14 @@ extension RillCLI {
             args.value("report-format") == nil || args.value("report") != nil
         else {
             throw CLIError.usage(
-                "Use run FILE with --format postman|native, supported selection/environment options, pacing/retry and reports. Saved workspace, TLS-file and iteration-data options are not supported."
+                "Use run FILE with --format postman|native, supported selection/environment/data options, pacing/retry and reports. Saved workspace and TLS-file options are not supported."
+            )
+        }
+        guard args.value("iteration-data-format") == nil || args.value("iteration-data") != nil,
+            args.value("iteration-data") == nil || args.value("iterations") == nil
+        else {
+            throw CLIError.usage(
+                "--iteration-data determines the iteration count and cannot be combined with --iterations. --iteration-data-format requires --iteration-data. No requests sent."
             )
         }
         let format = args.value("format") ?? "postman"
@@ -50,13 +58,15 @@ extension RillCLI {
         }
         let destinations = [args.value("report"), args.value("output")].compactMap { $0 }
         let normalized = destinations.map { URL(fileURLWithPath: $0).resolvingSymlinksInPath() }
-        let inputs = ([args.operands[0]] + [args.value("environment-file")].compactMap { $0 })
+        let inputs =
+            ([args.operands[0]]
+            + [args.value("environment-file"), args.value("iteration-data")].compactMap { $0 })
             .map { URL(fileURLWithPath: $0).resolvingSymlinksInPath() }
         guard Set(normalized).count == normalized.count, Set(normalized).isDisjoint(with: inputs),
             !normalized.contains(args.workspaceURL.resolvingSymlinksInPath())
         else {
             throw CLIError.usage(
-                "Outputs must be distinct and cannot replace collection/environment inputs or the desktop workspace."
+                "Outputs must be distinct and cannot replace collection/environment/iteration-data inputs or the desktop workspace."
             )
         }
         for destination in destinations
@@ -76,6 +86,30 @@ extension RillCLI {
                 throw CLIError.usage("Allure output must be a directory distinct from input files.")
             }
         }
+        let iterationData: IterationData?
+        do {
+            iterationData = try args.value("iteration-data").map { path in
+                let name =
+                    args.value("iteration-data-format")
+                    ?? URL(fileURLWithPath: path).pathExtension.lowercased()
+                guard let format = IterationData.Format(rawValue: name) else {
+                    throw CLIError.usage(
+                        "Iteration data needs a .json/.csv extension or --iteration-data-format json|csv. No requests sent; path omitted."
+                    )
+                }
+                return try IterationData(
+                    data: BoundedFileInput.read(
+                        URL(fileURLWithPath: path), limit: IterationData.maximumBytes),
+                    format: format)
+            }
+        } catch is CancellationError { throw CancellationError() } catch let error as CLIError {
+            throw error
+        } catch {
+            throw CLIError.usage(
+                "Could not read bounded UTF-8 JSON/CSV iteration rows. Check shape, unique variable names, quoting and row/value limits. No requests sent; data content omitted."
+            )
+        }
+        if let iterationData { config.iterations = iterationData.rows.count }
         let plan: FileRunPlan
         do {
             let data = try BoundedFileInput.read(
@@ -87,7 +121,8 @@ extension RillCLI {
                         environment: args.value("environment"),
                         overrides: args.variableOverrides(),
                         processEnvironment: ProcessInfo.processInfo.environment,
-                        allowInsecure: args.flags.contains("allow-insecure")))
+                        allowInsecure: args.flags.contains("allow-insecure"),
+                        iterationData: iterationData))
             } else {
                 plan = .postman(
                     try PostmanFileRun.prepare(
@@ -95,7 +130,8 @@ extension RillCLI {
                         environment: try args.value("environment-file").map {
                             try BoundedFileInput.read(
                                 URL(fileURLWithPath: $0), limit: ResourceLimits.workspaceBytes)
-                        }, overrides: args.variableOverrides(), folder: args.value("folder")))
+                        }, overrides: args.variableOverrides(), folder: args.value("folder"),
+                        iterationData: iterationData))
             }
         } catch let error as NativeFileRunError {
             let reason: String
@@ -153,7 +189,7 @@ extension RillCLI {
         }
         if !args.flags.contains("json") {
             try args.text(
-                "Rill file run · \(format) · \(args.value("folder") != nil ? "selected folder" : args.value("collection") != nil ? "selected collection" : "entire file") · \(requests.count) requests · \(plan.policy)"
+                "Rill file run · \(format) · \(args.value("folder") != nil ? "selected folder" : args.value("collection") != nil ? "selected collection" : "entire file") · \(requests.count) requests · \(config.iterations) iterations · \(plan.policy)"
             )
         }
         let report = try await plan.run(
@@ -179,13 +215,15 @@ extension RillCLI {
                 let folderSelected: Bool
                 let collectionSelected: Bool
                 let inputFormat: String
+                let iterationDataRows: Int?
             }
             try args.json(
                 Summary(
                     passed: report.passed, cancelled: report.cancelled, exhausted: report.exhausted,
                     attempts: report.outcomes.filter { $0.state != .notRun }.count,
                     folderSelected: args.value("folder") != nil,
-                    collectionSelected: args.value("collection") != nil, inputFormat: format))
+                    collectionSelected: args.value("collection") != nil, inputFormat: format,
+                    iterationDataRows: iterationData?.rows.count))
         } else {
             try args.text(
                 RunConsole.render(

@@ -111,11 +111,13 @@ indirect enum JSONValue: Equatable {
 }
 struct JSONValueParser {
     let bytes: [UInt8]
+    let preserveNumberSpelling: Bool
     var index = 0
     var nodes = 0
-    init(_ data: Data) throws {
+    init(_ data: Data, preserveNumberSpelling: Bool = false) throws {
         guard data.count <= 8 * 1024 * 1024 else { throw ComparisonError.limit }
         bytes = Array(data)
+        self.preserveNumberSpelling = preserveNumberSpelling
     }
     mutating func whitespace() {
         while index < bytes.count && [9, 10, 13, 32].contains(bytes[index]) { index += 1 }
@@ -226,7 +228,8 @@ struct JSONValueParser {
             while index < bytes.count && (48...57).contains(bytes[index]) { index += 1 }
             guard index > exponentStart else { throw ComparisonError.unsupported }
         }
-        let raw = String(decoding: bytes[start..<index], as: UTF8.self).lowercased()
+        let spelling = String(decoding: bytes[start..<index], as: UTF8.self)
+        let raw = spelling.lowercased()
         let parts = raw.split(separator: "e", omittingEmptySubsequences: false)
         let exponent: Int
         if parts.count == 2 {
@@ -237,6 +240,7 @@ struct JSONValueParser {
         } else {
             exponent = 0
         }
+        if preserveNumberSpelling { return spelling }
         var mantissa = String(parts[0])
         var negative = false
         if mantissa.hasPrefix("-") {
