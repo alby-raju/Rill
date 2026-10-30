@@ -1,6 +1,6 @@
 # Roadmap: CLI-first API testing
 
-Updated 30 October 2026. **This is a proposed delivery plan, not a list of shipped features or promised dates.** Current behavior is documented in [features and limits](docs/FEATURES.md) and the [CLI guide](docs/CLI.md).
+Updated 31 October 2026. **This is a proposed delivery plan, not a list of shipped features or promised dates.** Current behavior is documented in [features and limits](docs/FEATURES.md) and the [CLI guide](docs/CLI.md).
 
 Rill has reached an MVP development milestone. The next goal is a fast, local API testing workflow that moves from a collection file to a trustworthy CI result with minimal setup. Prioritize reproducibility, useful failure explanations and smooth migration over accumulating protocol names.
 
@@ -23,7 +23,7 @@ Deliver focused PRs in this order, reusing the shared engines:
 
 Mock discoverability/lifecycle follows the first reliable file-run/compatibility increments, reusing the existing server. Existing GraphQL/gRPC/broker capabilities remain supported acceptance work; this scope does not remove their criteria or promote synthetic fixtures into interoperability evidence. WorkbenchStore decomposition remains a measured maintenance task, not a prerequisite for each user-visible fix.
 
-Development source now implements the first **G1 conservative direct Postman v2 file-run** increment with whole-input preparation, explicit HTTP 2xx checks, transient secrets, environments/overrides, reports and cancellation. Scripts and unsupported inputs block before traffic. Exact nested Postman folder selection now preserves source order and inherited checks in both run and preflight. Native v1 file runs now support explicit collection/environment selection and shared workflows with process-only secrets. G1 remains open for complete acceptance; JSON/CSV iteration data is now implemented with row isolation and shared budgets; headless TLS and compatibility depth follow. The gates above add a release order to the milestone details below; they do not mark their unchecked tasks shipped. A PR, passing CI and documented behavior establish an increment; release evidence closes shipping status.
+Development source now implements the first **G1 conservative direct Postman v2 file-run** increment with whole-input preparation, explicit HTTP 2xx checks, transient secrets, environments/overrides, reports and cancellation. Scripts and unsupported inputs block before traffic. Exact nested Postman folder selection now preserves source order and inherited checks in both run and preflight. Native v1 file runs now support explicit collection/environment selection and shared workflows with process-only secrets. G1 remains open for complete acceptance; JSON/CSV iteration data is now implemented with row isolation and shared budgets; file-based CA/PEM/PKCS#12 TLS is implemented for one scoped HTTPS destination; compatibility depth and independent acceptance follow. The gates above add a release order to the milestone details below; they do not mark their unchecked tasks shipped. A PR, passing CI and documented behavior establish an increment; release evidence closes shipping status.
 
 ## At a glance
 
@@ -48,19 +48,21 @@ Milestones are delivery groups, not a promise to fit each into one PR. Use indep
 
 Ad-hoc development-source increment: `rill request METHOD URL` sends a single request through the shared HTTP engine, with temporary variable overrides and explicit optional saved profile selection. This addresses one-off calls without fulfilling CLI-01 direct collection-file execution.
 
-First CLI-01/02 increment: development source provides conservative Postman v2 `run` with environment files, overrides, whole-input preparation, explicit HTTP 2xx checks, reports and cancellation. Multipart/file bodies and foreign scripts block. Exact nested Postman folder selection works in run/preflight. Native v1 file runs support collection/environment selection and shared workflows with process-only secrets. Bounded JSON/CSV data rows now drive either file format with explicit precedence and per-row isolation; globals, final-environment export and headless TLS remain open.
+First CLI-01/02 increment: development source provides conservative Postman v2 `run` with environment files, overrides, whole-input preparation, explicit HTTP 2xx checks, reports and cancellation. Multipart/file bodies and foreign scripts block. Exact nested Postman folder selection works in run/preflight. Native v1 file runs support collection/environment selection and shared workflows with process-only secrets. Bounded JSON/CSV data rows now drive either file format with explicit precedence and per-row isolation; globals and final-environment export remain open.
+
+First CLI-03 increment: both file formats accept bounded CA roots, unencrypted PEM or PKCS#12 client identities, passphrase files and explicit insecure mode. One exact HTTPS origin scopes the identity; same-origin redirects remain allowed and cross-origin redirects remain unfollowed. Native identity requirements can use files without Keychain lookup. Synthetic fixtures cover trust/hostname rejection, RSA/EC identities, intermediate chains, redaction and input protection. Multiple destination identities, encrypted PEM keys and independent/installed acceptance remain open. See the [CLI guide](docs/CLI.md).
 
 First CLI-05 increment: development source provides offline Postman `preflight` with redacted script/variable/import diagnostics and optional unencrypted PEM pairing/expiry inspection. It does not send requests, produce a full execution plan or establish Newman compatibility. The complete file-run milestone and other items remain open.
 
 Acceptance: a sanitized suite shaped like the owner's 600-request collection runs from collection/environment files with four temporary variable overrides, mTLS and a simultaneous terminal/JSON report. Test from paths with spaces, without the desktop app running, and verify input files and personal workspace remain unchanged. Never publish the owner's collection, internal endpoints, environment or certificates as fixtures.
 
-### Full target command shape — not yet supported
+### File-run command shape (development source)
 
 ```sh
-rill run ./collection.json   --environment-file ./environment.json   --ssl-client-cert ./client.crt   --ssl-client-key ./client.key   --insecure   --env-var runLinks=true   --env-var runDelivery=true   --env-var runManagementExtras=true   --env-var runCleanup=true   --detail   --report ./results.json --report-format json
+rill run ./collection.json   --environment-file ./environment.json   --ssl-client-cert ./client.crt   --ssl-client-key ./client.key   --ssl-client-origin https://api.example.test   --ca-cert ./ca.pem   --env-var runLinks=true   --env-var runDelivery=true   --env-var runManagementExtras=true   --env-var runCleanup=true   --detail   --report ./results.json --report-format json
 ```
 
-Option names are provisional. A file runner is not sufficient for Newman equivalence: the suite's scripting and execution semantics must also satisfy milestone 2.
+This runs only the documented supported subset. A file runner is not sufficient for Newman equivalence: the suite's scripting and execution semantics must also satisfy milestone 2.
 
 ## 2. Workflow compatibility and trustworthy reports
 

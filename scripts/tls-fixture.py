@@ -78,6 +78,34 @@ for kind, usage, subject in [
         kind + ".pem",
     )
 openssl("x509", "-in", "ca.pem", "-outform", "DER", "-out", "ca.der")
+openssl("ecparam", "-name", "prime256v1", "-genkey", "-noout", "-out", "ec-client.key")
+openssl(
+    "req",
+    "-new",
+    "-key",
+    "ec-client.key",
+    "-subj",
+    "/CN=RillFixtureECClient",
+    "-out",
+    "ec-client.csr",
+)
+openssl(
+    "x509",
+    "-req",
+    "-in",
+    "ec-client.csr",
+    "-CA",
+    "ca.pem",
+    "-CAkey",
+    "ca.key",
+    "-CAcreateserial",
+    "-days",
+    "2",
+    "-extfile",
+    "client.ext",
+    "-out",
+    "ec-client.pem",
+)
 openssl(
     "pkcs12",
     "-export",
@@ -99,6 +127,83 @@ openssl(
     "sha1",
 )
 
+# A separate intermediate chain proves file-run clients actually send supplied chain certificates.
+openssl(
+    "req",
+    "-newkey",
+    "rsa:2048",
+    "-nodes",
+    "-subj",
+    "/CN=RillFixtureIntermediate",
+    "-keyout",
+    "intermediate.key",
+    "-out",
+    "intermediate.csr",
+)
+(root / "intermediate.ext").write_text(
+    "basicConstraints=critical,CA:TRUE,pathlen:0\nkeyUsage=critical,keyCertSign,cRLSign\n"
+)
+openssl(
+    "x509",
+    "-req",
+    "-in",
+    "intermediate.csr",
+    "-CA",
+    "ca.pem",
+    "-CAkey",
+    "ca.key",
+    "-CAcreateserial",
+    "-days",
+    "2",
+    "-extfile",
+    "intermediate.ext",
+    "-out",
+    "intermediate.pem",
+)
+openssl(
+    "x509",
+    "-req",
+    "-in",
+    "client.csr",
+    "-CA",
+    "intermediate.pem",
+    "-CAkey",
+    "intermediate.key",
+    "-CAcreateserial",
+    "-days",
+    "2",
+    "-extfile",
+    "client.ext",
+    "-out",
+    "chained-client.pem",
+)
+(root / "client-bundle.pem").write_bytes(
+    (root / "chained-client.pem").read_bytes() + (root / "intermediate.pem").read_bytes()
+)
+(root / "client-ca-chain.pem").write_bytes(
+    (root / "intermediate.pem").read_bytes() + (root / "ca.pem").read_bytes()
+)
+openssl(
+    "pkcs12",
+    "-export",
+    "-in",
+    "chained-client.pem",
+    "-inkey",
+    "client.key",
+    "-certfile",
+    "client-ca-chain.pem",
+    "-out",
+    "chained-client.p12",
+    "-passout",
+    "pass:rill-fixture",
+    "-keypbe",
+    "PBE-SHA1-3DES",
+    "-certpbe",
+    "PBE-SHA1-3DES",
+    "-macalg",
+    "sha1",
+)
+
 
 class Server(ThreadingHTTPServer):
     def server_bind(self):
@@ -109,6 +214,15 @@ class Server(ThreadingHTTPServer):
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
+        if self.path in ["/redirect-same", "/redirect-cross"]:
+            self.send_response(302)
+            self.send_header(
+                "Location",
+                "/json" if self.path == "/redirect-same" else "https://localhost:18751/json",
+            )
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
         body = b'{"message":"TLS fixture"}'
         self.send_response(200)
         self.send_header("X-Fixture", "RillTLS")

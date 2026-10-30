@@ -44,6 +44,7 @@ enum HTTPClientConfiguration {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.httpShouldSetCookies = false
         configuration.urlCache = nil
+        configuration.urlCredentialStorage = nil
         configuration.tlsMinimumSupportedProtocolVersion = .TLSv12
         return configuration
     }
@@ -226,15 +227,30 @@ public enum RequestEngine {
         _ draft: RequestDraft, environment: Environment?, budget: ResponseBudget = .standard,
         profiles: [AuthenticationProfile] = [], secrets: NamedSecretResolver? = nil,
         tlsProfiles: [TLSProfile] = [], identities: any TLSIdentityProvider = SystemTLSIdentities(),
-        definitions: [APIDefinitionSource] = [], followRedirects: Bool = true
+        definitions: [APIDefinitionSource] = [], followRedirects: Bool = true,
+        fileTLS: FileTLSConfiguration? = nil
     ) async throws -> Exchange {
         try Task.checkCancellation()
-        let tlsProfile = try TLSProfiles.selected(draft.tlsProfileID, from: tlsProfiles)
-        let identity = try tlsProfile?.identityReference.map { try identities.identity(for: $0) }
+        let selectedProfile = try TLSProfiles.selected(
+            draft.tlsProfileID, from: tlsProfiles,
+            fileIdentityAvailable: fileTLS?.hasClientIdentity == true)
+        let tlsProfile =
+            fileTLS?.overridesTrust == true ? fileTLS?.profile : selectedProfile ?? fileTLS?.profile
+        let savedIdentity =
+            fileTLS == nil
+            ? try selectedProfile?.identityReference.map { try identities.identity(for: $0) } : nil
         let frozen = try freeze(
             draft, environment: environment, profiles: profiles, secrets: secrets)
         defer { frozen.removeTemporaryBody() }
         let request = frozen.request
+        let fileCredential = fileTLS?.credential(for: request.url)
+        if fileTLS != nil, let selectedProfile,
+            selectedProfile.requiresClientIdentity || selectedProfile.identityReference != nil,
+            fileCredential == nil
+        {
+            throw FileTLSError.invalidOrigin
+        }
+        let identity = fileTLS == nil ? savedIdentity : fileCredential?.0
         let contract = try APIContractContext(draft.apiLink, definitions: definitions)
         if let contract {
             guard try contract.requestChecks(request).allSatisfy(\.passed) else {
@@ -242,24 +258,37 @@ public enum RequestEngine {
             }
         }
         let configuration = HTTPClientConfiguration.make()
+        let delegate = HTTPTransportDelegate(
+            prepared: frozen, profile: tlsProfile, identity: identity,
+            certificates: fileCredential?.1,
+            identityPersistence: fileTLS == nil ? .forSession : .none,
+            followRedirects: followRedirects)
         let session = URLSession(
-            configuration: configuration,
-            delegate: HTTPTransportDelegate(
-                prepared: frozen, profile: tlsProfile, identity: identity,
-                followRedirects: followRedirects), delegateQueue: nil)
+            configuration: configuration, delegate: delegate, delegateQueue: nil)
         defer { session.invalidateAndCancel() }
+        func transportFailure(_ error: Error) throws -> Never {
+            if Task.isCancelled { throw CancellationError() }
+            if let code = delegate.tlsRejection { throw URLError(code) }
+            throw error
+        }
         let start = ProcessInfo.processInfo.systemUptime
-        let (bytes, response) = try await session.bytes(for: request)
+        let received: (URLSession.AsyncBytes, URLResponse)
+        do { received = try await session.bytes(for: request) } catch {
+            try transportFailure(error)
+        }
+        let (bytes, response) = received
         guard let http = response as? HTTPURLResponse else { throw RillError.invalidURL }
         let headersElapsed = ProcessInfo.processInfo.systemUptime - start
         let maximum = budget.downloadBytes
         if response.expectedContentLength > Int64(maximum) { throw RillError.responseTooLarge }
         var data = Data()
-        for try await byte in bytes {
-            if data.count >= maximum { throw RillError.responseTooLarge }
-            if data.count % 4096 == 0 { try Task.checkCancellation() }
-            data.append(byte)
-        }
+        do {
+            for try await byte in bytes {
+                if data.count >= maximum { throw RillError.responseTooLarge }
+                if data.count % 4096 == 0 { try Task.checkCancellation() }
+                data.append(byte)
+            }
+        } catch { try transportFailure(error) }
         let headers = http.allHeaderFields.map {
             Field(name: String(describing: $0.key), value: String(describing: $0.value))
         }.sorted { $0.name < $1.name }
@@ -318,17 +347,29 @@ public enum RequestEngine {
 }
 
 final class HTTPTransportDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    private let rejectionLock = NSLock()
+    private var rejection: URLError.Code?
+    var tlsRejection: URLError.Code? { rejectionLock.withLock { rejection } }
+    private func rejectTLS(_ code: URLError.Code) {
+        rejectionLock.withLock { rejection = code }
+    }
     let prepared: PreparedHTTPRequest
     let profile: TLSProfile?
     let identity: SecIdentity?
+    let certificates: [SecCertificate]?
+    let identityPersistence: URLCredential.Persistence
     let followRedirects: Bool
     init(
         prepared: PreparedHTTPRequest, profile: TLSProfile?, identity: SecIdentity?,
+        certificates: [SecCertificate]? = nil,
+        identityPersistence: URLCredential.Persistence = .forSession,
         followRedirects: Bool = true
     ) {
         self.prepared = prepared
         self.profile = profile
         self.identity = identity
+        self.certificates = certificates
+        self.identityPersistence = identityPersistence
         self.followRedirects = followRedirects
     }
     func urlSession(
@@ -344,6 +385,7 @@ final class HTTPTransportDelegate: NSObject, URLSessionTaskDelegate, @unchecked 
                 return
             }
             guard let trust = challenge.protectionSpace.serverTrust else {
+                rejectTLS(.serverCertificateUntrusted)
                 completionHandler(.cancelAuthenticationChallenge, nil)
                 return
             }
@@ -353,16 +395,25 @@ final class HTTPTransportDelegate: NSObject, URLSessionTaskDelegate, @unchecked 
             {
                 completionHandler(.useCredential, URLCredential(trust: trust))
             } else {
+                rejectTLS(.serverCertificateUntrusted)
                 completionHandler(.cancelAuthenticationChallenge, nil)
             }
         case NSURLAuthenticationMethodClientCertificate:
-            guard let identity, challenge.previousFailureCount == 0 else {
+            guard let identity, challenge.previousFailureCount == 0,
+                FileTLSConfiguration.matches(challenge.protectionSpace, url: prepared.request.url)
+            else {
+                rejectTLS(
+                    challenge.previousFailureCount > 0
+                        ? .clientCertificateRejected : .clientCertificateRequired)
                 completionHandler(.cancelAuthenticationChallenge, nil)
                 return
             }
             completionHandler(
                 .useCredential,
-                URLCredential(identity: identity, certificates: nil, persistence: .forSession))
+                URLCredential(
+                    identity: identity,
+                    certificates: certificates?.isEmpty == false ? certificates : nil,
+                    persistence: identityPersistence))
         default: completionHandler(.performDefaultHandling, nil)
         }
     }
