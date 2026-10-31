@@ -18,7 +18,8 @@ public struct PostmanFileRun: Sendable {
     public static func prepare(
         collection: Data, environment inputEnvironment: Data? = nil,
         overrides: [String: String] = [:], folder: String? = nil,
-        iterationData: IterationData? = nil, fileTLS: FileTLSConfiguration? = nil
+        iterationData: IterationData? = nil, fileTLS: FileTLSConfiguration? = nil,
+        globals: Data? = nil
     ) throws -> Self {
         try Task.checkCancellation()
         guard overrides.count <= 10_000,
@@ -32,7 +33,8 @@ public struct PostmanFileRun: Sendable {
         var preflightOverrides = iterationData?.rows.first ?? [:]
         preflightOverrides.merge(overrides) { _, override in override }
         let preflight = try CollectionPreflight.inspect(
-            selection, environment: inputEnvironment, overrides: preflightOverrides)
+            selection, environment: inputEnvironment, overrides: preflightOverrides,
+            globals: globals)
         guard preflight.passed else { throw PostmanFileRunError.blocked(preflight) }
         let imported = try PostmanImporter.parse(selection.data)
         guard imported.workspace.requests.count * (iterationData?.rows.count ?? 1) <= 10_000 else {
@@ -47,8 +49,8 @@ public struct PostmanFileRun: Sendable {
             throw PostmanFileRunError.unsupportedBody
         }
         var fields: [String: Field] = [:]
-        var catalog = imported.workspace.namedSecrets ?? []
-        var secretValues = imported.secretValues
+        var catalog: [NamedSecret] = []
+        var secretValues: [UUID: String] = [:]
         func apply(_ environments: [Environment]) {
             for environment in environments {
                 for field in environment.variables where field.enabled {
@@ -56,12 +58,16 @@ public struct PostmanFileRun: Sendable {
                 }
             }
         }
-        apply(imported.workspace.environments)
+        func applyImport(_ imported: ForeignWorkspaceImport) {
+            apply(imported.workspace.environments)
+            catalog += imported.workspace.namedSecrets ?? []
+            secretValues.merge(imported.secretValues) { _, new in new }
+        }
+        if let globals { applyImport(try PostmanImporter.parseGlobals(globals)) }
+        applyImport(imported)
         if let inputEnvironment {
             let importedEnvironment = try PostmanImporter.parse(inputEnvironment)
-            apply(importedEnvironment.workspace.environments)
-            catalog += importedEnvironment.workspace.namedSecrets ?? []
-            secretValues.merge(importedEnvironment.secretValues) { _, new in new }
+            applyImport(importedEnvironment)
         }
         for (name, value) in overrides { fields[name] = Field(name: name, value: value) }
         var environment = Environment(name: "Collection file")

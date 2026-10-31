@@ -24,6 +24,19 @@ public enum PostmanImporter {
         else { throw PostmanImportError.invalid }
         return try Decoder().decode(root)
     }
+    // File-run globals reuse the environment importer and its transient secret handling.
+    // Keep globals opt-in here; ordinary collection-import format detection is unchanged.
+    static func parseGlobals(_ input: Data) throws -> ForeignWorkspaceImport {
+        try WorkspaceFile.checkJSONBounds(input)
+        let bytes = input.starts(with: [0xef, 0xbb, 0xbf]) ? Data(input.dropFirst(3)) : input
+        guard String(data: bytes, encoding: .utf8) != nil,
+            var root = try JSONSerialization.jsonObject(with: bytes) as? [String: Any],
+            root["_postman_variable_scope"] as? String == "globals",
+            root["values"] is [[String: Any]]
+        else { throw PostmanImportError.invalid }
+        root["_postman_variable_scope"] = "environment"
+        return try Decoder().decode(root)
+    }
     private final class Decoder {
         var requestBytes = 0
         var workspace = Workspace(), secrets: [UUID: String] = [:], warnings: Set<String> = []
@@ -48,7 +61,7 @@ public enum PostmanImporter {
                 guard let key = row["key"] as? String, !key.isEmpty, names.insert(key).inserted
                 else { throw PostmanImportError.unsupported }
                 var field = Field(name: key, value: try text(row["value"]))
-                field.enabled = row["enabled"] as? Bool ?? !(row["disabled"] as? Bool ?? false)
+                field.enabled = row["enabled"] as? Bool != false && row["disabled"] as? Bool != true
                 if row["type"] as? String == "secret" {
                     let secret = NamedSecret(name: "postman-" + UUID().uuidString)
                     workspace.namedSecrets = (workspace.namedSecrets ?? []) + [secret]

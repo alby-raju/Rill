@@ -2,6 +2,8 @@
 
 ## 0.4.5 (unreleased)
 
+- Add explicit Postman `--globals` inputs to file runs and offline preflight, below collection/environment/data/CLI overrides. Reuse transient secret handling, validate all selected rows before traffic and protect globals from output overwrite. Align importer/preflight disabling flags and correct stale preflight execution guidance.
+
 - Add bounded CA/PEM/PKCS#12 TLS inputs and password files to Postman/native file runs without Keychain imports or lookups. Scope one identity to an exact HTTPS origin, preserve native trust unless explicitly overridden, protect TLS inputs from overwrite, and classify rejected TLS handshakes as transport failures.
 - Explicitly compare certificate and private-key public material before accepting a file identity; reject mismatched pairs consistently across supported macOS versions.
 

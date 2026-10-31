@@ -9,7 +9,7 @@ extension RillCLI {
                     "environment-file", "env-var", "iterations", "delay", "retries", "retry-delay",
                     "report", "report-format", "allure", "output", "timeout", "color", "folder",
                     "format", "collection", "environment",
-                    "iteration-data", "iteration-data-format",
+                    "iteration-data", "iteration-data-format", "globals",
                 ]).union(FileTLSOptions.values)),
             args.flags.isSubset(of: [
                 "json", "quiet", "detail", "continue-on-failure", "overwrite", "allow-insecure",
@@ -35,10 +35,11 @@ extension RillCLI {
                 || (args.value("collection") == nil && args.value("environment") == nil
                     && !args.flags.contains("allow-insecure")),
             format != "native"
-                || (args.value("folder") == nil && args.value("environment-file") == nil)
+                || (args.value("folder") == nil && args.value("environment-file") == nil
+                    && args.value("globals") == nil)
         else {
             throw CLIError.usage(
-                "Postman runs use --folder/--environment-file; native runs use --collection/--environment and optional --allow-insecure. Choose --format postman|native explicitly; no requests sent."
+                "Postman runs use --folder/--globals/--environment-file; native runs use --collection/--environment and optional --allow-insecure. Choose --format postman|native explicitly; no requests sent."
             )
         }
         var config = RunConfiguration()
@@ -131,7 +132,11 @@ extension RillCLI {
                             try BoundedFileInput.read(
                                 URL(fileURLWithPath: $0), limit: ResourceLimits.workspaceBytes)
                         }, overrides: args.variableOverrides(), folder: args.value("folder"),
-                        iterationData: iterationData, fileTLS: fileTLS))
+                        iterationData: iterationData, fileTLS: fileTLS,
+                        globals: try args.value("globals").map {
+                            try BoundedFileInput.read(
+                                URL(fileURLWithPath: $0), limit: ResourceLimits.workspaceBytes)
+                        }))
             }
         } catch let error as NativeFileRunError {
             let reason: String
@@ -222,6 +227,7 @@ extension RillCLI {
                 let collectionSelected: Bool
                 let inputFormat: String
                 let iterationDataRows: Int?
+                let globalsSupplied: Bool
                 let tlsPolicy: String?
                 let clientIdentityConfigured: Bool?
             }
@@ -232,6 +238,7 @@ extension RillCLI {
                     folderSelected: args.value("folder") != nil,
                     collectionSelected: args.value("collection") != nil, inputFormat: format,
                     iterationDataRows: iterationData?.rows.count,
+                    globalsSupplied: args.value("globals") != nil,
                     tlsPolicy: fileTLS?.overridesTrust == true || format == "postman"
                         ? fileTLS?.profile.mode.rawValue : nil,
                     clientIdentityConfigured: fileTLS?.hasClientIdentity))
