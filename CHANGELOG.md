@@ -2,9 +2,12 @@
 
 ## 0.4.5 (unreleased)
 
+- Add bounded CA/PEM/PKCS#12 TLS inputs and password files to Postman/native file runs without Keychain imports or lookups. Scope one identity to an exact HTTPS origin, preserve native trust unless explicitly overridden, protect TLS inputs from overwrite, and classify rejected TLS handshakes as transport failures.
+- Explicitly compare certificate and private-key public material before accepting a file identity; reject mismatched pairs consistently across supported macOS versions.
+
 - Add bounded JSON/CSV iteration data to Postman/native file runs with explicit precedence, row isolation, preserved numeric spelling, data-aware step limits and input overwrite protection. Validate every Postman row before traffic; preserve native chaining, retries, cancellation and partial-run reporting.
 
-- Add explicit native v1 file runs with collection/environment selection, process-only named secrets, shared assertions/extraction/finite hooks, selected TLS safety checks and protected reports. Preserve configured native check semantics; unchecked responses require HTTP 2xx. Uploads, foreign scripts and Keychain identities block.
+- Add explicit native v1 file runs with collection/environment selection, process-only named secrets, shared assertions/extraction/finite hooks, selected TLS safety checks and protected reports. Preserve configured native check semantics; unchecked responses require HTTP 2xx. Uploads, foreign scripts and saved Keychain identity lookups block; explicit scoped TLS files can fulfill client-identity requirements.
 
 - Add exact nested Postman `--folder` selection to file runs and offline preflight. Preserve source order, inherited auth/script/transport checks and original diagnostic indices; reject missing/ambiguous paths before traffic and label selected scope.
 

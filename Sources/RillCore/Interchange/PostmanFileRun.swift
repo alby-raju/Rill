@@ -13,11 +13,12 @@ public struct PostmanFileRun: Sendable {
     public let secrets: NamedSecretResolver
     private let iterationData: IterationData?
     private let iterationOverrides: [String: String]
+    private let fileTLS: FileTLSConfiguration?
 
     public static func prepare(
         collection: Data, environment inputEnvironment: Data? = nil,
         overrides: [String: String] = [:], folder: String? = nil,
-        iterationData: IterationData? = nil
+        iterationData: IterationData? = nil, fileTLS: FileTLSConfiguration? = nil
     ) throws -> Self {
         try Task.checkCancellation()
         guard overrides.count <= 10_000,
@@ -84,7 +85,9 @@ public struct PostmanFileRun: Sendable {
         }
         return Self(
             requests: imported.workspace.requests, environment: environment, secrets: secrets,
-            iterationData: iterationData, iterationOverrides: iterationData == nil ? [:] : overrides
+            iterationData: iterationData,
+            iterationOverrides: iterationData == nil ? [:] : overrides,
+            fileTLS: fileTLS
         )
     }
 
@@ -100,12 +103,13 @@ public struct PostmanFileRun: Sendable {
             for index in requests.indices { requests[index].timeout = timeout }
         }
         let secrets = self.secrets
+        let fileTLS = self.fileTLS
         return try await CollectionRunner.run(
             requests: requests, environment: environment, configuration: configuration,
             iterationData: iterationData, iterationOverrides: iterationOverrides,
             executor: { request, variables in
                 var result = try await WorkflowEngine.execute(
-                    request, variables: variables, secrets: secrets)
+                    request, variables: variables, secrets: secrets, fileTLS: fileTLS)
                 result.exchange.checks.append(
                     CheckResult(
                         title: "HTTP status is 2xx",

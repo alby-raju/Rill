@@ -12,7 +12,8 @@ struct Arguments: Sendable {
         }
         let boolean: Set<String> = [
             "quiet", "detail", "json", "apply", "continue-on-failure", "allow-insecure",
-            "allow-lan", "overwrite", "show-messages", "help", "version",
+            "allow-lan", "overwrite", "show-messages", "help", "version", "insecure",
+            "include-system-roots",
         ]
         let valued: Set<String> = [
             "color", "workspace", "environment", "tls", "iterations", "delay", "retries",
@@ -24,6 +25,7 @@ struct Arguments: Sendable {
             "service", "wait", "send", "auth-profile", "proto-include", "collection",
             "environment-file", "env-var", "ssl-client-cert", "ssl-client-key", "folder",
             "iteration-data", "iteration-data-format",
+            "ca-cert", "ssl-client-p12", "ssl-passphrase-file", "ssl-client-origin",
         ]
         var index = 0
         var foundCommand = false
@@ -63,15 +65,25 @@ struct Arguments: Sendable {
         ]
         let allowedInputs: Set<String> =
             command == "run"
-            ? ["env-var", "environment-file", "folder"] : command == "request" ? ["env-var"] : []
+            ? ["env-var", "environment-file", "folder", "ssl-client-cert", "ssl-client-key"]
+            : command == "request" ? ["env-var"] : []
         let fileOnly = preflightOnly.subtracting(allowedInputs)
         if command != "preflight", !fileOnly.isDisjoint(with: values.keys) {
             throw CLIError.usage(
-                "File certificate options require preflight; folder/environment/variable inputs are supported by run and preflight, and request also accepts --env-var."
+                "PEM certificate/key options require run or preflight; folder/environment/variable inputs are supported by run and preflight, and request also accepts --env-var."
             )
         }
         if value("collection") != nil && command != "run" {
             throw CLIError.usage("--collection is supported only by native file runs.")
+        }
+        if command != "run",
+            !FileTLSOptions.values.subtracting(["ssl-client-cert", "ssl-client-key"]).isDisjoint(
+                with: values.keys)
+                || !FileTLSOptions.flags.isDisjoint(with: flags)
+        {
+            throw CLIError.usage(
+                "TLS file execution options require run; preflight supports only PEM pair inspection."
+            )
         }
         if command != "run", value("iteration-data") != nil || value("iteration-data-format") != nil
         {
@@ -168,12 +180,10 @@ struct Arguments: Sendable {
     func write(_ data: Data, to path: String) throws {
         let destination = URL(fileURLWithPath: path)
         if command == "run" {
-            let inputs =
-                (operands + [value("environment-file"), value("iteration-data")].compactMap { $0 })
-                .map { URL(fileURLWithPath: $0).resolvingSymlinksInPath() }
+            let inputs = fileRunInputs
             guard !inputs.contains(destination.resolvingSymlinksInPath()) else {
                 throw CLIError.usage(
-                    "Output cannot replace collection/environment/iteration-data inputs.")
+                    "Output cannot replace run inputs, including data and TLS files.")
             }
         }
         guard destination.resolvingSymlinksInPath() != workspaceURL.resolvingSymlinksInPath() else {
@@ -263,6 +273,11 @@ let usage = """
           --format native          Read a native Rill workspace file without opening Keychain
           --collection NAME_OR_ID --environment NAME_OR_ID   Native selection
           --allow-insecure         Native insecure profiles require explicit opt-in
+          --ca-cert FILE           DER/PEM roots for this run; --include-system-roots adds system trust
+          --ssl-client-cert FILE --ssl-client-key FILE   Unencrypted PEM identity
+          --ssl-client-p12 FILE --ssl-passphrase-file FILE   Memory-only PKCS#12 identity
+          --ssl-client-origin https://HOST:PORT   Required exact origin for either client identity
+          --insecure               Explicitly disable server certificate/hostname verification
           --environment-file FILE --env-var key=value (repeatable)
           --iteration-data FILE    JSON/CSV rows; sets iteration count (cannot use --iterations)
           --iteration-data-format json|csv   Optional override for the file extension

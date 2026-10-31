@@ -4,20 +4,22 @@ import RillCore
 extension RillCLI {
     static func runFile(_ args: Arguments) async throws {
         guard args.operands.count == 1,
-            Set(args.values.keys).isSubset(of: [
-                "environment-file", "env-var", "iterations", "delay", "retries", "retry-delay",
-                "report", "report-format", "allure", "output", "timeout", "color", "folder",
-                "format", "collection", "environment",
-                "iteration-data", "iteration-data-format",
-            ]),
+            Set(args.values.keys).isSubset(
+                of: Set([
+                    "environment-file", "env-var", "iterations", "delay", "retries", "retry-delay",
+                    "report", "report-format", "allure", "output", "timeout", "color", "folder",
+                    "format", "collection", "environment",
+                    "iteration-data", "iteration-data-format",
+                ]).union(FileTLSOptions.values)),
             args.flags.isSubset(of: [
                 "json", "quiet", "detail", "continue-on-failure", "overwrite", "allow-insecure",
+                "insecure", "include-system-roots",
             ]
             ),
             args.value("report-format") == nil || args.value("report") != nil
         else {
             throw CLIError.usage(
-                "Use run FILE with --format postman|native, supported selection/environment/data options, pacing/retry and reports. Saved workspace and TLS-file options are not supported."
+                "Use run FILE with --format postman|native, supported selection/environment/data/TLS options, pacing/retry and reports. Saved-workspace options are separate."
             )
         }
         guard args.value("iteration-data-format") == nil || args.value("iteration-data") != nil,
@@ -58,15 +60,12 @@ extension RillCLI {
         }
         let destinations = [args.value("report"), args.value("output")].compactMap { $0 }
         let normalized = destinations.map { URL(fileURLWithPath: $0).resolvingSymlinksInPath() }
-        let inputs =
-            ([args.operands[0]]
-            + [args.value("environment-file"), args.value("iteration-data")].compactMap { $0 })
-            .map { URL(fileURLWithPath: $0).resolvingSymlinksInPath() }
+        let inputs = args.fileRunInputs
         guard Set(normalized).count == normalized.count, Set(normalized).isDisjoint(with: inputs),
             !normalized.contains(args.workspaceURL.resolvingSymlinksInPath())
         else {
             throw CLIError.usage(
-                "Outputs must be distinct and cannot replace collection/environment/iteration-data inputs or the desktop workspace."
+                "Outputs must be distinct and cannot replace run inputs (including data and TLS files) or the desktop workspace."
             )
         }
         for destination in destinations
@@ -110,6 +109,7 @@ extension RillCLI {
             )
         }
         if let iterationData { config.iterations = iterationData.rows.count }
+        let fileTLS = try FileTLSOptions.load(args)
         let plan: FileRunPlan
         do {
             let data = try BoundedFileInput.read(
@@ -122,7 +122,7 @@ extension RillCLI {
                         overrides: args.variableOverrides(),
                         processEnvironment: ProcessInfo.processInfo.environment,
                         allowInsecure: args.flags.contains("allow-insecure"),
-                        iterationData: iterationData))
+                        iterationData: iterationData, fileTLS: fileTLS))
             } else {
                 plan = .postman(
                     try PostmanFileRun.prepare(
@@ -131,7 +131,7 @@ extension RillCLI {
                             try BoundedFileInput.read(
                                 URL(fileURLWithPath: $0), limit: ResourceLimits.workspaceBytes)
                         }, overrides: args.variableOverrides(), folder: args.value("folder"),
-                        iterationData: iterationData))
+                        iterationData: iterationData, fileTLS: fileTLS))
             }
         } catch let error as NativeFileRunError {
             let reason: String
@@ -145,7 +145,8 @@ extension RillCLI {
             case .unsupportedUpload:
                 reason = "Native file runs reject multipart/binary/upload references."
             case .unsupportedIdentity:
-                reason = "Native file runs cannot use saved Keychain client identities."
+                reason =
+                    "Native file runs cannot look up saved Keychain client identities; supply scoped PEM or PKCS#12 files instead."
             case .insecureNotAllowed:
                 reason = "Native insecure TLS profiles require explicit --allow-insecure."
             }
@@ -188,6 +189,11 @@ extension RillCLI {
             throw CLIError.usage("Requested run exceeds the execution limit; no requests sent.")
         }
         if !args.flags.contains("json") {
+            if fileTLS?.profile.mode == .insecure {
+                try args.text(
+                    "TLS: insecure for this run; certificate and hostname verification are disabled."
+                )
+            }
             try args.text(
                 "Rill file run · \(format) · \(args.value("folder") != nil ? "selected folder" : args.value("collection") != nil ? "selected collection" : "entire file") · \(requests.count) requests · \(config.iterations) iterations · \(plan.policy)"
             )
@@ -216,6 +222,8 @@ extension RillCLI {
                 let collectionSelected: Bool
                 let inputFormat: String
                 let iterationDataRows: Int?
+                let tlsPolicy: String?
+                let clientIdentityConfigured: Bool?
             }
             try args.json(
                 Summary(
@@ -223,7 +231,10 @@ extension RillCLI {
                     attempts: report.outcomes.filter { $0.state != .notRun }.count,
                     folderSelected: args.value("folder") != nil,
                     collectionSelected: args.value("collection") != nil, inputFormat: format,
-                    iterationDataRows: iterationData?.rows.count))
+                    iterationDataRows: iterationData?.rows.count,
+                    tlsPolicy: fileTLS?.overridesTrust == true || format == "postman"
+                        ? fileTLS?.profile.mode.rawValue : nil,
+                    clientIdentityConfigured: fileTLS?.hasClientIdentity))
         } else {
             try args.text(
                 RunConsole.render(

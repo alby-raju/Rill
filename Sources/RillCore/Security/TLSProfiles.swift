@@ -56,13 +56,17 @@ public struct SystemTLSIdentities: TLSIdentityProvider {
     }
 }
 public enum TLSProfiles {
-    public static func selected(_ id: UUID?, from profiles: [TLSProfile]) throws -> TLSProfile? {
+    public static func selected(
+        _ id: UUID?, from profiles: [TLSProfile], fileIdentityAvailable: Bool = false
+    ) throws -> TLSProfile? {
         guard let id else { return nil }
         guard let profile = profiles.first(where: { $0.id == id }) else {
             throw TLSError.missingProfile
         }
         try validate(profile, requireUsable: true)
-        if profile.requiresClientIdentity && profile.identityReference == nil {
+        if profile.requiresClientIdentity && profile.identityReference == nil
+            && !fileIdentityAvailable
+        {
             throw TLSError.unavailableIdentity
         }
         return profile

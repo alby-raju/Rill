@@ -19,11 +19,13 @@ public struct NativeFileRun: Sendable {
     private let definitions: [APIDefinitionSource]
     private let iterationData: IterationData?
     private let iterationOverrides: [String: String]
+    private let fileTLS: FileTLSConfiguration?
 
     public static func prepare(
         workspace data: Data, collection: String? = nil, environment selection: String? = nil,
         overrides: [String: String] = [:], processEnvironment: [String: String] = [:],
-        allowInsecure: Bool = false, iterationData: IterationData? = nil
+        allowInsecure: Bool = false, iterationData: IterationData? = nil,
+        fileTLS: FileTLSConfiguration? = nil
     ) throws -> Self {
         try Task.checkCancellation()
         let workspace = try WorkspaceFile.decode(data)
@@ -85,11 +87,18 @@ public struct NativeFileRun: Sendable {
                 try HookRuntime.validate(hook)
             }
             _ = try AuthenticationProfiles.applying(to: request, profiles: profiles)
-            if let tls = try TLSProfiles.selected(request.tlsProfileID, from: tlsProfiles) {
-                guard !tls.requiresClientIdentity, tls.identityReference == nil else {
+            if let tls = try TLSProfiles.selected(
+                request.tlsProfileID, from: tlsProfiles,
+                fileIdentityAvailable: fileTLS?.hasClientIdentity == true)
+            {
+                guard
+                    (!tls.requiresClientIdentity && tls.identityReference == nil)
+                        || fileTLS?.hasClientIdentity == true
+                else {
                     throw NativeFileRunError.unsupportedIdentity
                 }
-                guard tls.mode != .insecure || allowInsecure else {
+                guard tls.mode != .insecure || allowInsecure || fileTLS?.overridesTrust == true
+                else {
                     throw NativeFileRunError.insecureNotAllowed
                 }
             }
@@ -113,7 +122,9 @@ public struct NativeFileRun: Sendable {
             requests: requests, environment: WorkflowEngine.environment(variables),
             secrets: secrets,
             profiles: profiles, tlsProfiles: tlsProfiles, definitions: definitions,
-            iterationData: iterationData, iterationOverrides: iterationData == nil ? [:] : overrides
+            iterationData: iterationData,
+            iterationOverrides: iterationData == nil ? [:] : overrides,
+            fileTLS: fileTLS
         )
     }
 
@@ -132,6 +143,7 @@ public struct NativeFileRun: Sendable {
         let secrets = self.secrets
         let tlsProfiles = self.tlsProfiles
         let definitions = self.definitions
+        let fileTLS = self.fileTLS
         return try await CollectionRunner.run(
             requests: requests, environment: environment, configuration: configuration,
             iterationData: iterationData, iterationOverrides: iterationOverrides,
@@ -140,9 +152,11 @@ public struct NativeFileRun: Sendable {
                 do {
                     result = try await WorkflowEngine.execute(
                         request, variables: variables, profiles: profiles, secrets: secrets,
-                        tlsProfiles: tlsProfiles, definitions: definitions)
+                        tlsProfiles: tlsProfiles, definitions: definitions, fileTLS: fileTLS)
                 } catch {
-                    if error is AuthenticationError || error is TLSError || error is ContractError {
+                    if error is AuthenticationError || error is TLSError || error is ContractError
+                        || error is FileTLSError
+                    {
                         throw WorkflowError.invalidConfiguration
                     }
                     throw error
