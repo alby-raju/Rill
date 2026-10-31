@@ -164,7 +164,7 @@ import XCTest
         for option in options {
             let result = try await cli(
                 ["run", source.path, "--report", report.path, "--json"] + option)
-            XCTAssertEqual(result.status, 2)
+            XCTAssertEqual(result.status, 2, "Invalid TLS option set: \(option.first ?? "missing")")
             XCTAssertTrue(result.output.isEmpty)
             XCTAssertFalse(FileManager.default.fileExists(atPath: report.path))
             XCTAssertFalse(String(decoding: result.diagnostics, as: UTF8.self).contains("private-"))

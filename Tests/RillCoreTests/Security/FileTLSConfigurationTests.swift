@@ -63,10 +63,20 @@ private struct RejectFileTLSLookups: TLSIdentityProvider {
             pkcs12: file("client.p12"), passphrase: "rill-fixture", clientOrigin: endpoint(true))
         XCTAssertTrue(p12.hasClientIdentity)
         XCTAssertNil(p12.profile.identityReference)
-        XCTAssertThrowsError(
-            try FileTLSConfiguration(
-                clientCertificate: file("client.pem"), clientKey: file("server.key"),
-                clientOrigin: endpoint(true)))
+        for (certificate, key) in [
+            ("client.pem", "server.key"), ("client.pem", "ec-client.key"),
+            ("ec-client.pem", "client.key"),
+        ] {
+            XCTAssertThrowsError(
+                try FileTLSConfiguration(
+                    clientCertificate: file(certificate), clientKey: file(key),
+                    clientOrigin: endpoint(true))
+            ) { error in
+                guard case FileTLSError.invalidIdentity = error else {
+                    return XCTFail("Mismatched key pair returned an unexpected error")
+                }
+            }
+        }
         XCTAssertThrowsError(
             try FileTLSConfiguration(
                 pkcs12: file("client.p12"), passphrase: "private-wrong-passphrase",
@@ -82,6 +92,21 @@ private struct RejectFileTLSLookups: TLSIdentityProvider {
             try FileTLSConfiguration.validateClientCertificate(certificate, now: .distantFuture))
         XCTAssertThrowsError(
             try FileTLSConfiguration.validateClientCertificate(certificate, now: .distantPast))
+    }
+    func testPublicKeyValidationRejectsUnrelatedECKeyOnSameCurve() throws {
+        let certificate = try XCTUnwrap(
+            FileTLSConfiguration.certificates(file("ec-client.pem")).first)
+        let key = try XCTUnwrap(
+            SecKeyCreateRandomKey(
+                [kSecAttrKeyType: kSecAttrKeyTypeECSECPrimeRandom, kSecAttrKeySizeInBits: 256]
+                    as CFDictionary, nil))
+        XCTAssertThrowsError(try FileTLSConfiguration.validateKeyPair(certificate, privateKey: key))
+        {
+            error in
+            guard case FileTLSError.invalidIdentity = error else {
+                return XCTFail("Unrelated EC key returned an unexpected error")
+            }
+        }
     }
     func testOriginsAreExactAndChallengesCannotSwitchHostPortOrProtocol() throws {
         let origin = try endpoint(true)

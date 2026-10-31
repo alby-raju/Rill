@@ -70,6 +70,11 @@ public final class FileTLSConfiguration: @unchecked Sendable {
             else {
                 throw FileTLSError.invalidIdentity
             }
+            var key: SecKey?
+            guard SecIdentityCopyPrivateKey(identity, &key) == errSecSuccess, let key else {
+                throw FileTLSError.invalidIdentity
+            }
+            try Self.validateKeyPair(certificate, privateKey: key)
             try Self.validateClientCertificate(certificate)
             let objects = entry[kSecImportItemCertChain as String] as? [Any] ?? []
             guard objects.count <= 16 else { throw FileTLSError.invalidIdentity }
@@ -118,6 +123,7 @@ public final class FileTLSConfiguration: @unchecked Sendable {
                 CFGetTypeID(raw as CFTypeRef) == SecKeyGetTypeID()
             else { throw FileTLSError.invalidIdentity }
             let key = raw as! SecKey
+            try Self.validateKeyPair(certificate, privateKey: key)
             guard let identity = SecIdentityCreate(nil, certificate, key) else {
                 throw FileTLSError.invalidIdentity
             }
@@ -128,6 +134,17 @@ public final class FileTLSConfiguration: @unchecked Sendable {
             identity = nil
             chain = []
         }
+    }
+
+    static func validateKeyPair(_ certificate: SecCertificate, privateKey: SecKey) throws {
+        // Identity construction alone accepts mismatched keys on some supported macOS versions.
+        // Compare only public material; never export the private key to check the pair.
+        guard let certificateKey = SecCertificateCopyKey(certificate),
+            let publicKey = SecKeyCopyPublicKey(privateKey),
+            let certificateBytes = SecKeyCopyExternalRepresentation(certificateKey, nil),
+            let publicBytes = SecKeyCopyExternalRepresentation(publicKey, nil),
+            certificateBytes as Data == publicBytes as Data
+        else { throw FileTLSError.invalidIdentity }
     }
 
     static func certificates(_ data: Data) throws -> [SecCertificate] {
