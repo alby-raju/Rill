@@ -24,7 +24,7 @@ struct Arguments: Sendable {
             "client-secret-name", "scope", "save-secret", "plugins-dir", "trust-file", "plugin",
             "service", "wait", "send", "auth-profile", "proto-include", "collection",
             "environment-file", "env-var", "ssl-client-cert", "ssl-client-key", "folder",
-            "iteration-data", "iteration-data-format",
+            "iteration-data", "iteration-data-format", "globals",
             "ca-cert", "ssl-client-p12", "ssl-passphrase-file", "ssl-client-origin",
         ]
         var index = 0
@@ -61,11 +61,14 @@ struct Arguments: Sendable {
             index += 1
         }
         let preflightOnly: Set<String> = [
-            "environment-file", "env-var", "ssl-client-cert", "ssl-client-key", "folder",
+            "environment-file", "env-var", "ssl-client-cert", "ssl-client-key", "folder", "globals",
         ]
         let allowedInputs: Set<String> =
             command == "run"
-            ? ["env-var", "environment-file", "folder", "ssl-client-cert", "ssl-client-key"]
+            ? [
+                "env-var", "environment-file", "folder", "ssl-client-cert", "ssl-client-key",
+                "globals",
+            ]
             : command == "request" ? ["env-var"] : []
         let fileOnly = preflightOnly.subtracting(allowedInputs)
         if command != "preflight", !fileOnly.isDisjoint(with: values.keys) {
@@ -265,6 +268,7 @@ let usage = """
 
       preflight FILE               Offline Postman v2 collection inspection; sends no requests
           --folder /Parent/Child   Exact folder names; escape ~ as ~0 and / as ~1
+          --globals FILE           Postman globals JSON; lower precedence than collection variables
           --environment-file FILE --env-var key=value (repeatable)
           --ssl-client-cert FILE --ssl-client-key FILE (unencrypted PEM key)
           --json                   Structured diagnostics; exit 2 for blocked inputs
@@ -278,6 +282,7 @@ let usage = """
           --ssl-client-p12 FILE --ssl-passphrase-file FILE   Memory-only PKCS#12 identity
           --ssl-client-origin https://HOST:PORT   Required exact origin for either client identity
           --insecure               Explicitly disable server certificate/hostname verification
+          --globals FILE           Postman globals JSON; lowest variable precedence
           --environment-file FILE --env-var key=value (repeatable)
           --iteration-data FILE    JSON/CSV rows; sets iteration count (cannot use --iterations)
           --iteration-data-format json|csv   Optional override for the file extension

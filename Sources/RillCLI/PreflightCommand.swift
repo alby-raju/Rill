@@ -6,11 +6,11 @@ extension RillCLI {
         guard args.operands.count == 1,
             Set(args.values.keys).isSubset(of: [
                 "environment-file", "env-var", "ssl-client-cert", "ssl-client-key", "color",
-                "folder",
+                "folder", "globals",
             ]), args.flags.isSubset(of: ["json", "quiet", "detail"])
         else {
             throw CLIError.usage(
-                "Use preflight FILE with --folder, --environment-file, --env-var, a PEM certificate/key pair, --json or --quiet."
+                "Use preflight FILE with --folder, --globals, --environment-file, --env-var, a PEM certificate/key pair, --json or --quiet."
             )
         }
         var report: CollectionPreflight
@@ -30,7 +30,11 @@ extension RillCLI {
             }
             report = try CollectionPreflight.inspect(
                 collection: data, environment: environment, overrides: overrides,
-                folder: args.value("folder"))
+                folder: args.value("folder"),
+                globals: try args.value("globals").map {
+                    try BoundedFileInput.read(
+                        URL(fileURLWithPath: $0), limit: ResourceLimits.workspaceBytes)
+                })
         } catch let error as PostmanFolderSelectionError {
             throw folderSelectionUsage(error)
         } catch CollectionPreflightInputError.insomnia {
@@ -45,7 +49,7 @@ extension RillCLI {
             throw CancellationError()
         } catch {
             throw CLIError.usage(
-                "Preflight could not read a bounded Postman v2 collection/environment JSON file. No requests sent; input content omitted."
+                "Preflight could not read bounded Postman v2 collection/environment/globals JSON files. No requests sent; input content omitted."
             )
         }
         if args.value("ssl-client-cert") != nil || args.value("ssl-client-key") != nil {
@@ -90,6 +94,9 @@ extension RillCLI {
                     "Scope: selected folder and inherited settings; excluded folders are not checked."
                 )
             }
+            if report.globalsSupplied {
+                try args.text("Inputs: explicit Postman globals supplied.")
+            }
             try args.text(
                 "Requests: \(report.requests) · Script blocks: \(report.scripts) · Blockers: \(report.issueCount)"
             )
@@ -104,7 +111,7 @@ extension RillCLI {
                 "scripts.unsupported":
                     "Postman JavaScript is not executed. Migrate scripts to supported native workflows before treating the suite as equivalent.",
                 "variables.unresolved_cyclic_or_limit":
-                    "Supply enabled environment values or --env-var overrides; check recursive references. Script-generated values are not inferred.",
+                    "Supply enabled globals/environment values or --env-var overrides; check recursive references. Script-generated values are not inferred.",
                 "collection.unsupported_representation":
                     "The collection contains a representation the current Postman importer cannot reproduce. Review its published format limits.",
                 "transport.settings_not_applied":
@@ -119,7 +126,7 @@ extension RillCLI {
                 "No requests sent; no workspace or Keychain changes. Values and script text omitted."
             )
             try args.text(
-                "Static checks only: not Newman conformance, server trust verification or an execution plan. Direct file runs are not implemented."
+                "Static checks only: not Newman conformance, server trust verification or an execution plan. Use run for the documented file-execution subset."
             )
             try args.text(
                 report.passed

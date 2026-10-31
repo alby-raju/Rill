@@ -77,7 +77,8 @@ enum FileTLSOptions {
 extension Arguments {
     var fileRunInputs: [URL] {
         (operands
-            + (["environment-file", "iteration-data"] + FileTLSOptions.inputNames).compactMap {
+            + (["environment-file", "iteration-data", "globals"] + FileTLSOptions.inputNames)
+            .compactMap {
                 value($0)
             })
             .map { URL(fileURLWithPath: $0).resolvingSymlinksInPath() }

@@ -18,6 +18,7 @@ public struct CollectionPreflight: Encodable, Sendable {
     public let scope = "static-postman-input"
     public var requests = 0
     public var folderSelected = false
+    public var globalsSupplied = false
     public var scripts = 0
     public var issueCount = 0
     public var issues: [Issue] = []
@@ -25,20 +26,22 @@ public struct CollectionPreflight: Encodable, Sendable {
 
     public static func inspect(
         collection: Data, environment: Data? = nil, overrides: [String: String] = [:],
-        folder: String? = nil
+        folder: String? = nil, globals: Data? = nil
     ) throws -> Self {
         try inspect(
             PostmanFolderSelection.prepare(collection, folder: folder),
-            environment: environment, overrides: overrides)
+            environment: environment, overrides: overrides, globals: globals)
     }
 
     static func inspect(
-        _ selection: PostmanFolderSelection, environment: Data?, overrides: [String: String]
+        _ selection: PostmanFolderSelection, environment: Data?, overrides: [String: String],
+        globals: Data? = nil
     ) throws -> Self {
         func object(_ data: Data) throws -> [String: Any] {
             try WorkspaceFile.checkJSONBounds(data)
             let bytes = data.starts(with: [0xef, 0xbb, 0xbf]) ? Data(data.dropFirst(3)) : data
-            guard let value = try JSONSerialization.jsonObject(with: bytes) as? [String: Any]
+            guard String(data: bytes, encoding: .utf8) != nil,
+                let value = try JSONSerialization.jsonObject(with: bytes) as? [String: Any]
             else { throw PostmanImportError.invalid }
             return value
         }
@@ -54,6 +57,7 @@ public struct CollectionPreflight: Encodable, Sendable {
         }
         var result = Self()
         result.folderSelected = !selection.originalIndices.isEmpty
+        result.globalsSupplied = globals != nil
         func issue(_ code: String, _ path: String) {
             result.issueCount += 1
             if result.issues.count < 1000 { result.issues.append(Issue(code, path)) }
@@ -65,7 +69,7 @@ public struct CollectionPreflight: Encodable, Sendable {
         var variables: [String: String] = [:]
         func values(_ rows: Any?, path: String) {
             guard let rows else { return }
-            guard let rows = rows as? [[String: Any]] else {
+            guard let rows = rows as? [[String: Any]], rows.count <= 10_000 else {
                 issue("variables.invalid", path)
                 return
             }
@@ -80,6 +84,13 @@ public struct CollectionPreflight: Encodable, Sendable {
                 if row["enabled"] as? Bool == false || row["disabled"] as? Bool == true { continue }
                 variables[key] = value
             }
+        }
+        if let globals {
+            let global = try object(globals)
+            guard global["_postman_variable_scope"] as? String == "globals",
+                global["values"] is [[String: Any]]
+            else { throw PostmanImportError.invalid }
+            values(global["values"], path: "/globals/values")
         }
         values(root["variable"], path: "/variable")
         if let environment {
