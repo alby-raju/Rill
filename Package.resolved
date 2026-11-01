@@ -1,5 +1,5 @@
 {
-  "originHash" : "46be3605ab6616b1a88c22d6b58b07c74acdb822865717397fe9c0393c163fc2",
+  "originHash" : "12b4c3fc560276db472862bfade7b70b8088522c9c44de49a9001efc1ae34210",
   "pins" : [
     {
       "identity" : "grpc-swift-2",
@@ -105,8 +105,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/swift-server/swift-kafka-client.git",
       "state" : {
-        "revision" : "fd996f21073f90a84fde44f247b3f2be047ad29b",
-        "version" : "1.0.0-beta.1"
+        "revision" : "f457437e3c5ba4bb0bd501201e7dac2278a6c4d2",
+        "version" : "1.0.0"
       }
     },
     {

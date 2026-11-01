@@ -11,10 +11,10 @@ Rill's original code is MIT licensed. Third-party libraries, vendored components
 | [gRPC Swift](https://github.com/grpc/grpc-swift-2) | 2.4.4 | Native gRPC; Apache-2.0 |
 | [gRPC NIO transport](https://github.com/grpc/grpc-swift-nio-transport) | 2.11.0 | Native transport; Apache-2.0 and transitive notices |
 | [SwiftProtobuf](https://github.com/apple/swift-protobuf) | 1.39.0 | Models/compiler; Apache-2.0 with runtime exception |
-| [Swift Kafka client](https://github.com/swift-server/swift-kafka-client) | 1.0.0-beta.1 | Native librdkafka wrapper; retain its graph's native/TLS/compression notices |
+| [Swift Kafka client](https://github.com/swift-server/swift-kafka-client) | 1.0.0 | Native librdkafka wrapper; retain its graph's native/TLS/compression notices |
 | [Swift Log](https://github.com/apple/swift-log) | 1.16.2 | Logging interface; Apache-2.0 |
 
-SwiftPM resolves 26 pinned packages. Not every transitive source component is linked into every artifact. Kafka uses a beta API and is isolated behind an adapter. No office/reference runtime or Java bundle is shipped. MQTT/AMQP use first-party bounded codecs and Apple's Network framework; HTTP and native UI use Apple platform APIs.
+SwiftPM resolves 26 pinned packages. Not every transitive source component is linked into every artifact. Kafka uses the stable 1.0 API and is isolated behind an adapter. No office/reference runtime or Java bundle is shipped. MQTT/AMQP use first-party bounded codecs and Apple's Network framework; HTTP and native UI use Apple platform APIs.
 
 ## Parser and transport review boundaries
 
@@ -43,3 +43,5 @@ python3 scripts/collect-dependency-notices.py --check
 ## Developer-only tools
 
 Swift formatting and C formatting use the selected Xcode toolchain. Python formatting uses Ruff 0.17.3 from `requirements-dev.txt`; Bash formatting uses [shfmt 3.14.1](https://github.com/mvdan/sh/releases/tag/v3.14.1). These are not bundled runtime dependencies. The optional verification gRPC server uses separately installed grpcio 1.80.0. Client-validation SDK versions are pinned in CI and the validation harness; their libraries are not copied into the app.
+
+Kafka 1.0.0 reviewed 1 November 2026 at revision `f457437e3c5ba4bb0bd501201e7dac2278a6c4d2`. Upstream changes include producer byte APIs and consumer shutdown/metrics fixes. Rill release compilation passed in PR CI; regenerated exact-source notices accompany this update. Runtime, packaging and architecture acceptance remain subject to the updated-head checks.

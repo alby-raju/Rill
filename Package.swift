@@ -14,7 +14,7 @@ let package = Package(
         .package(url: "https://github.com/grpc/grpc-swift-nio-transport.git", exact: "2.11.0"),
         .package(url: "https://github.com/apple/swift-protobuf.git", exact: "1.39.0"),
         .package(
-            url: "https://github.com/swift-server/swift-kafka-client.git", exact: "1.0.0-beta.1"),
+            url: "https://github.com/swift-server/swift-kafka-client.git", exact: "1.0.0"),
         .package(url: "https://github.com/apple/swift-log.git", exact: "1.16.2"),
     ],
     targets: [

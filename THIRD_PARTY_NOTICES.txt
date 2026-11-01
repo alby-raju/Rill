@@ -2859,9 +2859,9 @@ This product contains a derivation of various scripts from SwiftNIO.
 
 
 ========================================================================
-swift-kafka-client 1.0.0-beta.1
+swift-kafka-client 1.0.0
 https://github.com/swift-server/swift-kafka-client.git
-Pinned revision: fd996f21073f90a84fde44f247b3f2be047ad29b
+Pinned revision: f457437e3c5ba4bb0bd501201e7dac2278a6c4d2
 
 --- LICENSE.txt · SHA256 cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30 ---
 
