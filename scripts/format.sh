@@ -18,8 +18,8 @@ command -v "$RILL_SHFMT" >/dev/null || {
   echo 'Install shfmt 3.14.1 or set RILL_SHFMT to its executable.' >&2
   exit 2
 }
-[[ "$("$RILL_RUFF" --version)" == 'ruff 0.17.2' ]] || {
-  echo 'Expected Ruff 0.17.2.' >&2
+[[ "$("$RILL_RUFF" --version)" == 'ruff 0.17.3' ]] || {
+  echo 'Expected Ruff 0.17.3.' >&2
   exit 2
 }
 [[ "$("$RILL_SHFMT" --version)" == 'v3.14.1' ]] || {
