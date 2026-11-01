@@ -10,7 +10,8 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: security-${{ github.workflow }}-${{ github.ref }}
+  # Routine pushes must not cancel a nightly or explicitly requested deep Swift scan.
+  group: security-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   plan:
