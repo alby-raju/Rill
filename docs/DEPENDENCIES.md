@@ -42,6 +42,6 @@ python3 scripts/collect-dependency-notices.py --check
 
 ## Developer-only tools
 
-Swift formatting and C formatting use the selected Xcode toolchain. Python formatting uses Ruff 0.17.2 from `requirements-dev.txt`; Bash formatting uses [shfmt 3.14.1](https://github.com/mvdan/sh/releases/tag/v3.14.1). These are not bundled runtime dependencies. The optional verification gRPC server uses separately installed grpcio 1.80.0. Client-validation SDK versions are pinned in CI and the validation harness; their libraries are not copied into the app.
+Swift formatting and C formatting use the selected Xcode toolchain. Python formatting uses Ruff 0.17.3 from `requirements-dev.txt`; Bash formatting uses [shfmt 3.14.1](https://github.com/mvdan/sh/releases/tag/v3.14.1). These are not bundled runtime dependencies. The optional verification gRPC server uses separately installed grpcio 1.80.0. Client-validation SDK versions are pinned in CI and the validation harness; their libraries are not copied into the app.
 
 Kafka 1.0.0 reviewed 1 November 2026 at revision `f457437e3c5ba4bb0bd501201e7dac2278a6c4d2`. Upstream changes include producer byte APIs and consumer shutdown/metrics fixes. Rill release compilation passed in PR CI; regenerated exact-source notices accompany this update. Runtime, packaging and architecture acceptance remain subject to the updated-head checks.
