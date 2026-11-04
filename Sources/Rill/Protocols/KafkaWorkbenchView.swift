@@ -26,9 +26,12 @@ struct KafkaWorkbenchView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Kafka workbench").font(.title2)
+                RillToolHeading(
+                    title: "Kafka workbench",
+                    subtitle: "Inspect topic partitions and publish messages.",
+                    icon: "arrow.triangle.branch")
                 Spacer()
-                Text(status).font(.caption)
+                RillToolStatus(title: status, active: running)
                 Button("Done") {
                     stop()
                     dismiss()
@@ -40,6 +43,7 @@ struct KafkaWorkbenchView: View {
             HSplitView {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 10) {
+                        Label("Connection", systemImage: "link").font(.headline)
                         settings.disabled(running || busy)
                         HStack {
                             Button("Connect and inspect latest") { connect() }.disabled(
@@ -47,6 +51,7 @@ struct KafkaWorkbenchView: View {
                             Button("Disconnect") { stop() }.disabled(!running && !busy)
                         }
                         Divider()
+                        Label("Publish message", systemImage: "paperplane").font(.headline)
                         TextField("Optional UTF-8 message key", text: $key)
                         Toggle("Structured CloudEvent 1.0", isOn: $cloudEvent)
                         if cloudEvent {
@@ -68,8 +73,16 @@ struct KafkaWorkbenchView: View {
                 }.frame(minWidth: 400, idealWidth: 460, maxWidth: 500)
                 VStack(alignment: .leading) {
                     if let error { Text(error).foregroundStyle(.red).textSelection(.enabled) }
+                    Label("Session timeline", systemImage: "clock").font(.headline)
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 10) {
+                            if records.isEmpty {
+                                RillToolEmpty(
+                                    title: "No Kafka activity",
+                                    detail:
+                                        "Connect to inspect existing partitions from their current end.",
+                                    icon: "waveform.path")
+                            }
                             ForEach(records) { record in
                                 Text(record.direction.rawValue + " · " + record.kind.rawValue).font(
                                     .caption
@@ -82,13 +95,13 @@ struct KafkaWorkbenchView: View {
                                     .enabled)
                                 Divider()
                             }
-                        }.frame(maxWidth: .infinity, alignment: .leading)
-                    }
+                        }.frame(maxWidth: .infinity, alignment: .leading).padding(12)
+                    }.rillToolPanel()
                     Text("\(records.count) records · \(bytes) bytes retained").font(.caption)
                         .foregroundStyle(.secondary)
                 }.padding(.leading, 12).frame(minWidth: 420)
             }
-        }.padding(24).frame(width: 1080, height: 760)
+        }.padding(24).frame(width: 1080, height: 760).rillToolControls()
             .onDisappear { stop() }
     }
     private var settings: some View {

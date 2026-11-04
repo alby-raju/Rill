@@ -5,15 +5,13 @@ struct EnvironmentEditor: View {
     @EnvironmentObject var store: WorkbenchStore
     @SwiftUI.Environment(\.dismiss) var dismiss
     @ViewState private var selected: UUID?
+    @ViewState private var pendingDeletion: RillCore.Environment?
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack {
-                VStack(alignment: .leading, spacing: 5) {
-                    Label("Environments", systemImage: "square.stack.3d.up").font(
-                        .title2.weight(.semibold))
-                    Text("Keep local, staging and production variables together.").font(.callout)
-                        .foregroundStyle(.secondary)
-                }
+                RillToolHeading(
+                    title: "Environments", subtitle: "Manage reusable variables and inheritance.",
+                    icon: "square.stack.3d.up")
                 Spacer()
                 Button("Done") {
                     store.persist()
@@ -48,35 +46,49 @@ struct EnvironmentEditor: View {
                 )
                 .background(RillPalette.surface, in: RoundedRectangle(cornerRadius: 12))
                 Group {
-                    if let index = store.workspace.environments.firstIndex(where: {
+                    if let environment = store.workspace.environments.first(where: {
                         $0.id == selected
                     }) {
-                        editor(index).id(store.workspace.environments[index].id)
+                        editor(environment).id(environment.id)
                     } else {
                         VStack(spacing: 15) {
                             Image(systemName: "square.stack.3d.up").font(.system(size: 38))
                                 .foregroundStyle(RillPalette.accent)
                             Text("Your API, in every environment").font(.title3.weight(.semibold))
-                            Text("Create a variable set, then select it from the Workbench.")
-                                .foregroundStyle(.secondary).multilineTextAlignment(.center)
+                            Text(
+                                store.workspace.environments.isEmpty
+                                    ? "Create a variable set, then select it from the Workbench."
+                                    : "Select a variable set to edit its name, parent and values."
+                            )
+                            .foregroundStyle(.secondary).multilineTextAlignment(.center)
                             Button(
-                                "Create your first environment", systemImage: "plus", action: create
+                                "New environment", systemImage: "plus", action: create
                             )
                             .buttonStyle(RillButtonStyle(emphasis: .primary))
                         }.padding(26).frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                 }.frame(minWidth: 430, maxWidth: .infinity, maxHeight: .infinity)
             }.frame(maxWidth: .infinity, maxHeight: .infinity)
-        }.padding(24).frame(width: 900, height: 590).background(RillPalette.canvas).textFieldStyle(
-            RillTextFieldStyle()
-        ).buttonStyle(
-            RillButtonStyle()
-        )
-        .onAppear {
-            selected =
-                store.workspace.selectedEnvironmentID ?? store.workspace.environments.first?.id
-        }
-        .onDisappear { store.persist() }
+        }.padding(24).frame(width: 900, height: 590).rillToolControls()
+            .alert(
+                "Delete environment?",
+                isPresented: Binding(
+                    get: { pendingDeletion != nil },
+                    set: { if !$0 { pendingDeletion = nil } }),
+                presenting: pendingDeletion
+            ) { environment in
+                Button("Delete", role: .destructive) { delete(environment.id) }
+                Button("Cancel", role: .cancel) {}
+            } message: { environment in
+                Text(
+                    "“\(environment.name)” and its variables will be removed. Environments that inherit from it will lose that parent."
+                )
+            }
+            .onAppear {
+                selected =
+                    store.workspace.selectedEnvironmentID ?? store.workspace.environments.first?.id
+            }
+            .onDisappear { store.persist() }
     }
     private func create() {
         var suffix = 1
@@ -91,36 +103,45 @@ struct EnvironmentEditor: View {
         selected = environment.id
         store.persist()
     }
-    private func editor(_ index: Int) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            TextField("Environment name", text: $store.workspace.environments[index].name)
-                .font(.title3.weight(.semibold)).textFieldStyle(RillTextFieldStyle())
-            RillSelect(
-                title: "Inherits from",
-                value: store.workspace.environments.first(where: {
-                    $0.id == store.workspace.environments[index].parentID
-                })?.name ?? "No parent environment",
-                selection: $store.workspace.environments[index].parentID
+    private func delete(_ id: UUID) {
+        selected = store.workspace.environments.first { $0.id != id }?.id
+        WorkspaceOperations.deleteEnvironment(id, in: &store.workspace)
+        store.persist()
+    }
+
+    private func editor(_ original: RillCore.Environment) -> some View {
+        let environment = $store.workspace.environments.element(original)
+        return VStack(alignment: .leading, spacing: 14) {
+            RillSection(
+                title: "Variable set", subtitle: "Child values override variables from the parent.",
+                icon: "square.stack.3d.up"
             ) {
-                Text("No parent environment").tag(nil as UUID?)
-                ForEach(
-                    EnvironmentResolver.validParents(
-                        for: store.workspace.environments[index].id,
-                        in: store.workspace.environments)
-                ) { Text($0.name).tag(Optional($0.id)) }
+                TextField("Environment name", text: environment.name)
+                    .accessibilityLabel("Environment name")
+                RillSelect(
+                    title: "Inherits from",
+                    value: store.workspace.environments.first {
+                        $0.id == original.parentID
+                    }?.name ?? "No parent environment",
+                    selection: environment.parentID
+                ) {
+                    Text("No parent environment").tag(nil as UUID?)
+                    ForEach(
+                        EnvironmentResolver.validParents(
+                            for: original.id, in: store.workspace.environments)
+                    ) { Text($0.name).tag(Optional($0.id)) }
+                }
             }
-            FieldEditor(fields: $store.workspace.environments[index].variables, noun: "variable")
+            FieldEditor(fields: environment.variables, noun: "variable")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-            Text(
-                "Use {{name}} in URLs, headers, body or auth. Values are stored in plain text; use named secrets for tokens."
-            )
-            .font(.caption).foregroundStyle(.secondary)
+                .rillToolPanel()
+            RillNotice(
+                text:
+                    "Use {{name}} in URLs, headers, bodies or auth. Use named secrets for credentials.",
+                icon: "curlybraces")
             Button("Delete environment", systemImage: "trash", role: .destructive) {
-                let id = store.workspace.environments[index].id
-                WorkspaceOperations.deleteEnvironment(id, in: &store.workspace)
-                selected = store.workspace.environments.first?.id
-                store.persist()
-            }
-        }.padding(.leading, 20).padding(.vertical, 6)
+                pendingDeletion = original
+            }.foregroundStyle(.red)
+        }.padding(.leading, 16).padding(.vertical, 2)
     }
 }

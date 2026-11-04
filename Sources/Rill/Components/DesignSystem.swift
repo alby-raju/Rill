@@ -238,3 +238,90 @@ struct RillTabs: View {
             .modifier(RillGlassSurface(role: .toolbar, cornerRadius: 11))
     }
 }
+
+struct RillToolHeading: View {
+    let title: String
+    let subtitle: String
+    let icon: String
+
+    var body: some View {
+        HStack(spacing: 13) {
+            Image(systemName: icon)
+                .font(.system(size: 18, weight: .medium))
+                .foregroundStyle(RillPalette.accent)
+                .frame(width: 44, height: 44)
+                .background(
+                    RillPalette.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 12)
+                )
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title).font(.title2.weight(.semibold)).accessibilityAddTraits(.isHeader)
+                Text(subtitle).font(.callout).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+}
+
+struct RillToolStatus: View {
+    let title: String
+    var active = false
+
+    var body: some View {
+        Label(title, systemImage: "circle.fill")
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(active ? RillPalette.accent : .secondary)
+            .padding(.horizontal, 10).padding(.vertical, 7)
+            .background(RillPalette.surface, in: Capsule())
+    }
+}
+
+struct RillToolEmpty: View {
+    let title: String
+    let detail: String
+    let icon: String
+
+    var body: some View {
+        VStack(spacing: 9) {
+            Image(systemName: icon).font(.title2).foregroundStyle(RillPalette.accent)
+                .accessibilityHidden(true)
+            Text(title).font(.headline)
+            Text(detail).font(.callout).foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(22)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+extension View {
+    func rillToolPanel() -> some View {
+        background(RillPalette.surface.opacity(0.55), in: RoundedRectangle(cornerRadius: 12))
+            .overlay {
+                RoundedRectangle(cornerRadius: 12).strokeBorder(RillPalette.line)
+                    .allowsHitTesting(false)
+            }
+    }
+
+    func rillToolControls() -> some View {
+        textFieldStyle(RillTextFieldStyle())
+            .buttonStyle(RillButtonStyle())
+            .tint(RillPalette.accent)
+            .background(RillPalette.canvas)
+    }
+}
+
+extension Binding {
+    /// SwiftUI can read an outgoing row during focus teardown after its item was removed.
+    func element<Item: Identifiable & Sendable>(_ item: Item) -> Binding<Item>
+    where Value == [Item] {
+        Binding<Item>(
+            get: { wrappedValue.first { $0.id == item.id } ?? item },
+            set: { updated in
+                guard let index = wrappedValue.firstIndex(where: { $0.id == item.id }) else {
+                    return
+                }
+                wrappedValue[index] = updated
+            })
+    }
+}

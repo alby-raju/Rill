@@ -29,9 +29,12 @@ struct GRPCWorkbenchView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("gRPC workbench").font(.title2)
+                RillToolHeading(
+                    title: "gRPC workbench",
+                    subtitle: "Discover methods, compose Protobuf JSON and inspect calls.",
+                    icon: "point.3.connected.trianglepath.dotted")
                 Spacer()
-                Text(status).font(.caption)
+                RillToolStatus(title: status, active: running)
                 Button("Done") {
                     stop()
                     dismiss()
@@ -40,9 +43,12 @@ struct GRPCWorkbenchView: View {
             Text(
                 "Native HTTP/2; grpc/http explicitly selects plaintext, grpcs/https verifies system TLS and hostname. No external grpcurl or generated application stubs. Metadata and decoded messages may contain secrets; this transient timeline is never written to history/reports. One call per session, 1 MiB wire messages, 1,000 records/8 MiB timeline."
             ).font(.caption).foregroundStyle(.secondary)
-            connectionControls
+            RillSection(title: "Server", subtitle: "", icon: "link") {
+                connectionControls
+            }
             HSplitView {
                 VStack(alignment: .leading) {
+                    Label("Service catalog", systemImage: "list.bullet.rectangle").font(.headline)
                     definitionControls
                     TextField("Find service/method", text: $search)
                     Picker("Call mode", selection: $mode) {
@@ -51,21 +57,31 @@ struct GRPCWorkbenchView: View {
                             Text($0.rawValue).tag($0.rawValue)
                         }
                     }
-                    List(selection: $selection) {
-                        ForEach(
-                            (schema?.methods ?? []).filter {
-                                (mode == "All" || $0.mode.rawValue == mode)
-                                    && (search.isEmpty
-                                        || $0.id.localizedCaseInsensitiveContains(search))
+                    if schema?.methods.isEmpty ?? true {
+                        RillToolEmpty(
+                            title: "No methods loaded",
+                            detail:
+                                "Load a .proto or descriptor set, or discover methods by reflection.",
+                            icon: "doc.badge.plus"
+                        ).rillToolPanel()
+                    } else {
+                        List(selection: $selection) {
+                            ForEach(
+                                (schema?.methods ?? []).filter {
+                                    (mode == "All" || $0.mode.rawValue == mode)
+                                        && (search.isEmpty
+                                            || $0.id.localizedCaseInsensitiveContains(search))
+                                }
+                            ) { method in
+                                VStack(alignment: .leading) {
+                                    Text(method.id).font(.system(.caption, design: .monospaced))
+                                    Text(method.mode.rawValue).font(.caption2).foregroundStyle(
+                                        .secondary)
+                                }.tag(method.id)
                             }
-                        ) { method in
-                            VStack(alignment: .leading) {
-                                Text(method.id).font(.system(.caption, design: .monospaced))
-                                Text(method.mode.rawValue).font(.caption2).foregroundStyle(
-                                    .secondary)
-                            }.tag(method.id)
                         }
                     }
+                    Label("Call metadata", systemImage: "list.bullet").font(.headline)
                     Text(
                         "Metadata: lowercase keys; -bin values are base64. Selected environment/named-secret templates resolve only for explicit network actions."
                     ).font(.caption).foregroundStyle(.secondary)
@@ -74,6 +90,7 @@ struct GRPCWorkbenchView: View {
                     ).disabled(running || busy)
                 }.frame(minWidth: 340, idealWidth: 390)
                 VStack(alignment: .leading) {
+                    Label("Request message", systemImage: "curlybraces").font(.headline)
                     if let selected {
                         Text(selected.inputType + " → " + selected.outputType).font(.caption)
                             .foregroundStyle(.secondary)
@@ -94,6 +111,13 @@ struct GRPCWorkbenchView: View {
                     if let error { Text(error).foregroundStyle(.red).textSelection(.enabled) }
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 10) {
+                            if records.isEmpty {
+                                RillToolEmpty(
+                                    title: "No call activity",
+                                    detail:
+                                        "Choose a method and start a call to inspect messages here.",
+                                    icon: "waveform.path")
+                            }
                             ForEach(records) { record in
                                 Text(record.direction.rawValue + " · " + record.kind.rawValue).font(
                                     .caption
@@ -102,13 +126,13 @@ struct GRPCWorkbenchView: View {
                                     .textSelection(.enabled)
                                 Divider()
                             }
-                        }.frame(maxWidth: .infinity, alignment: .leading)
-                    }
+                        }.frame(maxWidth: .infinity, alignment: .leading).padding(12)
+                    }.rillToolPanel()
                     Text("\(records.count) records · \(bytes) bytes retained").font(.caption)
                         .foregroundStyle(.secondary)
                 }.padding(.leading, 12).frame(minWidth: 570)
             }
-        }.padding(24).frame(width: 1150, height: 800)
+        }.padding(24).frame(width: 1150, height: 800).rillToolControls()
             .onDisappear { stop() }
             .onChange(of: selection) { _, _ in
                 stop()

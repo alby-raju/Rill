@@ -24,9 +24,12 @@ struct LiveStreamsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Live protocols").font(.title2)
+                RillToolHeading(
+                    title: "Live protocols",
+                    subtitle: "Observe real-time messages and connection events.",
+                    icon: "waveform.path")
                 Spacer()
-                Text(status).font(.caption)
+                RillToolStatus(title: status, active: running)
                 Button("Done") {
                     stop()
                     dismiss()
@@ -35,41 +38,56 @@ struct LiveStreamsView: View {
             Text(
                 "Connections use the selected request's auth, headers, environment and TLS settings with the explicit endpoint below. Messages may contain secrets; this timeline is transient and never enters saved history/reports. No automatic reconnect or replay. Limits: 1 MiB/message, 1,000 records/8 MiB timeline, five-minute sessions."
             ).font(.caption).foregroundStyle(.secondary)
-            HStack {
-                Picker("Protocol", selection: $mode) {
-                    Text("WebSocket").tag("WebSocket")
-                    Text("Server-sent events").tag("SSE")
-                    Text("GraphQL subscription").tag("Subscription")
-                }.frame(width: 250).disabled(busy)
-                TextField("Explicit ws(s):// or http(s):// endpoint", text: $endpoint).font(
-                    .system(.body, design: .monospaced)
-                ).disabled(running || busy)
-                Button("Connect") { connect() }.disabled(
-                    running || busy || endpoint.isEmpty || store.selected == nil)
-                Button("Disconnect") { stop() }.disabled(!running && !busy)
-            }
-            if mode == "Subscription" {
-                Text(
-                    "Uses the selected request's GraphQL query/variables with graphql-transport-ws. connection_init JSON is optional and may contain credentials; use named-secret templates where practical. Its expanded payload is omitted from the timeline."
-                ).font(.caption).foregroundStyle(.secondary)
-                TextField("connection_init payload (JSON object)", text: $initPayload).disabled(
-                    running || busy)
+            RillSection(title: "Connection", subtitle: "", icon: "link") {
+                HStack {
+                    Picker("Protocol", selection: $mode) {
+                        Text("WebSocket").tag("WebSocket")
+                        Text("Server-sent events").tag("SSE")
+                        Text("GraphQL subscription").tag("Subscription")
+                    }.frame(width: 250).disabled(busy)
+                    TextField("Explicit ws(s):// or http(s):// endpoint", text: $endpoint).font(
+                        .system(.body, design: .monospaced)
+                    ).disabled(running || busy)
+                    Button("Connect") { connect() }.disabled(
+                        running || busy || endpoint.isEmpty || store.selected == nil)
+                    Button("Disconnect") { stop() }.disabled(!running && !busy)
+                }
+                if mode == "Subscription" {
+                    Text(
+                        "Uses the selected request's GraphQL query/variables with graphql-transport-ws. connection_init JSON is optional and may contain credentials; use named-secret templates where practical. Its expanded payload is omitted from the timeline."
+                    ).font(.caption).foregroundStyle(.secondary)
+                    TextField("connection_init payload (JSON object)", text: $initPayload).disabled(
+                        running || busy)
+                }
             }
             if mode == "WebSocket" {
-                HStack {
-                    Picker("Send as", selection: $encoding) {
-                        Text("Text").tag("Text")
-                        Text("Base64 binary").tag("Binary")
-                    }.frame(width: 160)
-                    TextField("Message", text: $outgoing).font(.system(.body, design: .monospaced))
-                    Button("Send") { send() }.disabled(!running || sending || busy)
-                    Button("Ping") { ping() }.disabled(!running || sending || busy)
+                RillSection(
+                    title: "Message composer",
+                    subtitle: "Send a text or binary frame, or check the connection with Ping.",
+                    icon: "paperplane"
+                ) {
+                    HStack {
+                        Picker("Send as", selection: $encoding) {
+                            Text("Text").tag("Text")
+                            Text("Base64 binary").tag("Binary")
+                        }.frame(width: 160)
+                        TextField("Message", text: $outgoing).font(
+                            .system(.body, design: .monospaced))
+                        Button("Send") { send() }.disabled(!running || sending || busy)
+                        Button("Ping") { ping() }.disabled(!running || sending || busy)
+                    }
                 }
             }
             if let error { Text(error).foregroundStyle(.red).textSelection(.enabled) }
-            Divider()
+            Label("Session timeline", systemImage: "clock").font(.headline)
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 10) {
+                    if records.isEmpty {
+                        RillToolEmpty(
+                            title: "Waiting for events",
+                            detail: "Connect to an endpoint to start the session timeline.",
+                            icon: "waveform.path")
+                    }
                     ForEach(records) { record in
                         VStack(alignment: .leading, spacing: 4) {
                             Text(record.direction.rawValue + " · " + record.kind.rawValue).font(
@@ -80,8 +98,8 @@ struct LiveStreamsView: View {
                         }.frame(maxWidth: .infinity, alignment: .leading)
                         Divider()
                     }
-                }.frame(maxWidth: .infinity, alignment: .leading)
-            }
+                }.frame(maxWidth: .infinity, alignment: .leading).padding(12)
+            }.rillToolPanel()
             HStack {
                 Text("\(records.count) records · \(retainedBytes) retained bytes").font(.caption)
                     .foregroundStyle(.secondary)
@@ -91,7 +109,7 @@ struct LiveStreamsView: View {
                     retainedBytes = 0
                 }.disabled(running || busy)
             }
-        }.padding(24).frame(width: 1050, height: 720)
+        }.padding(24).frame(width: 1050, height: 720).rillToolControls()
             .onAppear {
                 if let request = store.selected {
                     endpoint = request.url

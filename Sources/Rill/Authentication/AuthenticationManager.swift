@@ -11,7 +11,10 @@ struct AuthenticationManager: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text("Authentication and secrets").font(.title2)
+                RillToolHeading(
+                    title: "Authentication and secrets",
+                    subtitle: "Reuse auth profiles and manage Keychain-backed values.",
+                    icon: "key.horizontal")
                 Spacer()
                 Button("Done") {
                     store.cancelOAuth()
@@ -31,14 +34,17 @@ struct AuthenticationManager: View {
                         store.workspace.authProfiles?.append(profile)
                         selection = profile.id
                     }
-                }.frame(minWidth: 160, maxWidth: 200)
+                }.padding(12).frame(minWidth: 180, maxWidth: 220).rillToolPanel()
                 if let index = store.workspace.authProfiles?.firstIndex(where: {
                     $0.id == selection
                 }) {
                     profileForm(index).frame(minWidth: 250)
                 } else {
-                    Text("Choose or create an auth profile.").foregroundStyle(.secondary).frame(
-                        minWidth: 250)
+                    RillToolEmpty(
+                        title: "No profile selected",
+                        detail: "Choose or create a profile to configure request authentication.",
+                        icon: "key.horizontal"
+                    ).frame(minWidth: 250)
                 }
                 VStack(alignment: .leading, spacing: 12) {
                     Text("NATIVE SECRETS").font(.caption).foregroundStyle(.secondary)
@@ -75,7 +81,7 @@ struct AuthenticationManager: View {
                     Text(
                         "Use {{secret:name}} directly or inside an environment value. Native entries take precedence. Process fallback uses RILL_SECRET_NAME (uppercase, dot/hyphen → underscore), is read-only and is never saved. Restart to pick up process changes."
                     ).font(.caption).foregroundStyle(.secondary)
-                }.frame(minWidth: 280)
+                }.padding(12).frame(minWidth: 300).rillToolPanel()
             }.disabled(store.oauthRunning)
             if store.oauthRunning {
                 HStack {
@@ -87,10 +93,11 @@ struct AuthenticationManager: View {
             } else if !store.oauthStatus.isEmpty {
                 Text(store.oauthStatus).font(.caption).foregroundStyle(.secondary)
             }
-        }.padding(24).frame(width: 1100, height: 700).disabled(store.importing).onDisappear {
-            store.cancelOAuth()
-            secretValue = ""
-        }
+        }.padding(24).frame(width: 1100, height: 700).rillToolControls().disabled(store.importing)
+            .onDisappear {
+                store.cancelOAuth()
+                secretValue = ""
+            }
     }
     private func profileForm(_ index: Int) -> some View {
         let original = store.workspace.authProfiles![index]

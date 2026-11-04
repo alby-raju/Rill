@@ -28,25 +28,34 @@ struct WorkspaceToolsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Workspace integrations").font(.title2)
+                RillToolHeading(
+                    title: "Workspace integrations",
+                    subtitle: "Version, share and extend your local workspace.",
+                    icon: "point.3.connected.trianglepath.dotted")
                 Spacer()
+                if busy { ProgressView().controlSize(.small).accessibilityLabel("Working") }
                 Button("Done") {
                     stop()
                     dismiss()
                 }.keyboardShortcut(.cancelAction)
             }
-            Picker("Tool", selection: $section) {
-                Text("Git").tag("Git")
-                Text("Read-only sharing").tag("Sharing")
-                Text("Local extensions").tag("Plugins")
-            }.pickerStyle(.segmented)
+            RillTabs(titles: ["Git", "Read-only sharing", "Local extensions"], selection: $section)
             if let error { Text(error).foregroundStyle(.red).textSelection(.enabled) }
-            if section == "Git" { git } else if section == "Sharing" { sharing } else { extensions }
+            Group {
+                switch section {
+                case "Git": ScrollView { git }
+                case "Read-only sharing": ScrollView { sharing }
+                default: extensions
+                }
+            }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             ScrollView {
-                Text(result).font(.system(.body, design: .monospaced)).textSelection(.enabled)
+                Text(result.isEmpty ? "Activity and results will appear here." : result)
+                    .font(.system(.caption, design: .monospaced)).textSelection(.enabled).padding(
+                        14
+                    )
                     .frame(maxWidth: .infinity, alignment: .leading)
-            }.frame(minHeight: 100, maxHeight: 160)
-        }.padding(24).frame(width: 950, height: 680)
+            }.frame(height: 105).rillToolPanel()
+        }.padding(24).frame(width: 950, height: 680).rillToolControls()
             .onDisappear { stop() }
             .onChange(of: section) { _, _ in stop() }
     }
@@ -55,42 +64,53 @@ struct WorkspaceToolsView: View {
             Text(
                 "Explicit portable workspace checkout, separate from runtime data. Export retains entered URLs, headers, bodies, schemas and environment values; review them before committing. Keychain values and response history are omitted. No remote operations or automatic commits run; hooks and automatic commit signing are disabled for these limited commands."
             ).font(.callout)
-            HStack {
-                TextField("Repository directory", text: $repository)
-                Button("Choose…") { chooseDirectory { repository = $0.path } }
+            RillSection(
+                title: "Repository",
+                subtitle: "Choose a local directory for the portable workspace.", icon: "folder"
+            ) {
+                HStack {
+                    TextField("Repository directory", text: $repository)
+                    Button("Choose…") { chooseDirectory { repository = $0.path } }
+                }
+                HStack {
+                    Button("Initialize repository") {
+                        perform {
+                            try await WorkspaceGit.initialize(URL(fileURLWithPath: repository))
+                            result = "Repository initialized"
+                        }
+                    }
+                    Button("Status") {
+                        perform {
+                            result = try await WorkspaceGit.status(URL(fileURLWithPath: repository))
+                        }
+                    }
+                    Button("Export saved workspace") {
+                        let workspace = store.workspace
+                        let directory = URL(fileURLWithPath: repository)
+                        perform {
+                            try await Task.detached {
+                                try WorkspaceGit.export(workspace, to: directory)
+                            }.value
+                            try Task.checkCancellation()
+                            result =
+                                "Portable workspace exported; review workspace.json before committing."
+                        }
+                    }
+                }.disabled(busy || repository.isEmpty)
             }
-            HStack {
-                Button("Initialize repository") {
+            RillSection(
+                title: "Commit reviewed files",
+                subtitle: "Review the exported workspace before committing.",
+                icon: "arrow.triangle.branch"
+            ) {
+                TextField("Commit message", text: $commitMessage)
+                Button("Commit reviewed workspace.json and .gitignore") {
                     perform {
-                        try await WorkspaceGit.initialize(URL(fileURLWithPath: repository))
-                        result = "Repository initialized"
+                        result = try await WorkspaceGit.commit(
+                            URL(fileURLWithPath: repository), message: commitMessage)
                     }
-                }
-                Button("Status") {
-                    perform {
-                        result = try await WorkspaceGit.status(URL(fileURLWithPath: repository))
-                    }
-                }
-                Button("Export saved workspace") {
-                    let workspace = store.workspace
-                    let directory = URL(fileURLWithPath: repository)
-                    perform {
-                        try await Task.detached {
-                            try WorkspaceGit.export(workspace, to: directory)
-                        }.value
-                        try Task.checkCancellation()
-                        result =
-                            "Portable workspace exported; review workspace.json before committing."
-                    }
-                }
-            }.disabled(busy || repository.isEmpty)
-            TextField("Commit message", text: $commitMessage)
-            Button("Commit reviewed workspace.json and .gitignore") {
-                perform {
-                    result = try await WorkspaceGit.commit(
-                        URL(fileURLWithPath: repository), message: commitMessage)
-                }
-            }.disabled(busy || repository.isEmpty || commitMessage.isEmpty)
+                }.disabled(busy || repository.isEmpty || commitMessage.isEmpty)
+            }
             Spacer()
         }
     }
@@ -99,38 +119,51 @@ struct WorkspaceToolsView: View {
             Text(
                 "Shares a sanitized snapshot: removes credentials/profiles/history, values, bodies, schemas and hooks. Labels and URL hosts/paths remain visible. Review names and paths before sharing. Token required on every request; default bind is loopback. Closing this tool stops the listener."
             ).font(.callout)
-            SecureField("Access token (generate or paste 32–256 characters)", text: $token)
-                .disabled(!shareURL.isEmpty)
-            HStack {
-                Button("Generate token") {
-                    do { token = try WorkspaceSharing.token() } catch {
-                        self.error = error.localizedDescription
-                    }
-                }.disabled(!shareURL.isEmpty)
-                Button("Copy token") {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(token, forType: .string)
-                }.disabled(token.isEmpty)
-                Text("Port")
-                TextField("Port", value: $port, format: .number).frame(width: 80).disabled(
-                    !shareURL.isEmpty)
-                Toggle("Allow LAN (plaintext HTTP)", isOn: $lan).disabled(!shareURL.isEmpty)
+            RillSection(
+                title: "Host a snapshot",
+                subtitle: "Configure access before starting the listener.", icon: "network"
+            ) {
+                SecureField("Access token (generate or paste 32–256 characters)", text: $token)
+                    .disabled(!shareURL.isEmpty)
+                HStack {
+                    Button("Generate token") {
+                        do { token = try WorkspaceSharing.token() } catch {
+                            self.error = error.localizedDescription
+                        }
+                    }.disabled(!shareURL.isEmpty)
+                    Button("Copy token") {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(token, forType: .string)
+                    }.disabled(token.isEmpty)
+                    Text("Port")
+                    TextField("Port", value: $port, format: .number).frame(width: 80).disabled(
+                        !shareURL.isEmpty)
+                    Toggle("Allow LAN (plaintext HTTP)", isOn: $lan).disabled(!shareURL.isEmpty)
+                }
+                HStack {
+                    Button("Start read-only share") { startSharing() }.disabled(
+                        busy || !shareURL.isEmpty || token.isEmpty)
+                    Button("Stop share") {
+                        perform {
+                            await server.stop()
+                            shareURL = ""
+                        }
+                    }.disabled(busy || shareURL.isEmpty)
+                    Spacer()
+                    if !shareURL.isEmpty { Text(shareURL).textSelection(.enabled) }
+                    RillToolStatus(
+                        title: shareURL.isEmpty ? "Stopped" : "Listening",
+                        active: !shareURL.isEmpty)
+                }
             }
-            HStack {
-                Button("Start read-only share") { startSharing() }.disabled(
-                    busy || !shareURL.isEmpty || token.isEmpty)
-                Button("Stop share") {
-                    perform {
-                        await server.stop()
-                        shareURL = ""
-                    }
-                }.disabled(busy || shareURL.isEmpty)
-                Text(shareURL).textSelection(.enabled)
+            RillSection(
+                title: "Import a shared snapshot",
+                subtitle: "Pull a sanitized copy into a new file.", icon: "square.and.arrow.down"
+            ) {
+                TextField("Share URL to pull", text: $pullURL)
+                Button("Pull sanitized copy to a new file…") { pull() }.disabled(
+                    busy || pullURL.isEmpty || token.isEmpty)
             }
-            Divider()
-            TextField("Share URL to pull", text: $pullURL)
-            Button("Pull sanitized copy to a new file…") { pull() }.disabled(
-                busy || pullURL.isEmpty || token.isEmpty)
             Spacer()
         }
     }
@@ -139,42 +172,58 @@ struct WorkspaceToolsView: View {
             Text(
                 "Native extension API v1 registers data-only request templates and mock-route services. No scripts, JARs or dynamic libraries are loaded. Enabling trusts exact manifest/service hashes; edits invalidate approval. Imported template hooks and automatic introspection stay disabled."
             ).font(.callout)
-            HStack {
-                TextField("Extension directory", text: $pluginDirectory)
-                Button("Choose…") { chooseDirectory { pluginDirectory = $0.path } }
-                Button("Discover") { discover() }.disabled(busy || pluginDirectory.isEmpty)
+            RillSection(
+                title: "Discover extensions",
+                subtitle: "Choose a directory containing a local extension manifest.",
+                icon: "puzzlepiece.extension"
+            ) {
+                HStack {
+                    TextField("Extension directory", text: $pluginDirectory)
+                    Button("Choose…") { chooseDirectory { pluginDirectory = $0.path } }
+                    Button("Discover") { discover() }.disabled(busy || pluginDirectory.isEmpty)
+                }
             }
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
+                    if plugins.isEmpty {
+                        RillToolEmpty(
+                            title: "No extensions discovered",
+                            detail:
+                                "Choose a directory and discover available templates and route services.",
+                            icon: "puzzlepiece.extension")
+                    }
                     ForEach(plugins) { plugin in
-                        Text(
-                            plugin.descriptor.name + " · " + plugin.id + " · "
-                                + plugin.descriptor.version
-                        ).font(.headline)
-                        HStack {
+                        VStack(alignment: .leading, spacing: 10) {
                             Text(
-                                trust.allows(plugin) ? "Enabled for this exact content" : "Disabled"
-                            ).font(.caption)
-                            Button(trust.allows(plugin) ? "Revoke" : "Review and enable…") {
-                                enable(plugin)
-                            }.disabled(busy)
-                        }
-                        ForEach(plugin.descriptor.services) { service in
+                                plugin.descriptor.name + " · " + plugin.id + " · "
+                                    + plugin.descriptor.version
+                            ).font(.headline)
                             HStack {
-                                Text(service.id + " · " + service.kind.rawValue).font(.caption)
-                                if service.kind == .mockRoutes {
-                                    Button("Export routes…") {
-                                        exportRoutes(plugin, service: service.id)
-                                    }.disabled(busy || !trust.allows(plugin))
-                                }
-                                if service.kind == .requestTemplate {
-                                    Button("Import template") {
-                                        importTemplate(plugin, service: service.id)
-                                    }.disabled(busy || !trust.allows(plugin))
+                                Text(
+                                    trust.allows(plugin)
+                                        ? "Enabled for this exact content" : "Disabled"
+                                ).font(.caption)
+                                Button(trust.allows(plugin) ? "Revoke" : "Review and enable…") {
+                                    enable(plugin)
+                                }.disabled(busy)
+                            }
+                            ForEach(plugin.descriptor.services) { service in
+                                HStack {
+                                    Text(service.id + " · " + service.kind.rawValue).font(.caption)
+                                    if service.kind == .mockRoutes {
+                                        Button("Export routes…") {
+                                            exportRoutes(plugin, service: service.id)
+                                        }.disabled(busy || !trust.allows(plugin))
+                                    }
+                                    if service.kind == .requestTemplate {
+                                        Button("Import template") {
+                                            importTemplate(plugin, service: service.id)
+                                        }.disabled(busy || !trust.allows(plugin))
+                                    }
                                 }
                             }
-                        }
-                        Divider()
+                        }.padding(14).frame(maxWidth: .infinity, alignment: .leading)
+                            .rillToolPanel()
                     }
                 }.frame(maxWidth: .infinity, alignment: .leading)
             }
