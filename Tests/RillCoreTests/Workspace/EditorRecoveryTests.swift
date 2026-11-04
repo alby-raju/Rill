@@ -9,6 +9,99 @@ import XCTest
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         return directory
     }
+    private func request(_ name: String, collectionID: UUID? = nil) -> RequestDraft {
+        var draft = RequestDraft(collectionID: collectionID)
+        draft.name = name
+        return draft
+    }
+
+    func testBulkMovePreservesIdentityOrderAndDrafts() throws {
+        let source = RequestCollection(name: "Source")
+        let destination = RequestCollection(name: "Destination")
+        let first = request("First", collectionID: source.id)
+        let second = request("Second", collectionID: source.id)
+        let existing = request("Existing", collectionID: destination.id)
+        var workspace = Workspace()
+        workspace.collections = [source, destination]
+        workspace.requests = [first, existing, second]
+        var editor = EditorSessionState()
+        var draft = first
+        draft.body = "unsaved body"
+        try editor.update(draft, savedIn: workspace)
+        editor.pinnedTabs = [first.id]
+        try editor.applyRequestBatch(
+            [first.id, second.id], action: .move(to: destination.id), in: &workspace)
+        XCTAssertEqual(workspace.requests.map(\.id), [existing.id, first.id, second.id])
+        XCTAssertEqual(
+            workspace.requests.map(\.collectionID), Array(repeating: destination.id, count: 3))
+        XCTAssertEqual(editor.drafts.first?.body, draft.body)
+        XCTAssertEqual(editor.drafts.first?.collectionID, destination.id)
+        XCTAssertEqual(editor.activeID, first.id)
+        XCTAssertEqual(editor.pinnedTabs, [first.id])
+    }
+
+    func testBulkDuplicateAndCopyUseVisibleDraftsWithoutOpeningTabs() throws {
+        let collection = RequestCollection(name: "Source")
+        let first = request("First", collectionID: collection.id)
+        let second = request("Second")
+        var workspace = Workspace()
+        workspace.collections = [collection]
+        workspace.requests = [first, second]
+        var editor = EditorSessionState()
+        var draft = first
+        draft.name = "Visible"
+        try editor.update(draft, savedIn: workspace)
+        let session = editor
+        let duplicates = try editor.applyRequestBatch(
+            [first.id, second.id], action: .duplicate, in: &workspace)
+        XCTAssertEqual(
+            workspace.requests.filter { duplicates.contains($0.id) }.map(\.name),
+            ["Visible copy", "Second copy"])
+        XCTAssertEqual(
+            workspace.requests.first { $0.id == duplicates[0] }?.collectionID, collection.id)
+        let copies = try editor.applyRequestBatch(
+            [first.id, second.id], action: .copy(to: nil), in: &workspace)
+        XCTAssertEqual(Set(duplicates + copies).count, 4)
+        XCTAssertTrue(
+            workspace.requests.filter { copies.contains($0.id) }.allSatisfy {
+                $0.collectionID == nil
+            })
+        XCTAssertEqual(editor, session)
+    }
+
+    func testBulkDeleteCleansEditorAndRejectsStaleSelectionAtomically() throws {
+        let first = request("First")
+        let second = request("Second")
+        let remaining = request("Remaining")
+        var workspace = Workspace()
+        workspace.requests = [first, second, remaining]
+        var editor = EditorSessionState()
+        try editor.open(remaining.id)
+        try editor.open(second.id)
+        var draft = first
+        draft.body = "unsaved body"
+        try editor.update(draft, savedIn: workspace)
+        editor.closedTabs = [second.id]
+        editor.pinnedTabs = [first.id]
+        let before = workspace
+        let session = editor
+        XCTAssertThrowsError(
+            try editor.applyRequestBatch(
+                [first.id, UUID()], action: .delete, in: &workspace))
+        XCTAssertThrowsError(
+            try editor.applyRequestBatch(
+                [first.id, second.id], action: .move(to: UUID()), in: &workspace))
+        XCTAssertEqual(workspace, before)
+        XCTAssertEqual(editor, session)
+        try editor.applyRequestBatch([first.id, second.id], action: .delete, in: &workspace)
+        XCTAssertEqual(workspace.requests, [remaining])
+        XCTAssertEqual(editor.openTabs, [remaining.id])
+        XCTAssertEqual(editor.activeID, remaining.id)
+        XCTAssertTrue(editor.closedTabs.isEmpty)
+        XCTAssertTrue(editor.pinnedTabs.isEmpty)
+        XCTAssertTrue(editor.drafts.isEmpty)
+    }
+
     func testDraftEditingNeverChangesSavedRequestAndCloseRequiresDecision() throws {
         let workspace = Workspace.starter
         let original = workspace.requests[0]

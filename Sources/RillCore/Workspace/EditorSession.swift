@@ -2,6 +2,13 @@ import Foundation
 
 public enum TabCloseScope: Sendable { case all, left, right }
 
+public enum RequestBatchAction: Sendable {
+    case duplicate
+    case copy(to: UUID?)
+    case move(to: UUID?)
+    case delete
+}
+
 public struct EditorSessionState: Codable, Equatable, Sendable {
     public var version = 1
     public var checkpointID = UUID()
@@ -89,6 +96,59 @@ public struct EditorSessionState: Codable, Equatable, Sendable {
         drafts.removeAll { ids.contains($0.id) }
         if activeID.map({ ids.contains($0) }) ?? false { activeID = openTabs.first }
     }
+    /// Apply one selection as a transaction, including any unsaved editor state.
+    @discardableResult public mutating func applyRequestBatch(
+        _ ids: [UUID], action: RequestBatchAction, in workspace: inout Workspace
+    ) throws -> [UUID] {
+        let selected = Set(ids)
+        guard !ids.isEmpty, ids.count == selected.count else { throw EditingError.missingItem }
+        let saved = Dictionary(
+            uniqueKeysWithValues: workspace.requests.filter { selected.contains($0.id) }.map {
+                ($0.id, $0)
+            })
+        let pending = Dictionary(
+            uniqueKeysWithValues: drafts.filter { selected.contains($0.id) }.map { ($0.id, $0) })
+        let requests = try ids.map { id in
+            guard let request = pending[id] ?? saved[id] else { throw EditingError.missingItem }
+            return request
+        }
+        var updated = self
+        var document = workspace
+        var copies: [UUID] = []
+        switch action {
+        case .duplicate:
+            for request in requests {
+                copies.append(
+                    try WorkspaceOperations.copy(
+                        request, to: request.collectionID, in: &document
+                    ).id)
+            }
+        case .copy(let destination):
+            for request in requests {
+                copies.append(
+                    try WorkspaceOperations.copy(request, to: destination, in: &document).id)
+            }
+        case .move(let destination):
+            guard
+                destination == nil || document.collections.contains(where: { $0.id == destination })
+            else { throw EditingError.missingItem }
+            for request in requests where saved[request.id] != nil {
+                try WorkspaceOperations.relocate(request.id, to: destination, in: &document)
+            }
+            for index in updated.drafts.indices where selected.contains(updated.drafts[index].id) {
+                updated.drafts[index].collectionID = destination
+            }
+        case .delete:
+            document.requests.removeAll { selected.contains($0.id) }
+            updated.remove(selected)
+        }
+        try WorkspaceFile.validate(document)
+        try updated.validate(in: document)
+        workspace = document
+        self = updated
+        return copies
+    }
+
     public mutating func reconcile(with workspace: Workspace) throws {
         let collections = Set(workspace.collections.map(\.id))
         for index in drafts.indices {
