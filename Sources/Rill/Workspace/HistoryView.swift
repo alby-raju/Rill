@@ -10,9 +10,12 @@ struct HistoryView: View {
     var body: some View {
         VStack(spacing: 16) {
             HStack {
-                Text("Response history").font(.title2.weight(.semibold))
+                RillToolHeading(
+                    title: "Response history",
+                    subtitle: "Inspect captured responses and compare JSON snapshots.",
+                    icon: "clock.arrow.circlepath")
                 Spacer()
-                Button("Clear") { store.clearHistory() }
+                Button("Clear history", systemImage: "trash") { store.clearHistory() }
                 Button("Done") { dismiss() }.keyboardShortcut(.defaultAction)
             }
             HStack {
@@ -62,12 +65,22 @@ struct HistoryView: View {
                         }.tag(exchange.id).padding(.vertical, 5)
                     }
                 }.frame(minWidth: 200, idealWidth: 250)
-                ResponseView(
-                    exchange: store.workspace.history.first { $0.id == store.inspectedHistoryID },
-                    running: false
-                ).frame(minWidth: 500)
+                if store.workspace.history.isEmpty {
+                    RillToolEmpty(
+                        title: "No responses captured",
+                        detail: "Send a request in the Workbench to start your response history.",
+                        icon: "clock"
+                    ).frame(minWidth: 500)
+                } else {
+                    ResponseView(
+                        exchange: store.workspace.history.first {
+                            $0.id == store.inspectedHistoryID
+                        },
+                        running: false
+                    ).frame(minWidth: 500)
+                }
             }
-        }.padding(24).frame(width: 1000, height: 600)
+        }.padding(24).frame(width: 1000, height: 600).rillToolControls()
             .onDisappear { comparisonTask?.cancel() }
             .sheet(
                 isPresented: Binding(

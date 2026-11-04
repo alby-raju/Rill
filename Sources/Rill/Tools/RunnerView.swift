@@ -25,7 +25,10 @@ struct RunnerView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Text("Run and compare").font(.title2)
+                RillToolHeading(
+                    title: "Run and compare",
+                    subtitle: "Exercise saved requests and review their outcomes.",
+                    icon: "play.rectangle")
                 Spacer()
                 Button("Done") {
                     task?.cancel()
@@ -35,17 +38,14 @@ struct RunnerView: View {
             Text(
                 "Runs use a saved-workspace snapshot. Save drafts first. These actions send real requests to your configured targets; variables stay local to the run. Cancellation and closing stop owned work."
             ).font(.caption).foregroundStyle(.secondary)
-            Group {
-                Picker("Mode", selection: $mode) {
-                    Text("Collection").tag("Collection")
-                    Text("Environment matrix").tag("Matrix")
-                    Text("Load test").tag("Load")
-                }.pickerStyle(.segmented)
+            RillTabs(titles: ["Collection", "Environment matrix", "Load test"], selection: $mode)
+                .disabled(running)
+            RillSection(title: "Targets and execution", subtitle: "", icon: "slider.horizontal.3") {
                 Picker("Saved collection", selection: $collectionID) {
                     Text("All saved requests").tag(nil as UUID?)
                     ForEach(store.workspace.collections) { Text($0.name).tag(Optional($0.id)) }
                 }
-                if mode == "Load" {
+                if mode == "Load test" {
                     Picker("Saved request", selection: $requestID) {
                         Text("Choose request").tag(nil as UUID?)
                         ForEach(requests) { Text($0.name).tag(Optional($0.id)) }
@@ -69,7 +69,7 @@ struct RunnerView: View {
                         number("Retry delay (ms)", $configuration.retryDelayMilliseconds)
                         Toggle("Stop on failure", isOn: $configuration.stopOnFailure)
                     }
-                    if mode == "Matrix" {
+                    if mode == "Environment matrix" {
                         Stepper(
                             "Concurrent environments: \(matrixConcurrency)",
                             value: $matrixConcurrency, in: 1...4)
@@ -116,7 +116,7 @@ struct RunnerView: View {
                 if load != nil { Button("Export load metrics") { exportLoad() } }
             }
             if let error { Text(error).foregroundStyle(.red).textSelection(.enabled) }
-            Divider()
+            Label("Results", systemImage: "list.bullet.rectangle").font(.headline)
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 8) {
                     if let report { results(report) }
@@ -144,13 +144,14 @@ struct RunnerView: View {
                         )
                     }
                     if report == nil && matrix == nil && load == nil {
-                        Text(
-                            "Select targets and run to see outcomes. Empty or cancelled runs cannot pass."
-                        ).foregroundStyle(.secondary)
+                        RillToolEmpty(
+                            title: "No run results",
+                            detail: "Select saved targets and run them to inspect outcomes.",
+                            icon: "checklist")
                     }
-                }.frame(maxWidth: .infinity, alignment: .leading)
-            }
-        }.padding(24).frame(width: 980, height: 720)
+                }.frame(maxWidth: .infinity, alignment: .leading).padding(14)
+            }.rillToolPanel()
+        }.padding(24).frame(width: 980, height: 720).rillToolControls()
             .onAppear {
                 collectionID = store.focusedCollectionID
                 environmentIDs = Set(store.workspace.selectedEnvironmentID.map { [$0] } ?? [])
@@ -190,7 +191,7 @@ struct RunnerView: View {
         let ids = environmentIDs
         let parallel = matrixConcurrency
         let targetID = requestID
-        if selectedMode == "Load" && !selectedRequests.contains(where: { $0.id == targetID }) {
+        if selectedMode == "Load test" && !selectedRequests.contains(where: { $0.id == targetID }) {
             error = "Choose one saved request."
             return
         }
@@ -228,7 +229,7 @@ struct RunnerView: View {
                 let profiles = snapshot.authProfiles ?? []
                 let secrets = NamedSecretResolver(catalog: snapshot.namedSecrets ?? [])
                 let tls = snapshot.tlsProfiles ?? []
-                if selectedMode == "Matrix" {
+                if selectedMode == "Environment matrix" {
                     let environments = try snapshot.environments.filter { ids.contains($0.id) }.map
                     { try EnvironmentResolver.resolve($0.id, in: snapshot.environments) }
                     let result = try await MatrixRunner.run(
@@ -237,7 +238,7 @@ struct RunnerView: View {
                         secrets: secrets, tlsProfiles: tls,
                         definitions: snapshot.apiDefinitions ?? [])
                     if generation == id { matrix = result }
-                } else if selectedMode == "Load",
+                } else if selectedMode == "Load test",
                     let request = selectedRequests.first(where: { $0.id == targetID })
                 {
                     let result = try await LoadRunner.run(

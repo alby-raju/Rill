@@ -608,24 +608,25 @@ struct FieldEditor: View {
                 }.font(.system(size: 9, weight: .medium, design: .monospaced)).foregroundStyle(
                     .secondary
                 ).padding(.leading, 28).padding(.trailing, 28)
-                ForEach($fields) { $field in
+                ForEach(fields) { field in
+                    let binding = $fields.element(field)
                     HStack {
-                        Toggle("Enabled", isOn: $field.enabled).labelsHidden().toggleStyle(
+                        Toggle("Enabled", isOn: binding.enabled).labelsHidden().toggleStyle(
                             .checkbox)
-                        TextField("Key", text: $field.name)
+                        TextField("Key", text: binding.name)
                         Menu {
                             ForEach(
                                 InputSuggestions.keys(
                                     prefix: field.name, headers: noun == "header",
                                     workspace: store.workspace), id: \.self
-                            ) { value in Button(value) { field.name = value } }
+                            ) { value in Button(value) { binding.wrappedValue.name = value } }
                         } label: {
                             Image(systemName: "chevron.down")
                         }.menuStyle(.borderlessButton).frame(width: 18).help("Key suggestions")
-                        TextField("Value or {{variable}}", text: $field.value)
+                        TextField("Value or {{variable}}", text: binding.value)
                         Menu {
                             ForEach(InputSuggestions.variables(in: store.environment), id: \.self) {
-                                value in Button(value) { field.value = value }
+                                value in Button(value) { binding.wrappedValue.value = value }
                             }
                         } label: {
                             Image(systemName: "curlybraces")
@@ -649,7 +650,7 @@ struct FieldEditor: View {
                 if fields.isEmpty {
                     RillNotice(
                         text:
-                            "No \(noun)s yet. Add a key and value, or use {{variables}} from your environment.",
+                            "Add a key and value, or use {{variables}} from your environment.",
                         icon: "list.bullet.rectangle"
                     ).padding(.top, 12)
                 }

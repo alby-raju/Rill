@@ -41,9 +41,11 @@ struct MQTTAMQPWorkbenchView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Broker workbench").font(.title2)
+                RillToolHeading(
+                    title: "Broker workbench", subtitle: "Subscribe and publish on MQTT or AMQP.",
+                    icon: "antenna.radiowaves.left.and.right")
                 Spacer()
-                Text(status).font(.caption)
+                RillToolStatus(title: status, active: running)
                 Button("Done") {
                     stop()
                     dismiss()
@@ -55,6 +57,7 @@ struct MQTTAMQPWorkbenchView: View {
             HSplitView {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 12) {
+                        Label("Connection", systemImage: "link").font(.headline)
                         Picker("Protocol", selection: $protocolName) {
                             Text("MQTT").tag("MQTT")
                             Text("AMQP 0-9-1").tag("AMQP")
@@ -65,6 +68,7 @@ struct MQTTAMQPWorkbenchView: View {
                             Button("Disconnect") { stop() }.disabled(!running && !busy)
                         }
                         Divider()
+                        Label("Subscribe", systemImage: "tray.and.arrow.down").font(.headline)
                         TextField(
                             protocolName == "MQTT"
                                 ? "Subscription filter (wildcards allowed)"
@@ -72,6 +76,7 @@ struct MQTTAMQPWorkbenchView: View {
                         Button("Subscribe and wait for broker acknowledgement") { subscribe() }
                             .disabled(!running || busy || sending)
                         Divider()
+                        Label("Publish message", systemImage: "paperplane").font(.headline)
                         TextField(
                             protocolName == "MQTT"
                                 ? "Concrete publish topic" : "Existing destination queue",
@@ -105,8 +110,15 @@ struct MQTTAMQPWorkbenchView: View {
                 }.frame(minWidth: 390, idealWidth: 440, maxWidth: 500)
                 VStack(alignment: .leading) {
                     if let error { Text(error).foregroundStyle(.red).textSelection(.enabled) }
+                    Label("Session timeline", systemImage: "clock").font(.headline)
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 10) {
+                            if timeline.isEmpty {
+                                RillToolEmpty(
+                                    title: "No broker activity",
+                                    detail: "Connect and subscribe to see broker messages here.",
+                                    icon: "waveform.path")
+                            }
                             ForEach(timeline) { record in
                                 Text(record.direction.rawValue + " · " + record.kind.rawValue).font(
                                     .caption
@@ -118,14 +130,14 @@ struct MQTTAMQPWorkbenchView: View {
                                 ).font(.system(.body, design: .monospaced)).textSelection(.enabled)
                                 Divider()
                             }
-                        }.frame(maxWidth: .infinity, alignment: .leading)
-                    }
+                        }.frame(maxWidth: .infinity, alignment: .leading).padding(12)
+                    }.rillToolPanel()
                     Text("\(timeline.count) events · \(retainedBytes) bytes retained").font(
                         .caption
                     ).foregroundStyle(.secondary)
                 }.padding(.leading, 12).frame(minWidth: 400)
             }
-        }.padding(24).frame(width: 1080, height: 760)
+        }.padding(24).frame(width: 1080, height: 760).rillToolControls()
             .onDisappear { stop() }
             .onChange(of: protocolName) { _, value in
                 stop()

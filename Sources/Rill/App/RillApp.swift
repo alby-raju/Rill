@@ -7,6 +7,7 @@ typealias ViewState<Value> = SwiftUI.State<Value>
 @main struct RillApp: App {
     @NSApplicationDelegateAdaptor(RillAppDelegate.self) private var delegate
     @StateObject private var store = RillPreview.makeStore()
+    @ViewState<String> private var settingsSection = "General"
     @AppStorage("appearance") private var appearance = "system"
     var body: some Scene {
         WindowGroup {
@@ -112,18 +113,41 @@ typealias ViewState<Value> = SwiftUI.State<Value>
             }
         }
         Settings {
-            Form {
-                Picker("Appearance", selection: $appearance) {
-                    Text("System").tag("system")
-                    Text("Light").tag("light")
-                    Text("Dark").tag("dark")
-                }
-                Text(
-                    "Authentication tokens and passwords are stored in macOS Keychain. Headers, bodies, URLs and environment values are stored locally as entered. Response history is session-only unless you explicitly enable durable snapshots below."
+            VStack(alignment: .leading, spacing: 16) {
+                RillToolHeading(
+                    title: "Settings", subtitle: "Customize Rill on this Mac.",
+                    icon: "gearshape")
+                RillTabs(
+                    titles: ["General", "Response limits", "Snapshots"], selection: $settingsSection
                 )
-                .font(.callout).foregroundStyle(.secondary)
-                ResponseSettingsView().environmentObject(store)
-            }.padding(24).frame(width: 650, height: 650)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) {
+                        if settingsSection == "General" {
+                            RillSection(
+                                title: "Appearance", subtitle: "Choose a theme or follow macOS.",
+                                icon: "circle.lefthalf.filled"
+                            ) {
+                                Picker("Appearance", selection: $appearance) {
+                                    Text("System").tag("system")
+                                    Text("Light").tag("light")
+                                    Text("Dark").tag("dark")
+                                }.pickerStyle(.segmented).labelsHidden()
+                            }
+                            RillSection(title: "Local data", subtitle: "", icon: "lock") {
+                                Text(
+                                    "Authentication tokens and passwords are stored in macOS Keychain. Headers, bodies, URLs and environment values are stored locally as entered. Enable snapshots to retain response history across sessions."
+                                )
+                                .font(.callout).foregroundStyle(.secondary)
+                            }
+                        } else {
+                            ResponseSettingsView(snapshots: settingsSection == "Snapshots")
+                                .environmentObject(store)
+                        }
+                    }
+                }
+            }.padding(24).frame(width: 650, height: 550).rillToolControls()
+                .preferredColorScheme(
+                    appearance == "dark" ? .dark : appearance == "light" ? .light : nil)
         }
     }
 }

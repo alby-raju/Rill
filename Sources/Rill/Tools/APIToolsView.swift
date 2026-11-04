@@ -29,16 +29,19 @@ struct APIToolsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("API definitions and tools").font(.title2)
+                RillToolHeading(
+                    title: "API definitions and tools",
+                    subtitle: "Import contracts, validate data and test locally.",
+                    icon: "doc.text.magnifyingglass")
                 Spacer()
-                if busy { Button("Cancel") { task?.cancel() } }
+                if busy {
+                    ProgressView().controlSize(.small).accessibilityLabel("Working")
+                    Button("Cancel") { task?.cancel() }
+                }
                 Button("Done") { dismiss() }.keyboardShortcut(.cancelAction)
             }
-            Picker("Tool", selection: $section) {
-                ForEach(["Definitions", "Schema", "Mocks", "Inspection"], id: \.self) {
-                    Text($0).tag($0)
-                }
-            }.pickerStyle(.segmented).disabled(busy)
+            RillTabs(titles: ["Definitions", "Schema", "Mocks", "Inspection"], selection: $section)
+                .disabled(busy)
             Group {
                 switch section {
                 case "Definitions": definitions
@@ -48,7 +51,7 @@ struct APIToolsView: View {
                 }
             }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             if let error { Text(error).foregroundStyle(.red).textSelection(.enabled) }
-        }.padding(24).frame(width: 1000, height: 740)
+        }.padding(24).frame(width: 1000, height: 740).rillToolControls()
             .onAppear { probeURL = store.selected?.url ?? "" }
             .onDisappear {
                 generation = UUID()
@@ -70,22 +73,29 @@ struct APIToolsView: View {
             Text(
                 "Local JSON/YAML or an explicit URL. No references, external examples or endpoints are fetched automatically. Review generated samples and setup gaps before Apply; source snapshots may contain secrets."
             ).font(.caption).foregroundStyle(.secondary)
-            Picker("Import or refresh", selection: $refreshID) {
-                Text("Import as a new source").tag(nil as UUID?)
-                ForEach(store.workspace.apiDefinitions ?? []) {
-                    Text($0.title + " · " + String($0.id.uuidString.prefix(8))).tag(Optional($0.id))
-                }
-            }.disabled(busy)
-            HStack {
-                Button("Load local definition…") {
-                    let panel = NSOpenPanel()
-                    panel.allowedContentTypes = [.json, .yaml]
-                    guard panel.runModal() == .OK, let url = panel.url else { return }
-                    loadFile(url)
-                }
-                TextField("https://example.test/openapi.json", text: $remoteURL)
-                Button("Fetch this URL") { fetch() }.disabled(remoteURL.isEmpty)
-            }.disabled(busy)
+            RillSection(
+                title: "Definition source",
+                subtitle: "Load a local OpenAPI file or fetch a specific URL.",
+                icon: "doc.badge.plus"
+            ) {
+                Picker("Import or refresh", selection: $refreshID) {
+                    Text("Import as a new source").tag(nil as UUID?)
+                    ForEach(store.workspace.apiDefinitions ?? []) {
+                        Text($0.title + " · " + String($0.id.uuidString.prefix(8))).tag(
+                            Optional($0.id))
+                    }
+                }.disabled(busy)
+                HStack {
+                    Button("Load local definition…") {
+                        let panel = NSOpenPanel()
+                        panel.allowedContentTypes = [.json, .yaml]
+                        guard panel.runModal() == .OK, let url = panel.url else { return }
+                        loadFile(url)
+                    }
+                    TextField("https://example.test/openapi.json", text: $remoteURL)
+                    Button("Fetch this URL") { fetch() }.disabled(remoteURL.isEmpty)
+                }.disabled(busy)
+            }
             if let preview {
                 Text(
                     preview.source.title + " · " + preview.source.version
@@ -120,8 +130,12 @@ struct APIToolsView: View {
                     }.frame(maxWidth: .infinity, alignment: .leading)
                 }
             } else {
-                Text("Load a definition to preview operations and positive test expectations.")
-                    .foregroundStyle(.secondary)
+                RillToolEmpty(
+                    title: "No definition loaded",
+                    detail:
+                        "Load a file or fetch a URL to review operations and setup gaps before importing.",
+                    icon: "doc.text.magnifyingglass"
+                ).rillToolPanel()
             }
             if let refreshID,
                 let source = store.workspace.apiDefinitions?.first(where: { $0.id == refreshID })
@@ -144,17 +158,17 @@ struct APIToolsView: View {
             ).font(.caption).foregroundStyle(.secondary)
             HSplitView {
                 VStack(alignment: .leading) {
-                    Text("Schema JSON")
+                    Label("Schema JSON", systemImage: "curlybraces").font(.headline)
                     CodeEditor(text: $schema, contentType: "application/json", completions: [])
                         .disabled(busy)
                 }
                 VStack(alignment: .leading) {
-                    Text("Instance JSON")
+                    Label("Instance JSON", systemImage: "doc.text").font(.headline)
                     CodeEditor(text: $instance, contentType: "application/json", completions: [])
                         .disabled(busy)
                 }
             }
-            Button("Validate instance") {
+            Button("Validate instance", systemImage: "checkmark.seal") {
                 let schema = Data(schema.utf8)
                 let instance = Data(instance.utf8)
                 perform {
@@ -174,8 +188,10 @@ struct APIToolsView: View {
                 }
             }.disabled(busy)
             ScrollView {
-                Text(result).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
-            }.frame(height: 130)
+                Text(result.isEmpty ? "Results will appear here." : result)
+                    .textSelection(.enabled).padding(14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }.frame(height: 130).rillToolPanel()
         }
     }
     private var mocks: some View {
@@ -183,6 +199,7 @@ struct APIToolsView: View {
             Text(
                 "Loopback-only HTTP mock server. Edit method/path/status/headers/body JSON. Paths can use {parameter} segments. No scripts run. Mock responses are examples, not proof of schema conformance. Closing this window stops the server."
             ).font(.caption).foregroundStyle(.secondary)
+            Label("Route definitions", systemImage: "curlybraces").font(.headline)
             CodeEditor(text: $mockJSON, contentType: "application/json", completions: []).disabled(
                 !mockAddress.isEmpty || busy)
             HStack {
@@ -208,62 +225,79 @@ struct APIToolsView: View {
                         mockAddress = ""
                     }
                 }.disabled(busy || mockAddress.isEmpty)
-                Text(mockAddress).textSelection(.enabled)
+                Spacer()
+                if !mockAddress.isEmpty { Text(mockAddress).textSelection(.enabled) }
+                RillToolStatus(
+                    title: mockAddress.isEmpty ? "Stopped" : "Listening",
+                    active: !mockAddress.isEmpty)
             }
         }
     }
     private var inspection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Button("Inspect current response headers (no traffic)") {
-                guard let response = store.response else {
-                    error = "Send or select a response first."
-                    return
-                }
-                let findings = SecurityInspection.passive(response)
-                result =
-                    findings.isEmpty
-                    ? "No indicators in this limited header check; this is not security certification."
-                    : findings.map { $0.rule + ": " + $0.evidence + "\n" + $0.guidance }.joined(
-                        separator: "\n\n")
-            }.disabled(busy)
-            Divider()
-            Text(
-                "Active probes send additional unauthenticated requests to the exact URL below. They do not use selected request auth, headers or hooks. Query probes modify one existing query value and may re-encode the query; rate samples send at most ten sequential requests. Use targets you are authorized to test."
-            ).font(.caption).foregroundStyle(.secondary)
-            TextField("Explicit target URL", text: $probeURL).disabled(busy)
-            HStack {
-                Picker("Method", selection: $probeMethod) {
-                    Text("GET").tag(HTTPMethod.GET)
-                    Text("HEAD").tag(HTTPMethod.HEAD)
-                }
-                Picker("Probe", selection: $probe) {
-                    ForEach(ActiveProbeKind.allCases, id: \.self) { Text($0.rawValue).tag($0) }
-                }
-                if probe == .rate {
-                    Stepper("Samples: \(sampleCount)", value: $sampleCount, in: 1...10)
-                } else {
-                    TextField("One existing query name", text: $queryName)
-                }
-            }.disabled(busy)
-            Button("Send explicit probe requests") {
-                let url = probeURL
-                let method = probeMethod
-                let kind = probe
-                let name = queryName
-                let count = probe == .rate ? sampleCount : 1
-                perform {
-                    let report = try await ActiveProbes.run(
-                        url: url, method: method, kind: kind, queryName: name, count: count)
+            RillSection(
+                title: "Passive header review",
+                subtitle: "Inspect a response already in the Workbench.", icon: "shield"
+            ) {
+                Button("Inspect current response headers (no traffic)") {
+                    guard let response = store.response else {
+                        error = "Send or select a response first."
+                        return
+                    }
+                    let findings = SecurityInspection.passive(response)
                     result =
-                        "Statuses: " + report.statuses.map(String.init).joined(separator: ", ")
-                        + " · Cancelled: \(report.cancelled)\n\n"
-                        + report.findings.map { $0.evidence + "\n" + $0.guidance }.joined(
+                        findings.isEmpty
+                        ? "No indicators in this limited header check; this is not security certification."
+                        : findings.map { $0.rule + ": " + $0.evidence + "\n" + $0.guidance }.joined(
                             separator: "\n\n")
-                }
-            }.disabled(busy || probeURL.isEmpty)
-            ScrollView {
-                Text(result).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
+                }.disabled(busy)
             }
+            RillSection(
+                title: "Active probes",
+                subtitle: "Send a bounded set of requests to an explicit target.",
+                icon: "scope"
+            ) {
+                Text(
+                    "Active probes send additional unauthenticated requests to the exact URL below. They do not use selected request auth, headers or hooks. Query probes modify one existing query value and may re-encode the query; rate samples send at most ten sequential requests. Use targets you are authorized to test."
+                ).font(.caption).foregroundStyle(.secondary)
+                TextField("Explicit target URL", text: $probeURL).disabled(busy)
+                HStack {
+                    Picker("Method", selection: $probeMethod) {
+                        Text("GET").tag(HTTPMethod.GET)
+                        Text("HEAD").tag(HTTPMethod.HEAD)
+                    }
+                    Picker("Probe", selection: $probe) {
+                        ForEach(ActiveProbeKind.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                    }
+                    if probe == .rate {
+                        Stepper("Samples: \(sampleCount)", value: $sampleCount, in: 1...10)
+                    } else {
+                        TextField("One existing query name", text: $queryName)
+                    }
+                }.disabled(busy)
+                Button("Send explicit probe requests") {
+                    let url = probeURL
+                    let method = probeMethod
+                    let kind = probe
+                    let name = queryName
+                    let count = probe == .rate ? sampleCount : 1
+                    perform {
+                        let report = try await ActiveProbes.run(
+                            url: url, method: method, kind: kind, queryName: name, count: count)
+                        result =
+                            "Statuses: " + report.statuses.map(String.init).joined(separator: ", ")
+                            + " · Cancelled: \(report.cancelled)\n\n"
+                            + report.findings.map { $0.evidence + "\n" + $0.guidance }.joined(
+                                separator: "\n\n")
+                    }
+                }.disabled(busy || probeURL.isEmpty)
+            }
+            Label("Inspection results", systemImage: "list.bullet.rectangle").font(.headline)
+            ScrollView {
+                Text(result.isEmpty ? "Results will appear here." : result)
+                    .textSelection(.enabled).padding(14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }.rillToolPanel()
         }
     }
     private func loadFile(_ url: URL) {
