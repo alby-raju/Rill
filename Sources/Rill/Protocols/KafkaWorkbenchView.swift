@@ -101,7 +101,7 @@ struct KafkaWorkbenchView: View {
                         .foregroundStyle(.secondary)
                 }.padding(.leading, 12).frame(minWidth: 420)
             }
-        }.padding(24).frame(width: 1080, height: 760).rillToolControls()
+        }.padding(RillSpacing.sheet).frame(width: 1080, height: 760).rillToolControls()
             .onDisappear { stop() }
     }
     private var settings: some View {

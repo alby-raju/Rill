@@ -106,17 +106,22 @@ struct RunnerView: View {
                     Text("\(completed) completed attempts")
                 }
                 Spacer()
-                if report != nil || matrix != nil {
-                    Menu("Export redacted report") {
-                        ForEach(RunReportFormat.allCases, id: \.self) { format in
-                            Button(format.rawValue) { export(format) }
-                        }
-                    }
-                }
-                if load != nil { Button("Export load metrics") { exportLoad() } }
             }
             if let error { Text(error).foregroundStyle(.red).textSelection(.enabled) }
-            Label("Results", systemImage: "list.bullet.rectangle").font(.headline)
+            HStack {
+                Label("Results", systemImage: "list.bullet.rectangle").font(.headline)
+                Spacer()
+                if report != nil || matrix != nil || load != nil {
+                    Menu("Export results") {
+                        if report != nil || matrix != nil {
+                            ForEach(RunReportFormat.allCases, id: \.self) { format in
+                                Button("Redacted " + format.rawValue) { export(format) }
+                            }
+                        }
+                        if load != nil { Button("Load metrics") { exportLoad() } }
+                    }
+                }
+            }
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 8) {
                     if let report { results(report) }
@@ -151,7 +156,7 @@ struct RunnerView: View {
                     }
                 }.frame(maxWidth: .infinity, alignment: .leading).padding(14)
             }.rillToolPanel()
-        }.padding(24).frame(width: 980, height: 720).rillToolControls()
+        }.padding(RillSpacing.sheet).frame(width: 980, height: 720).rillToolControls()
             .onAppear {
                 collectionID = store.focusedCollectionID
                 environmentIDs = Set(store.workspace.selectedEnvironmentID.map { [$0] } ?? [])
@@ -164,7 +169,7 @@ struct RunnerView: View {
     private func number(_ label: String, _ binding: Binding<Int>) -> some View {
         HStack {
             Text(label)
-            TextField(label, value: binding, format: .number).frame(width: 80)
+            TextField(label, value: binding, format: .number).frame(width: RillControlWidth.number)
         }
     }
     private func metric(_ value: Double?) -> String {

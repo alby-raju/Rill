@@ -55,7 +55,7 @@ struct WorkspaceToolsView: View {
                     )
                     .frame(maxWidth: .infinity, alignment: .leading)
             }.frame(height: 105).rillToolPanel()
-        }.padding(24).frame(width: 950, height: 680).rillToolControls()
+        }.padding(RillSpacing.sheet).frame(width: 950, height: 680).rillToolControls()
             .onDisappear { stop() }
             .onChange(of: section) { _, _ in stop() }
     }
@@ -136,7 +136,9 @@ struct WorkspaceToolsView: View {
                         NSPasteboard.general.setString(token, forType: .string)
                     }.disabled(token.isEmpty)
                     Text("Port")
-                    TextField("Port", value: $port, format: .number).frame(width: 80).disabled(
+                    TextField("Port", value: $port, format: .number).frame(
+                        width: RillControlWidth.number
+                    ).disabled(
                         !shareURL.isEmpty)
                     Toggle("Allow LAN (plaintext HTTP)", isOn: $lan).disabled(!shareURL.isEmpty)
                 }

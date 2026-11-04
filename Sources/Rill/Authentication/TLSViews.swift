@@ -61,7 +61,7 @@ struct TLSManagerView: View {
                 }.frame(minWidth: 430, maxWidth: .infinity, maxHeight: .infinity)
             }.frame(maxWidth: .infinity, maxHeight: .infinity)
                 .disabled(busy)
-        }.padding(24).frame(width: 850, height: 600).rillToolControls()
+        }.padding(RillSpacing.sheet).frame(width: 850, height: 600).rillToolControls()
             .onAppear { selection = store.workspace.tlsProfiles?.first?.id }
     }
     private func profileForm(_ original: TLSProfile) -> some View {
@@ -118,7 +118,9 @@ struct TLSManagerView: View {
                                 }
                             }
                         }
-                        Button("Remove custom anchors") { profile.wrappedValue.anchors = [] }
+                        Button("Remove custom anchors", role: .destructive) {
+                            profile.wrappedValue.anchors = []
+                        }.disabled(profile.wrappedValue.anchors.isEmpty)
                         Text(
                             "Hostname verification remains enabled. Custom evaluation does not fetch missing certificates from the network."
                         ).font(.caption).foregroundStyle(.secondary)

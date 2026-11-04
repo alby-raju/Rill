@@ -49,6 +49,7 @@ struct CookieManagerView: View {
                     }.padding(12)
                 }.rillToolPanel()
             }
+            Divider()
             HStack {
                 Text("\(visible.count) of \(cookies.count) cookies · cleared when Rill quits")
                     .font(.caption).foregroundStyle(.secondary)
@@ -57,7 +58,7 @@ struct CookieManagerView: View {
                     confirmingClear = true
                 }.disabled(cookies.isEmpty)
             }
-        }.padding(24).frame(width: 760, height: 540).rillToolControls()
+        }.padding(RillSpacing.sheet).frame(width: 760, height: 540).rillToolControls()
             .onAppear(perform: refresh)
             .onReceive(
                 NotificationCenter.default.publisher(for: .NSHTTPCookieManagerCookiesChanged)
@@ -95,12 +96,12 @@ struct CookieManagerView: View {
                 }
             }
             Spacer()
-            Button {
+            Button(role: .destructive) {
                 jar.remove(cookie)
                 refresh()
             } label: {
                 Image(systemName: "trash")
-            }.buttonStyle(RillButtonStyle(emphasis: .quiet))
+            }.buttonStyle(RillButtonStyle(emphasis: .quiet, size: .icon))
                 .accessibilityLabel("Delete cookie \(cookie.name)")
         }.padding(12).rillToolPanel()
     }

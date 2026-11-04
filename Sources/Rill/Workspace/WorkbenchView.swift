@@ -15,6 +15,7 @@ struct WorkbenchView: View {
     private var showingLaunch: Bool { store.loading || !launchIntroductionFinished }
     @ViewState private var selector: WorkbenchSelector?
     @ViewState private var requestTransfer: RequestTransfer?
+    @ViewState<WorkspaceTool?> private var pendingTool: WorkspaceTool?
     @AppStorage("collapsedCollectionIDs") private var collapsedCollectionIDs = ""
     @ViewState private var collapsedSearchCollections: Set<UUID> = []
     @AppStorage("requestLayout") private var requestLayout = "automatic"
@@ -130,6 +131,12 @@ struct WorkbenchView: View {
             EnvironmentEditor().environmentObject(store)
         }
         .sheet(isPresented: $store.showCookies) { CookieManagerView(jar: store.cookieJar) }
+        .sheet(isPresented: $store.showToolBrowser, onDismiss: openPendingTool) {
+            WorkspaceToolsBrowser { tool in
+                pendingTool = tool
+                store.showToolBrowser = false
+            }.environmentObject(store)
+        }
         .sheet(isPresented: $store.showHistory) { HistoryView().environmentObject(store) }
         .sheet(isPresented: $store.showPalette) { RequestSearch().environmentObject(store) }
         .alert(
@@ -155,7 +162,8 @@ struct WorkbenchView: View {
                 Image(systemName: "magnifyingglass")
                 TextField("Find a request", text: $store.search).textFieldStyle(.plain)
             }
-            .font(.callout).padding(9).background(
+            .font(.callout).padding(.horizontal, RillControlSize.standard.inset)
+            .frame(minHeight: RillControlSize.standard.height).background(
                 .quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8)
             ).padding(.horizontal, 14)
             HStack {
@@ -166,9 +174,8 @@ struct WorkbenchView: View {
                     store.newCollection()
                 } label: {
                     Image(systemName: "folder.badge.plus")
-                }.buttonStyle(RillButtonStyle(emphasis: .quiet)).help("New collection")
-                    .accessibilityLabel("New collection").buttonStyle(
-                        RillButtonStyle(emphasis: .quiet))
+                }.buttonStyle(RillButtonStyle(emphasis: .quiet, size: .icon)).help("New collection")
+                    .accessibilityLabel("New collection")
             }
             .padding(.horizontal, 20).padding(.top, 25).padding(.bottom, 8)
             List(selection: $store.selection) {
@@ -201,6 +208,7 @@ struct WorkbenchView: View {
                         .contextMenu {
                             Button("New request") { store.newRequest(in: collection.id) }
                             Button("Rename…") { store.renameCollection(collection) }
+                            Divider()
                             Button("Delete collection…", role: .destructive) {
                                 store.deleteCollection(collection)
                             }
@@ -242,43 +250,24 @@ struct WorkbenchView: View {
                         ).padding(.top, 22).allowsHitTesting(false)
                     }
                 }
-            Menu {
-                Button("Blank request") { store.newRequest() }
-                ForEach(RequestTemplate.allCases, id: \.self) { template in
-                    Button(template.rawValue) { store.newRequest(template: template) }
-                }
-            } label: {
-                Label("New request", systemImage: "plus").frame(
-                    maxWidth: .infinity, alignment: .leading)
-            }
-            .menuStyle(.borderlessButton).padding(.horizontal, 20).padding(.vertical, 12)
-            Divider().padding(.horizontal, 14)
-            VStack(alignment: .leading, spacing: 16) {
+            Divider()
+            VStack(spacing: 6) {
+                NewRequestControl()
                 Button {
-                    store.showEnvironments = true
+                    store.showToolBrowser = true
                 } label: {
-                    Label("Environments", systemImage: "square.stack.3d.up")
-                }
-                Button {
-                    store.showCookies = true
-                } label: {
-                    Label("Cookies", systemImage: "tray.full")
-                }
-                Button {
-                    store.showHistory = true
-                } label: {
-                    Label("Session history", systemImage: "clock.arrow.circlepath")
-                }
-                Menu {
-                    Button("Import Rill workspace…") { store.importWorkspace() }
-                    Button("Export Rill workspace…") { store.exportWorkspace() }
-                } label: {
-                    Label("Workspace files", systemImage: "tray.2")
-                }
-                .menuStyle(.borderlessButton)
-            }.buttonStyle(.plain).font(.callout).foregroundStyle(.secondary).padding(20)
+                    Label("Workspace tools", systemImage: "square.grid.2x2")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }.buttonStyle(RillButtonStyle(emphasis: .quiet))
+            }.padding(12)
         }.modifier(RillGlassSurface(role: .navigation, cornerRadius: 0))
     }
+    private func openPendingTool() {
+        guard let tool = pendingTool else { return }
+        pendingTool = nil
+        if tool.isAvailable(in: store) { tool.open(store) }
+    }
+
     private func collectionExpansion(_ id: UUID) -> Binding<Bool> {
         Binding(
             get: {
@@ -352,6 +341,7 @@ struct WorkbenchView: View {
                         try WorkspaceOperations.move(request.id, offset: 1, in: &store.workspace)
                     }
                 }
+                Divider()
                 Button("Delete request…", role: .destructive) { store.delete(request) }
             }
     }
@@ -380,7 +370,8 @@ struct WorkbenchView: View {
                                     store.closeTab(id)
                                 } label: {
                                     Image(systemName: "xmark").font(.system(size: 9))
-                                }.buttonStyle(RillButtonStyle(emphasis: .quiet)).help("Close tab")
+                                }.buttonStyle(RillButtonStyle(emphasis: .quiet, size: .compact))
+                                    .help("Close tab")
                                     .accessibilityLabel("Close request tab")
                             }
                         }.font(.caption).padding(.horizontal, 12).padding(.vertical, 10)
@@ -420,12 +411,42 @@ struct WorkbenchView: View {
                 store.showPalette = true
             } label: {
                 Image(systemName: "command")
-            }.buttonStyle(RillButtonStyle(emphasis: .quiet)).help("Find request (⌘K)")
+            }.buttonStyle(RillButtonStyle(emphasis: .quiet, size: .icon)).help("Find request (⌘K)")
                 .accessibilityLabel("Find request")
         }.padding(.horizontal, 24).padding(.vertical, 15)
             .modifier(RillGlassSurface(role: .toolbar, cornerRadius: 0))
     }
 }
+struct NewRequestControl: View {
+    @EnvironmentObject private var store: WorkbenchStore
+
+    var body: some View {
+        HStack(spacing: RillSpacing.controls) {
+            Button {
+                store.newRequest()
+            } label: {
+                HStack {
+                    Image(systemName: "plus")
+                    Text("New request").fixedSize(horizontal: true, vertical: false)
+                    Spacer(minLength: 0)
+                }
+            }.buttonStyle(RillButtonStyle(emphasis: .primary))
+                .accessibilityLabel("New request")
+            Menu {
+                ForEach(RequestTemplate.allCases, id: \.self) { template in
+                    Button(template.rawValue) { store.newRequest(template: template) }
+                }
+            } label: {
+                Image(systemName: "chevron.down")
+                    .frame(width: RillControlSize.icon.height, height: RillControlSize.icon.height)
+                    .contentShape(Rectangle())
+            }.menuStyle(.borderlessButton).menuIndicator(.hidden)
+                .frame(width: RillControlSize.icon.height, height: RillControlSize.icon.height)
+                .help("Request templates").accessibilityLabel("Request templates")
+        }
+    }
+}
+
 func methodColor(_ method: HTTPMethod) -> Color {
     switch method {
     case .GET: accent
@@ -466,13 +487,13 @@ struct RequestEditor: View {
                 ) {
                     Text("Unfiled").tag(nil as UUID?)
                     ForEach(store.workspace.collections) { Text($0.name).tag(Optional($0.id)) }
-                }.frame(width: 180)
+                }.frame(width: RillControlWidth.selector)
             }.padding(.horizontal, 24).padding(.top, 24).padding(.bottom, 20)
-            HStack(spacing: 10) {
+            HStack(spacing: RillSpacing.controls) {
                 RillSelect(
                     title: "HTTP method", value: request.method.rawValue, selection: $request.method
                 ) { ForEach(HTTPMethod.allCases, id: \.self) { Text($0.rawValue).tag($0) } }.frame(
-                    width: 100
+                    width: RillControlWidth.method
                 ).foregroundStyle(methodColor(request.method))
                 TextField("https://api.example.com/v1/resources", text: $request.url)
                     .textFieldStyle(.plain).font(.system(size: 13, design: .monospaced)).onSubmit {
@@ -488,9 +509,7 @@ struct RequestEditor: View {
                     Button {
                         store.send()
                     } label: {
-                        Label("Send", systemImage: "arrow.up.right").fontWeight(.semibold).padding(
-                            .horizontal, 10
-                        ).padding(.vertical, 3)
+                        Label("Send", systemImage: "arrow.up.right")
                     }.buttonStyle(RillButtonStyle(emphasis: .primary)).keyboardShortcut(
                         .return, modifiers: .command
                     ).disabled(
@@ -578,7 +597,7 @@ struct RequestEditor: View {
                                     Text("Timeout")
                                     Spacer()
                                     TextField("Seconds", value: $request.timeout, format: .number)
-                                        .frame(width: 90)
+                                        .frame(width: RillControlWidth.number)
                                     Text("seconds · 1–300").font(.caption).foregroundStyle(
                                         .secondary)
                                 }
@@ -628,7 +647,9 @@ struct FieldEditor: View {
                             ) { value in Button(value) { binding.wrappedValue.name = value } }
                         } label: {
                             Image(systemName: "chevron.down")
-                        }.menuStyle(.borderlessButton).frame(width: 18).help("Key suggestions")
+                        }.menuStyle(.borderlessButton).menuIndicator(.hidden).frame(
+                            width: RillControlSize.compactIcon.height
+                        ).help("Key suggestions")
                         TextField("Value or {{variable}}", text: binding.value)
                         Menu {
                             ForEach(InputSuggestions.variables(in: store.environment), id: \.self) {
@@ -636,13 +657,16 @@ struct FieldEditor: View {
                             }
                         } label: {
                             Image(systemName: "curlybraces")
-                        }.menuStyle(.borderlessButton).frame(width: 18).help(
+                        }.menuStyle(.borderlessButton).menuIndicator(.hidden).frame(
+                            width: RillControlSize.compactIcon.height
+                        ).help(
                             "Environment variables")
                         Button {
                             fields.removeAll { $0.id == field.id }
                         } label: {
                             Image(systemName: "minus.circle")
-                        }.buttonStyle(RillButtonStyle(emphasis: .quiet)).foregroundStyle(.secondary)
+                        }.buttonStyle(RillButtonStyle(emphasis: .quiet, size: .icon))
+                            .foregroundStyle(.secondary)
                             .help("Remove \(noun)").accessibilityLabel("Remove \(noun)")
                     }.textFieldStyle(RillTextFieldStyle()).font(
                         .system(size: 12, design: .monospaced))

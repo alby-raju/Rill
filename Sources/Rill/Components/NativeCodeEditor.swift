@@ -13,17 +13,20 @@ struct CodeEditor: View {
     @ViewState<Int> private var searchStep = 0
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 10) {
-                TextField("Find in body", text: $query).textFieldStyle(RillTextFieldStyle()).frame(
-                    maxWidth: 220
+            HStack(spacing: RillSpacing.controls) {
+                TextField("Find in body", text: $query).textFieldStyle(
+                    RillTextFieldStyle(size: .compact)
+                ).frame(
+                    maxWidth: RillControlWidth.search
                 ).onSubmit { searchStep += 1 }
                 Button {
                     searchStep += 1
                 } label: {
                     Image(systemName: "chevron.down")
-                }.help("Find next").accessibilityLabel("Find next match")
+                }.buttonStyle(RillButtonStyle(emphasis: .quiet, size: .compactIcon))
+                    .help("Find next").accessibilityLabel("Find next match")
                 Spacer()
-                Toggle("Wrap", isOn: $wrap).toggleStyle(.checkbox)
+                Toggle("Wrap", isOn: $wrap).toggleStyle(.checkbox).controlSize(.small)
                 Button("A−") { fontSize = max(10, fontSize - 1) }.help("Decrease editor text size")
                     .accessibilityLabel("Decrease editor text size")
                 Button("A+") { fontSize = min(26, fontSize + 1) }.help("Increase editor text size")
@@ -38,7 +41,7 @@ struct CodeEditor: View {
         }.background(RillPalette.canvas, in: RoundedRectangle(cornerRadius: 9))
             .clipShape(RoundedRectangle(cornerRadius: 9))
             .overlay(RoundedRectangle(cornerRadius: 9).strokeBorder(RillPalette.line))
-            .buttonStyle(RillButtonStyle(emphasis: .quiet))
+            .buttonStyle(RillButtonStyle(emphasis: .quiet, size: .compact))
     }
 }
 

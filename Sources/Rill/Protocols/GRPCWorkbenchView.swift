@@ -132,7 +132,7 @@ struct GRPCWorkbenchView: View {
                         .foregroundStyle(.secondary)
                 }.padding(.leading, 12).frame(minWidth: 570)
             }
-        }.padding(24).frame(width: 1150, height: 800).rillToolControls()
+        }.padding(RillSpacing.sheet).frame(width: 1150, height: 800).rillToolControls()
             .onDisappear { stop() }
             .onChange(of: selection) { _, _ in
                 stop()
@@ -146,8 +146,10 @@ struct GRPCWorkbenchView: View {
                 .system(.body, design: .monospaced)
             ).disabled(running || busy)
             Text("Deadline (seconds)")
-            TextField("Deadline", value: $configuration.timeout, format: .number).frame(width: 70)
-                .disabled(running || busy)
+            TextField("Deadline", value: $configuration.timeout, format: .number).frame(
+                width: RillControlWidth.number
+            )
+            .disabled(running || busy)
             Button("Discover by reflection") { reflect() }.disabled(running || busy)
         }
     }

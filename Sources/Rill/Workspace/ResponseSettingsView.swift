@@ -60,7 +60,9 @@ struct ResponseSettingsView: View {
                     "Total snapshot body budget: \(store.responseSettings.snapshotTotalBodyBytes / (1024 * 1024)) MiB",
                     value: mib(\.snapshotTotalBodyBytes), in: 1...16)
                 Text(store.historyStatus).font(.caption).foregroundStyle(.secondary)
-                Button("Clear History…", systemImage: "trash") { store.clearHistory() }
+                Button("Clear History…", systemImage: "trash", role: .destructive) {
+                    store.clearHistory()
+                }
             }
         }
     }

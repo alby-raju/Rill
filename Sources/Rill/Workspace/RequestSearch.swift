@@ -7,12 +7,11 @@ struct RequestSearch: View {
     @ViewState<String> private var query = ""
     @FocusState private var focused: Bool
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Image(systemName: "magnifyingglass")
+        VStack(alignment: .leading, spacing: RillSpacing.section) {
+            HStack(spacing: RillSpacing.controls) {
                 TextField("Find requests, collections, environments or history", text: $query)
-                    .textFieldStyle(.plain).focused($focused)
-                Button("Done") { dismiss() }
+                    .focused($focused)
+                Button("Done") { dismiss() }.keyboardShortcut(.cancelAction)
             }
             Divider()
             List(store.searchResults(query)) { result in
@@ -34,8 +33,9 @@ struct RequestSearch: View {
                         }
                         Spacer()
                     }
-                }.buttonStyle(.plain).padding(.vertical, 6)
+                }.buttonStyle(.plain).frame(minHeight: RillControlSize.row.height)
             }
-        }.padding(24).frame(width: 720, height: 400).onAppear { focused = true }
+        }.padding(RillSpacing.sheet).frame(width: 720, height: 400).rillToolControls()
+            .onAppear { focused = true }
     }
 }

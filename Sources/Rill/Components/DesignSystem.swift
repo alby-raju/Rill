@@ -85,18 +85,60 @@ struct RillGlassSurface: ViewModifier {
     }
 }
 
+enum RillControlSize {
+    case standard, compact, icon, compactIcon, row
+
+    var height: CGFloat {
+        switch self {
+        case .standard, .icon: 34
+        case .compact, .compactIcon: 28
+        case .row: 48
+        }
+    }
+
+    var isIcon: Bool { self == .icon || self == .compactIcon }
+
+    var inset: CGFloat {
+        switch self {
+        case .standard: 12
+        case .compact, .row: 9
+        case .icon, .compactIcon: 0
+        }
+    }
+}
+
+enum RillControlWidth {
+    static let number: CGFloat = 88
+    static let method: CGFloat = 100
+    static let selector: CGFloat = 180
+    static let search: CGFloat = 220
+}
+
+enum RillSpacing {
+    static let controls: CGFloat = 8
+    static let section: CGFloat = 16
+    static let sheet: CGFloat = 24
+}
+
 struct RillButtonStyle: ButtonStyle {
     enum Emphasis { case primary, secondary, quiet }
     var emphasis: Emphasis = .secondary
+    var size: RillControlSize = .standard
     @SwiftUI.Environment(\.isEnabled) private var enabled
     @SwiftUI.Environment(\.colorScheme) private var scheme
     @ViewState private var hovered = false
     @SwiftUI.Environment(\.accessibilityReduceMotion) private var reduceMotion
     func makeBody(configuration: Configuration) -> some View {
         configuration.label.font(.system(size: 12, weight: .semibold))
-            .padding(.horizontal, emphasis == .quiet ? 9 : 14).padding(.vertical, 9)
+            .padding(.horizontal, size.inset)
+            .padding(.vertical, size.isIcon ? 0 : 4)
+            .frame(minHeight: size.height)
+            .frame(width: size.isIcon ? size.height : nil)
             .foregroundStyle(
-                emphasis == .primary ? (scheme == .dark ? Color.black : .white) : Color.primary
+                configuration.role == .destructive
+                    ? Color.red
+                    : emphasis == .primary
+                        ? (scheme == .dark ? Color.black : .white) : Color.primary
             )
             .background {
                 if emphasis == .secondary {
@@ -128,9 +170,12 @@ struct RillButtonStyle: ButtonStyle {
 }
 
 struct RillTextFieldStyle: TextFieldStyle {
+    var size: RillControlSize = .standard
     @FocusState private var focused: Bool
     func _body(configuration: TextField<Self._Label>) -> some View {
-        configuration.textFieldStyle(.plain).padding(.horizontal, 11).padding(.vertical, 9)
+        configuration.textFieldStyle(.plain)
+            .padding(.horizontal, size.inset)
+            .frame(minHeight: size.height)
             .background(RillPalette.surface, in: RoundedRectangle(cornerRadius: 7))
             .overlay(
                 RoundedRectangle(cornerRadius: 7).strokeBorder(
@@ -160,7 +205,8 @@ struct RillSelect<Value: Hashable, Options: View>: View {
                 ).foregroundStyle(.secondary)
             }.font(.system(size: 12, weight: .medium))
         }.menuStyle(.borderlessButton).menuIndicator(.hidden)
-            .padding(.horizontal, 11).padding(.vertical, 9)
+            .padding(.horizontal, RillControlSize.standard.inset)
+            .frame(minHeight: RillControlSize.standard.height)
             .modifier(RillGlassSurface(role: .control, cornerRadius: 10))
             .accessibilityLabel(title).accessibilityValue(value)
     }
@@ -172,7 +218,7 @@ struct RillSection<Content: View>: View {
     var icon: String = "slider.horizontal.3"
     @ViewBuilder var content: () -> Content
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: RillSpacing.section) {
             HStack(alignment: .top, spacing: 11) {
                 Image(systemName: icon).foregroundStyle(RillPalette.accent).frame(width: 20)
                     .padding(.top, 2)
@@ -185,7 +231,7 @@ struct RillSection<Content: View>: View {
                 }
             }
             content()
-        }.padding(18).frame(maxWidth: .infinity, alignment: .leading)
+        }.padding(RillSpacing.section).frame(maxWidth: .infinity, alignment: .leading)
             .background(RillPalette.surface.opacity(0.55), in: RoundedRectangle(cornerRadius: 12))
             .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(RillPalette.line))
     }
@@ -219,7 +265,8 @@ struct RillTabs: View {
                         Text(title).font(
                             .system(size: 12, weight: selection == title ? .semibold : .medium)
                         )
-                        .padding(.horizontal, 13).padding(.vertical, 9)
+                        .padding(.horizontal, RillControlSize.compact.inset)
+                        .frame(minHeight: RillControlSize.compact.height)
                         .foregroundStyle(selection == title ? RillPalette.accent : .secondary)
                         .background {
                             if selection == title {
@@ -234,7 +281,7 @@ struct RillTabs: View {
                 }
             }.padding(5)
                 .animation(RillMotion.transition(reduceMotion), value: selection)
-        }.frame(height: 42)
+        }.frame(height: RillControlSize.compact.height + 10)
             .modifier(RillGlassSurface(role: .toolbar, cornerRadius: 11))
     }
 }
@@ -304,7 +351,8 @@ extension View {
     }
 
     func rillToolControls() -> some View {
-        textFieldStyle(RillTextFieldStyle())
+        controlSize(.regular)
+            .textFieldStyle(RillTextFieldStyle())
             .buttonStyle(RillButtonStyle())
             .tint(RillPalette.accent)
             .background(RillPalette.canvas)

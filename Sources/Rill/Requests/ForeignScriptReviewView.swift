@@ -26,6 +26,6 @@ struct ForeignScriptReviewView: View {
                     }
                 }.frame(maxWidth: .infinity, alignment: .leading)
             }
-        }.padding(24).frame(width: 850, height: 600)
+        }.padding(RillSpacing.sheet).frame(width: 850, height: 600).rillToolControls()
     }
 }

@@ -14,7 +14,7 @@ struct BodyComposer: View {
                 Spacer()
                 RillSelect(title: "Body type", value: mode.wrappedValue.rawValue, selection: mode) {
                     ForEach(RequestBodyMode.allCases, id: \.self) { Text($0.rawValue).tag($0) }
-                }.frame(width: 180)
+                }.frame(width: RillControlWidth.selector)
             }
             if (request.method == .GET || request.method == .HEAD)
                 && request.bodyMode != RequestBodyMode.none
@@ -124,17 +124,20 @@ private struct MultipartComposer: View {
                             move(part.id, by: -1)
                         } label: {
                             Image(systemName: "arrow.up")
-                        }.help("Move part earlier")
+                        }.buttonStyle(RillButtonStyle(emphasis: .quiet, size: .icon))
+                            .help("Move part earlier").accessibilityLabel("Move part earlier")
                         Button {
                             move(part.id, by: 1)
                         } label: {
                             Image(systemName: "arrow.down")
-                        }.help("Move part later")
+                        }.buttonStyle(RillButtonStyle(emphasis: .quiet, size: .icon))
+                            .help("Move part later").accessibilityLabel("Move part later")
                         Button {
                             parts.removeAll { $0.id == part.id }
                         } label: {
                             Image(systemName: "minus.circle")
-                        }.help("Remove part")
+                        }.buttonStyle(RillButtonStyle(emphasis: .quiet, size: .icon))
+                            .help("Remove part").accessibilityLabel("Remove part")
                     }
                 }
                 Button("Add part", systemImage: "plus") {
@@ -206,6 +209,6 @@ private struct MultipartPartEditor: View {
                 Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
                 Button("Apply") { apply(draft) }.keyboardShortcut(.defaultAction)
             }
-        }.padding(24).frame(width: 650, height: 450)
+        }.padding(RillSpacing.sheet).frame(width: 650, height: 450).rillToolControls()
     }
 }

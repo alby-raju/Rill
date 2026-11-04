@@ -60,7 +60,9 @@ struct AuthenticationManager: View {
                                 store.deleteNamedSecret(secret)
                             } label: {
                                 Image(systemName: "trash")
-                            }.buttonStyle(.plain).help("Delete native secret")
+                            }.buttonStyle(RillButtonStyle(emphasis: .quiet, size: .icon))
+                                .help("Delete native secret").accessibilityLabel(
+                                    "Delete native secret")
                         }
                     }
                     TextField("Secret name", text: $secretName).disabled(replacing != nil)
@@ -93,11 +95,13 @@ struct AuthenticationManager: View {
             } else if !store.oauthStatus.isEmpty {
                 Text(store.oauthStatus).font(.caption).foregroundStyle(.secondary)
             }
-        }.padding(24).frame(width: 1100, height: 700).rillToolControls().disabled(store.importing)
-            .onDisappear {
-                store.cancelOAuth()
-                secretValue = ""
-            }
+        }.padding(RillSpacing.sheet).frame(width: 1100, height: 700).rillToolControls().disabled(
+            store.importing
+        )
+        .onDisappear {
+            store.cancelOAuth()
+            secretValue = ""
+        }
     }
     private func profileForm(_ index: Int) -> some View {
         let original = store.workspace.authProfiles![index]

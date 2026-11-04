@@ -67,7 +67,8 @@ struct GraphQLComposer: View {
                 HStack {
                     Text(status).font(.caption)
                     Spacer()
-                    TextField("Find schema name", text: $schemaSearch).frame(width: 200)
+                    TextField("Find schema name", text: $schemaSearch).frame(
+                        width: RillControlWidth.search)
                 }
                 ScrollView(.horizontal) {
                     Text(

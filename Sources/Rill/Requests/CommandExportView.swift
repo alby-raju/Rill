@@ -100,7 +100,7 @@ struct CommandExportView: View {
                     NSPasteboard.general.setString(output, forType: .string)
                 }.disabled(output.isEmpty)
             }
-        }.padding(24).frame(width: 850, height: 600)
+        }.padding(RillSpacing.sheet).frame(width: 850, height: 600).rillToolControls()
             .onChange(of: target) { _, _ in clear() }
             .onChange(of: clientTarget) { _, _ in clear() }
             .onChange(of: clientSnippet) { _, _ in clear() }

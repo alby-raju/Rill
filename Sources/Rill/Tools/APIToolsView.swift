@@ -51,7 +51,7 @@ struct APIToolsView: View {
                 }
             }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             if let error { Text(error).foregroundStyle(.red).textSelection(.enabled) }
-        }.padding(24).frame(width: 1000, height: 740).rillToolControls()
+        }.padding(RillSpacing.sheet).frame(width: 1000, height: 740).rillToolControls()
             .onAppear { probeURL = store.selected?.url ?? "" }
             .onDisappear {
                 generation = UUID()
@@ -204,7 +204,9 @@ struct APIToolsView: View {
                 !mockAddress.isEmpty || busy)
             HStack {
                 Text("Port (0 chooses a free port)")
-                TextField("Port", value: $port, format: .number).frame(width: 90).disabled(
+                TextField("Port", value: $port, format: .number).frame(
+                    width: RillControlWidth.number
+                ).disabled(
                     !mockAddress.isEmpty || busy)
                 Button("Start mock server") {
                     guard (0...65535).contains(port) else {

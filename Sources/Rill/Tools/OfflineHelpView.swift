@@ -30,7 +30,7 @@ struct OfflineHelpView: View {
                     }
                 }.padding(.vertical, 12)
             }
-        }.padding(28).frame(width: 850, height: 720)
+        }.padding(RillSpacing.sheet).frame(width: 850, height: 720).rillToolControls()
             .onAppear {
                 if let url = RillResources.url(forResource: "Help", withExtension: "json"),
                     let data = try? Data(contentsOf: url)
