@@ -94,6 +94,7 @@ import UniformTypeIdentifiers
     @Published var showBrokers = false
     @Published var showGRPC = false
     @Published var showWorkspaceTools = false
+    @Published var showToolBrowser = false
     @Published var showHelp = false
     @Published var showTLS = false
     @Published var showAuthentication = false

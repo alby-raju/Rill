@@ -104,12 +104,12 @@ struct LiveStreamsView: View {
                 Text("\(records.count) records · \(retainedBytes) retained bytes").font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
-                Button("Clear timeline") {
+                Button("Clear timeline", role: .destructive) {
                     records = []
                     retainedBytes = 0
-                }.disabled(running || busy)
+                }.disabled(running || busy || records.isEmpty)
             }
-        }.padding(24).frame(width: 1050, height: 720).rillToolControls()
+        }.padding(RillSpacing.sheet).frame(width: 1050, height: 720).rillToolControls()
             .onAppear {
                 if let request = store.selected {
                     endpoint = request.url

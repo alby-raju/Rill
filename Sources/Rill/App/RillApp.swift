@@ -36,81 +36,92 @@ typealias ViewState<Value> = SwiftUI.State<Value>
                 Button("New Collection") { store.newCollection() }.keyboardShortcut(
                     "n", modifiers: [.command, .shift])
                 Divider()
-                Button("Import cURL / HTTPie / HAR…") { store.showCommandImport = true }
-                Button("Import Postman JSON…") { store.importForeign(.postman) }
-                Button("Import HTTPie Desktop JSON…") { store.importForeign(.httpieDesktop) }
-                Button("Import Insomnia JSON / YAML…") { store.importForeign(.insomnia) }
-                Button("Import Bruno File / Folder / ZIP…") { store.importForeign(.bruno) }
-                Button("Import Rill Workspace…") { store.importWorkspace() }
-                Button("Export Bruno Bundle…") { store.exportInterchange("Bruno bundle") }
-                Button("Export Insomnia Collection…") {
-                    store.exportInterchange("Insomnia collection")
+                Menu("Import Requests and Collections") {
+                    Button("cURL / HTTPie / HAR…") { store.showCommandImport = true }
+                    Divider()
+                    Button("Bruno File / Folder / ZIP…") { store.importForeign(.bruno) }
+                    Button("HTTPie Desktop JSON…") { store.importForeign(.httpieDesktop) }
+                    Button("Insomnia JSON / YAML…") { store.importForeign(.insomnia) }
+                    Button("Postman JSON…") { store.importForeign(.postman) }
                 }
-                Button("Export Postman Collection…") {
-                    store.exportInterchange("Postman collection")
+                Menu("Export Requests and Collections") {
+                    Button("Bruno Bundle…") { store.exportInterchange("Bruno bundle") }
+                    Button("HAR Request…") { store.exportInterchange("HAR request") }.disabled(
+                        store.selected == nil)
+                    Button("Insomnia Collection…") {
+                        store.exportInterchange("Insomnia collection")
+                    }
+                    Button("Postman Collection…") {
+                        store.exportInterchange("Postman collection")
+                    }
+                    Button("Postman Environment…") {
+                        store.exportInterchange("Postman environment")
+                    }.disabled(store.environment == nil)
                 }
-                Button("Export Postman Environment…") {
-                    store.exportInterchange("Postman environment")
-                }.disabled(store.environment == nil)
-                Button("Export HAR Request…") { store.exportInterchange("HAR") }.disabled(
-                    store.selected == nil)
-                Button("Export Rill Workspace…") { store.exportWorkspace() }
-                Button("Export Support Diagnostics…") { store.exportDiagnostics() }
-                Divider()
-                Button("Create Backup…") { store.createBackup() }
-                Button("Restore Backup…") { store.restoreBackup() }
             }
             CommandGroup(replacing: .help) {
                 Button("Rill Offline Help") { store.showHelp = true }.keyboardShortcut(
                     "?", modifiers: .command)
+                Button("Export Support Diagnostics…") { store.exportDiagnostics() }
             }
             CommandGroup(replacing: .saveItem) {
                 Button("Save Request") { store.saveSelected() }.keyboardShortcut("s")
             }
             CommandMenu("Request") {
-                Button("Review Imported Scripts…") { store.showForeignScripts = true }.disabled(
-                    store.selected?.foreignScripts?.isEmpty != false)
-                Button("New Request Tab") { store.newRequest() }.keyboardShortcut("t")
-                Button("Close Request Tab") { if let id = store.selection { store.closeTab(id) } }
-                    .keyboardShortcut("w")
-                Button("Close Tabs to the Left") {
-                    store.closeTabs(.left, relativeTo: store.selection)
-                }.disabled(
-                    !store.canEdit
-                        || store.editor.tabsToClose(.left, relativeTo: store.selection).isEmpty)
-                Button("Close Tabs to the Right") {
-                    store.closeTabs(.right, relativeTo: store.selection)
-                }.disabled(
-                    !store.canEdit
-                        || store.editor.tabsToClose(.right, relativeTo: store.selection).isEmpty)
-                Button("Close All Tabs") { store.closeTabs(.all) }.disabled(
-                    !store.canEdit || store.editor.openTabs.isEmpty)
-                Button("Reopen Closed Tab") { store.reopenTab() }.keyboardShortcut(
-                    "t", modifiers: [.command, .shift])
-                Button("Move Request Earlier") { store.reorderSelected(-1) }.keyboardShortcut(
-                    .upArrow, modifiers: .option)
-                Button("Move Request Later") { store.reorderSelected(1) }.keyboardShortcut(
-                    .downArrow, modifiers: .option)
-                Divider()
-                Button("Git / Sharing / Local Extensions…") { store.showWorkspaceTools = true }
-                Button("gRPC…") { store.showGRPC = true }
-                Button("MQTT / Kafka / AMQP Brokers…") { store.showBrokers = true }
-                Button("WebSocket / SSE / Subscriptions…") { store.showLiveStreams = true }
-                    .disabled(store.selected == nil)
-                Button("API Definitions / Contracts / Mocks…") { store.showAPITools = true }
-                Button("Collection Runner / Matrix / Load…") { store.showRunner = true }
-                Button("Generate Command…") { store.showCommandExport = true }.disabled(
-                    store.selection == nil)
                 Button("Send Request") { store.send() }.keyboardShortcut(
                     .return, modifiers: .command
-                ).disabled(store.running || store.loading)
+                ).disabled(store.running || !store.canEdit || store.selected == nil)
                 Button("Cancel Request") { store.cancel() }.keyboardShortcut(".")
+                    .disabled(!store.running)
                 Button("Find Request") { store.showPalette = true }.keyboardShortcut("k")
-                Button("Cookie Manager…") { store.showCookies = true }
-                Button("TLS Profiles") { store.showTLS = true }
-                Button("Authentication and Secrets") { store.showAuthentication = true }
-                Button("Environments") { store.showEnvironments = true }.keyboardShortcut(
-                    "e", modifiers: [.command, .shift])
+                Divider()
+                Menu("Tabs") {
+                    Button("New Request Tab") { store.newRequest() }.keyboardShortcut("t")
+                    Button("Reopen Closed Tab") { store.reopenTab() }.keyboardShortcut(
+                        "t", modifiers: [.command, .shift])
+                    Divider()
+                    Button("Close Request Tab") {
+                        if let id = store.selection { store.closeTab(id) }
+                    }
+                    .keyboardShortcut("w")
+                    Button("Close Tabs to the Left") {
+                        store.closeTabs(.left, relativeTo: store.selection)
+                    }.disabled(
+                        !store.canEdit
+                            || store.editor.tabsToClose(.left, relativeTo: store.selection).isEmpty)
+                    Button("Close Tabs to the Right") {
+                        store.closeTabs(.right, relativeTo: store.selection)
+                    }.disabled(
+                        !store.canEdit
+                            || store.editor.tabsToClose(.right, relativeTo: store.selection).isEmpty
+                    )
+                    Button("Close All Tabs") { store.closeTabs(.all) }.disabled(
+                        !store.canEdit || store.editor.openTabs.isEmpty)
+                }
+                Menu("Reorder Request") {
+                    Button("Move Request Earlier") { store.reorderSelected(-1) }.keyboardShortcut(
+                        .upArrow, modifiers: .option)
+                    Button("Move Request Later") { store.reorderSelected(1) }.keyboardShortcut(
+                        .downArrow, modifiers: .option)
+                }.disabled(store.selected == nil)
+                Divider()
+                Button("Review Imported Scripts…") { store.showForeignScripts = true }.disabled(
+                    store.selected?.foreignScripts?.isEmpty != false)
+                Button("Generate Command…") { store.showCommandExport = true }.disabled(
+                    store.selection == nil)
+            }
+            CommandMenu("Workspace") {
+                Button("Browse Tools…") { store.showToolBrowser = true }.disabled(!store.canEdit)
+                Divider()
+                ForEach(WorkspaceTool.groups) { group in
+                    Menu(group.title) {
+                        ForEach(group.tools) { tool in
+                            Button(tool.title + "…") { tool.open(store) }
+                                .keyboardShortcut(tool.shortcut)
+                                .disabled(!tool.isAvailable(in: store))
+                        }
+                    }
+                }
             }
         }
         Settings {
@@ -146,7 +157,7 @@ typealias ViewState<Value> = SwiftUI.State<Value>
                         }
                     }
                 }
-            }.padding(24).frame(width: 650, height: 550).rillToolControls()
+            }.padding(RillSpacing.sheet).frame(width: 650, height: 550).rillToolControls()
                 .preferredColorScheme(
                     appearance == "dark" ? .dark : appearance == "light" ? .light : nil)
         }

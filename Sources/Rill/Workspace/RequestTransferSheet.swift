@@ -72,9 +72,7 @@ struct RequestTransferSheet: View {
                     .disabled(
                         request == nil || (!transfer.copy && destination == request?.collectionID))
             }
-        }.padding(24).frame(width: 510, height: 510).background(RillPalette.canvas).buttonStyle(
-            RillButtonStyle()
-        )
-        .onAppear { destination = request?.collectionID }
+        }.padding(RillSpacing.sheet).frame(width: 510, height: 510).rillToolControls()
+            .onAppear { destination = request?.collectionID }
     }
 }

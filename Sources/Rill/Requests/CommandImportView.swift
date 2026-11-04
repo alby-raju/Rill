@@ -88,23 +88,25 @@ struct CommandImportView: View {
                 }
             }
             if let error { Text(error).foregroundStyle(.red).textSelection(.enabled) }
-        }.padding(24).frame(width: 800, height: 620).disabled(store.importing)
-            .onChange(of: input) { _, _ in
-                parseTask?.cancel()
-                entries = []
-                preview = nil
-                error = nil
-            }
-            .onChange(of: har) { _, _ in
-                parseTask?.cancel()
-                entries = []
-                preview = nil
-                error = nil
-            }
-            .onDisappear {
-                parseTask?.cancel()
-                input = ""
-                preview = nil
-            }
+        }.padding(RillSpacing.sheet).frame(width: 800, height: 620).rillToolControls().disabled(
+            store.importing
+        )
+        .onChange(of: input) { _, _ in
+            parseTask?.cancel()
+            entries = []
+            preview = nil
+            error = nil
+        }
+        .onChange(of: har) { _, _ in
+            parseTask?.cancel()
+            entries = []
+            preview = nil
+            error = nil
+        }
+        .onDisappear {
+            parseTask?.cancel()
+            input = ""
+            preview = nil
+        }
     }
 }

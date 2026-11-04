@@ -68,30 +68,12 @@ struct WelcomeView: View {
                             }.buttonStyle(RillButtonStyle())
                         }.padding(.top, 5)
                     }
-                    LazyVGrid(
-                        columns: [GridItem(.adaptive(minimum: 245), spacing: 12)], spacing: 12
-                    ) {
-                        entry(
-                            "API definitions",
-                            detail: "Bring in an OpenAPI document or create a mock.",
-                            icon: "curlybraces.square"
-                        ) { store.showAPITools = true }
-                        entry(
-                            "Live connections",
-                            detail: "Explore WebSocket, SSE and GraphQL streams.",
-                            icon: "waveform.path"
-                        ) { store.showLiveStreams = true }
-                        entry(
-                            "gRPC explorer",
-                            detail: "Load Protobuf schemas and call native gRPC services.",
-                            icon: "point.3.connected.trianglepath.dotted"
-                        ) { store.showGRPC = true }
-                        entry(
-                            "Workspace tools",
-                            detail: "Git, read-only sharing and local extensions.",
-                            icon: "square.stack.3d.up"
-                        ) { store.showWorkspaceTools = true }
-                    }
+                    entry(
+                        "Workspace tools",
+                        detail:
+                            "Browse request setup, session history, protocol workbenches and workspace files.",
+                        icon: "square.grid.2x2"
+                    ) { store.showToolBrowser = true }
                     HStack(spacing: 16) {
                         Label(
                             "\(store.workspace.requests.count) requests",

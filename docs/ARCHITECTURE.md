@@ -55,3 +55,29 @@ Debug preview/diagnostic states use synthetic stores, temporary directories and 
 Production dependencies are exact-pinned. The native protobuf compiler and required resources/runtimes ship in the app; generated client programs are text until a user explicitly runs them elsewhere. Test SDKs and optional Python gRPC tooling are not app runtime dependencies.
 
 See [DEPENDENCIES.md](DEPENDENCIES.md) for review and packaging policy, [FEATURES.md](FEATURES.md) for supported subsets, and [SECURITY.md](../SECURITY.md) for trust boundaries.
+
+## Navigation and actions
+
+The Workbench sidebar reserves its footer for request creation and the workspace tools browser.
+Add workspace-wide tools to the ordered WorkspaceTool.groups catalog, which feeds both the
+browser and the macOS Workspace menu. Keep request commands with the request editor or Request
+menu, file-format interchange in File, and tool-specific actions with the section or result they affect.
+Keep destructive collection-wide actions in a separate footer or menu group.
+
+### Control sizing
+
+Rill's shared SwiftUI controls use points. Choose a size by where the control appears.
+
+| Placement | Size rule |
+| --- | --- |
+| Forms, sheet actions, sidebar actions and request controls | Standard, 34 pt minimum height |
+| Dense editor toolbars and tabs | Compact, 28 pt minimum height |
+| Standalone icon actions | 34 × 34 pt, or 28 × 28 pt in compact toolbars, with help and accessibility labels |
+| Selectable rows with a title and optional description | 48 pt minimum height, with room to wrap |
+
+Use RillButtonStyle, RillTextFieldStyle, RillSelect and RillTabs for these roles. Button emphasis
+sets color and surface independently of size. Let text controls size to their content or fill their
+column. Use RillControlWidth for repeated numeric, method, selector and search widths.
+Use an 8 pt gap in control rows, 16 pt section padding and 24 pt sheet padding through
+RillSpacing. Native controls such as toggles, steppers and menus use the system regular size
+in forms, and the system small size when embedded in a compact toolbar.

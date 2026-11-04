@@ -23,7 +23,10 @@ struct SelectionRow: View {
                 if selected {
                     Image(systemName: "checkmark.circle.fill").foregroundStyle(RillPalette.accent)
                 }
-            }.padding(10).frame(maxWidth: .infinity, alignment: .leading)
+            }.padding(.horizontal, RillControlSize.row.inset).padding(.vertical, 4)
+                .frame(
+                    maxWidth: .infinity, minHeight: RillControlSize.row.height, alignment: .leading
+                )
                 .background(
                     selected
                         ? RillPalette.accent.opacity(0.12)
@@ -56,7 +59,7 @@ struct EnvironmentSwitcher: View {
                 Text(store.environment?.name ?? "No environment").lineLimit(1)
                 Spacer(minLength: 4)
                 Image(systemName: "chevron.down").font(.caption2)
-            }.frame(width: 180)
+            }.frame(width: RillControlWidth.selector)
         }.buttonStyle(RillButtonStyle()).accessibilityLabel("Choose environment")
     }
 }
@@ -126,7 +129,9 @@ struct RequestLayoutSelector: View {
         Button(action: action) {
             Image(systemName: "rectangle.split.2x1")
         }
-        .buttonStyle(RillButtonStyle(emphasis: .quiet)).help("Request and response layout")
+        .buttonStyle(RillButtonStyle(emphasis: .quiet, size: .icon)).help(
+            "Request and response layout"
+        )
         .accessibilityLabel("Request and response layout")
     }
 }
@@ -191,7 +196,7 @@ struct ContainedWorkbenchSelector<Content: View>: View {
                 .modifier(RillGlassSurface())
                 .overlay(alignment: .topTrailing) {
                     Button(action: dismiss) { Image(systemName: "xmark") }
-                        .buttonStyle(RillButtonStyle(emphasis: .quiet))
+                        .buttonStyle(RillButtonStyle(emphasis: .quiet, size: .icon))
                         .keyboardShortcut(.cancelAction)
                         .accessibilityLabel("Close selector")
                         .padding(6)

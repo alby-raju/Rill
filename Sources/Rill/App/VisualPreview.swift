@@ -100,6 +100,9 @@ import SwiftUI
                 let previewHeight = argument("--ui-height").flatMap(Double.init) ?? 920
                 window.setContentSize(
                     NSSize(width: max(1050, compact), height: max(700, previewHeight)))
+                if argument("--ui-state") == "control-sizes" {
+                    try verifyControlSizes()
+                }
                 if argument("--ui-state") == "response-resize" {
                     try await verifyTabResizing(window)
                 }
@@ -226,7 +229,13 @@ import SwiftUI
                     panel.orderFront(nil)
                 }
                 if let state = argument("--ui-state"), let store = previewStore {
-                    if state == "environment-empty" || state == "environment-editor" {
+                    if state == "workspace-tools" {
+                        let host = NSHostingView(
+                            rootView: WorkspaceToolsBrowser { _ in }
+                                .environmentObject(store).preferredColorScheme(scheme))
+                        showSurface(host, size: NSSize(width: 650, height: 575))
+                        view = host
+                    } else if state == "environment-empty" || state == "environment-editor" {
                         if state == "environment-editor" {
                             var local = RillCore.Environment(name: "Local development")
                             local.variables = [
@@ -358,6 +367,63 @@ import SwiftUI
         #endif
     }
     #if DEBUG
+        private static func verifyControlSizes() throws {
+            func measure<Content: View>(_ control: Content) -> NSSize {
+                NSHostingView(rootView: control.fixedSize()).fittingSize
+            }
+            func check(_ name: String, _ measured: NSSize, height: CGFloat, width: CGFloat? = nil)
+                throws
+            {
+                guard abs(measured.height - height) <= 1,
+                    width.map({ abs(measured.width - $0) <= 1 }) ?? true
+                else {
+                    fputs("Unexpected control size for \(name): \(measured)\n", stderr)
+                    throw CocoaError(.coderInvalidValue)
+                }
+            }
+            for (name, size, expected): (String, RillControlSize, CGFloat) in [
+                ("standard", .standard, 34), ("compact", .compact, 28), ("row", .row, 48),
+            ] {
+                try check(
+                    name + " button",
+                    measure(Button("Action") {}.buttonStyle(RillButtonStyle(size: size))),
+                    height: expected)
+                if size != .row {
+                    try check(
+                        name + " field",
+                        measure(
+                            TextField("Value", text: .constant("")).textFieldStyle(
+                                RillTextFieldStyle(size: size))),
+                        height: expected)
+                }
+            }
+            for (size, expected): (RillControlSize, CGFloat) in [(.icon, 34), (.compactIcon, 28)] {
+                try check(
+                    "icon button",
+                    measure(
+                        Button(action: {}) { Image(systemName: "plus") }
+                            .buttonStyle(RillButtonStyle(size: size))), height: expected,
+                    width: expected)
+            }
+            try check(
+                "selector",
+                measure(
+                    RillSelect(
+                        title: "Method", value: "GET",
+                        selection: .constant("GET")
+                    ) { Text("GET").tag("GET") }), height: 34)
+            if let store = previewStore {
+                // The sidebar is 220 pt at minimum, with 12 pt insets on both sides.
+                try check(
+                    "sidebar new request",
+                    measure(NewRequestControl().environmentObject(store).frame(width: 196)),
+                    height: 34, width: 196)
+            } else {
+                throw CocoaError(.coderInvalidValue)
+            }
+            print("RILL_CONTROL_SIZES_OK cases=9")
+        }
+
         @MainActor private final class MenuDiagnosticDriver: NSObject {
             let store: WorkbenchStore
             let menuView: RequestTabMenu.MenuView

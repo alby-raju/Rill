@@ -25,6 +25,8 @@ states = [
     ("selector-layout", "light", 1440),
     ("selector-environment", "dark", 1050),
     ("selector-environment", "light", 1440),
+    ("workspace-tools", "dark", 1050),
+    ("control-sizes", "light", 1050),
     ("environment-empty", "dark", 1440),
     ("environment-editor", "light", 1440),
     ("copy-request", "dark", 1440),

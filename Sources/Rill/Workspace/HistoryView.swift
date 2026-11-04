@@ -15,7 +15,6 @@ struct HistoryView: View {
                     subtitle: "Inspect captured responses and compare JSON snapshots.",
                     icon: "clock.arrow.circlepath")
                 Spacer()
-                Button("Clear history", systemImage: "trash") { store.clearHistory() }
                 Button("Done") { dismiss() }.keyboardShortcut(.defaultAction)
             }
             HStack {
@@ -80,7 +79,14 @@ struct HistoryView: View {
                     ).frame(minWidth: 500)
                 }
             }
-        }.padding(24).frame(width: 1000, height: 600).rillToolControls()
+            Divider()
+            HStack {
+                Spacer()
+                Button("Clear history…", systemImage: "trash", role: .destructive) {
+                    store.clearHistory()
+                }
+            }
+        }.padding(RillSpacing.sheet).frame(width: 1000, height: 600).rillToolControls()
             .onDisappear { comparisonTask?.cancel() }
             .sheet(
                 isPresented: Binding(
@@ -96,7 +102,7 @@ struct HistoryView: View {
                         Text(comparison ?? "").font(.system(.body, design: .monospaced))
                             .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
                     }
-                }.padding(24).frame(width: 750, height: 550)
+                }.padding(RillSpacing.sheet).frame(width: 750, height: 550).rillToolControls()
             }
     }
 }

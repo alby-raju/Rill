@@ -69,7 +69,7 @@ struct EnvironmentEditor: View {
                     }
                 }.frame(minWidth: 430, maxWidth: .infinity, maxHeight: .infinity)
             }.frame(maxWidth: .infinity, maxHeight: .infinity)
-        }.padding(24).frame(width: 900, height: 590).rillToolControls()
+        }.padding(RillSpacing.sheet).frame(width: 900, height: 590).rillToolControls()
             .alert(
                 "Delete environment?",
                 isPresented: Binding(
