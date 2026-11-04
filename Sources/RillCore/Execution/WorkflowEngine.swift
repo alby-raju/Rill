@@ -42,7 +42,7 @@ public enum WorkflowEngine {
         _ request: RequestDraft, variables: [String: String], budget: ResponseBudget = .standard,
         profiles: [AuthenticationProfile] = [], secrets: NamedSecretResolver? = nil,
         tlsProfiles: [TLSProfile] = [], definitions: [APIDefinitionSource] = [],
-        fileTLS: FileTLSConfiguration? = nil
+        fileTLS: FileTLSConfiguration? = nil, cookieJar: CookieJar? = nil
     ) async throws -> WorkflowStepResult {
         try Task.checkCancellation()
         let prepared = try prepare(request, variables: variables)
@@ -50,7 +50,7 @@ public enum WorkflowEngine {
             prepared.request, environment: environment(prepared.variables), budget: budget,
             profiles: profiles, secrets: secrets, tlsProfiles: tlsProfiles,
             definitions: definitions,
-            fileTLS: fileTLS
+            fileTLS: fileTLS, cookieJar: cookieJar
         )
         exchange.checks += prepared.checks
         guard exchange.checks.allSatisfy(\.passed) else {

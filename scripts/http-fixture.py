@@ -95,6 +95,21 @@ class Handler(BaseHTTPRequestHandler):
     do_OPTIONS = do_echo
 
     def do_GET(self):
+        if self.path in ("/cookie/set", "/cookie/expire", "/cookie/redirect"):
+            self.send_response(302 if self.path == "/cookie/redirect" else 200)
+            if self.path == "/cookie/set":
+                self.send_header("Set-Cookie", "session=fixture; Path=/; HttpOnly")
+                self.send_header("Set-Cookie", "scoped=fixture; Path=/echo/scoped")
+                self.send_header("Set-Cookie", "secure=fixture; Path=/; Secure")
+                self.send_header("Set-Cookie", "foreign=fixture; Domain=example.invalid; Path=/")
+            elif self.path == "/cookie/expire":
+                self.send_header("Set-Cookie", "session=expired; Path=/; Max-Age=0")
+            else:
+                self.send_header("Set-Cookie", "redirect=fixture; Path=/")
+                self.send_header("Location", "/echo")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
         if self.path.startswith("/gzip/"):
             count = min(int(self.path.rsplit("/", 1)[1]), 1024 * 1024)
             body = gzip.compress(b"x" * count)

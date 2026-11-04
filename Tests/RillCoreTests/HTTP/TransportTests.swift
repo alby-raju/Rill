@@ -13,6 +13,62 @@ import XCTest
         request.url = base + path
         return request
     }
+    func testCookieJarReusesScopedCookiesAndKeepsOtherSessionsIsolated() async throws {
+        let jar = CookieJar()
+        _ = try await RequestEngine.execute(
+            try draft("/cookie/set"), environment: nil, cookieJar: jar)
+        XCTAssertTrue(jar.cookies.contains { $0.name == "session" && $0.isHTTPOnly })
+        XCTAssertTrue(jar.cookies.contains { $0.name == "scoped" })
+        XCTAssertFalse(jar.cookies.contains { $0.name == "foreign" })
+
+        let echo = try draft("/echo")
+        let regular = try await cookieHeader(echo, jar: jar)
+        XCTAssertEqual(regular, "session=fixture")
+        let scoped = try await cookieHeader(draft("/echo/scoped/nested"), jar: jar)
+        XCTAssertEqual(
+            Set(scoped.split(separator: ";").map { $0.trimmingCharacters(in: .whitespaces) }),
+            ["scoped=fixture", "session=fixture"])
+        let otherPath = try await cookieHeader(draft("/echo/scoped-other"), jar: jar)
+        XCTAssertEqual(otherPath, regular)
+
+        var otherHost = echo
+        var url = try XCTUnwrap(URLComponents(string: echo.url))
+        url.host = "localhost"
+        otherHost.url = try XCTUnwrap(url.string)
+        let other = try await cookieHeader(otherHost, jar: jar)
+        XCTAssertEqual(other, "")
+        let newJar = try await cookieHeader(echo, jar: CookieJar())
+        XCTAssertEqual(newJar, "")
+        let disabled = try await cookieHeader(echo)
+        XCTAssertEqual(disabled, "")
+
+        _ = try await RequestEngine.execute(
+            try draft("/cookie/expire"), environment: nil, cookieJar: jar)
+        let expired = try await cookieHeader(echo, jar: jar)
+        XCTAssertEqual(expired, "")
+        jar.removeAll()
+        XCTAssertTrue(jar.cookies.isEmpty)
+    }
+
+    func testCookieJarCapturesRedirectCookiesAndSupportsRemoval() async throws {
+        let jar = CookieJar()
+        let redirect = try await cookieHeader(draft("/cookie/redirect"), jar: jar)
+        XCTAssertEqual(redirect, "redirect=fixture")
+        let cookie = try XCTUnwrap(jar.cookies.first)
+        jar.remove(cookie)
+        let afterRemoval = try await cookieHeader(draft("/echo"), jar: jar)
+        XCTAssertEqual(afterRemoval, "")
+    }
+
+    private func cookieHeader(_ request: RequestDraft, jar: CookieJar? = nil) async throws -> String
+    {
+        let exchange = try await RequestEngine.execute(request, environment: nil, cookieJar: jar)
+        let object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: exchange.body) as? [String: Any])
+        let headers = try XCTUnwrap(object["headers"] as? [String: String])
+        return headers.first { $0.key.lowercased() == "cookie" }?.value ?? ""
+    }
+
     func testRealResponseAndChecks() async throws {
         var request = try draft("/json")
         request.expectedStatus = "200"

@@ -99,6 +99,8 @@ import UniformTypeIdentifiers
     @Published var showAuthentication = false
     @Published var showEnvironments = false
     @Published var showHistory = false
+    @Published var showCookies = false
+    let cookieJar = CookieJar()
     @Published var showPalette = false
     @Published var persistenceAvailable = true
     @Published var persistenceHealth: PersistenceHealth = .loading
@@ -624,7 +626,7 @@ import UniformTypeIdentifiers
                     budget: try ResponseBudget(
                         downloadBytes: settings.downloadBytes, previewBytes: settings.previewBytes),
                     profiles: profiles, secrets: secrets, tlsProfiles: tlsProfiles,
-                    definitions: definitions)
+                    definitions: definitions, cookieJar: cookieJar)
                 let exchange = result.exchange
                 try Task.checkCancellation()
                 guard activeContext == context.id else { return }

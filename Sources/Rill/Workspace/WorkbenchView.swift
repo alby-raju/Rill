@@ -129,6 +129,7 @@ struct WorkbenchView: View {
         .sheet(isPresented: $store.showEnvironments) {
             EnvironmentEditor().environmentObject(store)
         }
+        .sheet(isPresented: $store.showCookies) { CookieManagerView(jar: store.cookieJar) }
         .sheet(isPresented: $store.showHistory) { HistoryView().environmentObject(store) }
         .sheet(isPresented: $store.showPalette) { RequestSearch().environmentObject(store) }
         .alert(
@@ -257,6 +258,11 @@ struct WorkbenchView: View {
                     store.showEnvironments = true
                 } label: {
                     Label("Environments", systemImage: "square.stack.3d.up")
+                }
+                Button {
+                    store.showCookies = true
+                } label: {
+                    Label("Cookies", systemImage: "tray.full")
                 }
                 Button {
                     store.showHistory = true

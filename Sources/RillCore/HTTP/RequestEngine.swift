@@ -228,7 +228,7 @@ public enum RequestEngine {
         profiles: [AuthenticationProfile] = [], secrets: NamedSecretResolver? = nil,
         tlsProfiles: [TLSProfile] = [], identities: any TLSIdentityProvider = SystemTLSIdentities(),
         definitions: [APIDefinitionSource] = [], followRedirects: Bool = true,
-        fileTLS: FileTLSConfiguration? = nil
+        fileTLS: FileTLSConfiguration? = nil, cookieJar: CookieJar? = nil
     ) async throws -> Exchange {
         try Task.checkCancellation()
         let selectedProfile = try TLSProfiles.selected(
@@ -258,6 +258,7 @@ public enum RequestEngine {
             }
         }
         let configuration = HTTPClientConfiguration.make()
+        cookieJar?.configure(configuration)
         let delegate = HTTPTransportDelegate(
             prepared: frozen, profile: tlsProfile, identity: identity,
             certificates: fileCredential?.1,

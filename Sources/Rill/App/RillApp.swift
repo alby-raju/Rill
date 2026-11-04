@@ -106,6 +106,7 @@ typealias ViewState<Value> = SwiftUI.State<Value>
                 ).disabled(store.running || store.loading)
                 Button("Cancel Request") { store.cancel() }.keyboardShortcut(".")
                 Button("Find Request") { store.showPalette = true }.keyboardShortcut("k")
+                Button("Cookie Manager…") { store.showCookies = true }
                 Button("TLS Profiles") { store.showTLS = true }
                 Button("Authentication and Secrets") { store.showAuthentication = true }
                 Button("Environments") { store.showEnvironments = true }.keyboardShortcut(
