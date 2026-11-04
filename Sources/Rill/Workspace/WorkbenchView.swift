@@ -15,6 +15,7 @@ struct WorkbenchView: View {
     private var showingLaunch: Bool { store.loading || !launchIntroductionFinished }
     @ViewState private var selector: WorkbenchSelector?
     @ViewState private var requestTransfer: RequestTransfer?
+    @ViewState<Set<UUID>> private var selectedRows: Set<UUID> = []
     @ViewState<WorkspaceTool?> private var pendingTool: WorkspaceTool?
     @AppStorage("collapsedCollectionIDs") private var collapsedCollectionIDs = ""
     @ViewState private var collapsedSearchCollections: Set<UUID> = []
@@ -22,6 +23,14 @@ struct WorkbenchView: View {
     var body: some View {
         NavigationSplitView {
             sidebar.onChange(of: store.search) { _, _ in collapsedSearchCollections.removeAll() }
+                .onChange(of: visibleRequestIDs) { _, ids in selectedRows.formIntersection(ids) }
+                .onChange(of: store.selection, initial: true) { _, id in
+                    guard let id else {
+                        selectedRows.removeAll()
+                        return
+                    }
+                    if !selectedRows.contains(id) { selectedRows = [id] }
+                }
                 .navigationSplitViewColumnWidth(min: 220, ideal: 250, max: 360)
                 .background(SplitAutosave(name: "rill.sidebar", vertical: true))
         } detail: {
@@ -80,6 +89,7 @@ struct WorkbenchView: View {
         }
         #if DEBUG
             .onReceive(RillPreview.selectors) { selector = $0 }
+            .onReceive(RillPreview.selectAllRequests) { _ in selectAllVisibleRequests() }
         #endif
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .buttonStyle(RillButtonStyle())
@@ -171,6 +181,17 @@ struct WorkbenchView: View {
                     .secondary)
                 Spacer()
                 Button {
+                    selectAllVisibleRequests()
+                } label: {
+                    Image(systemName: "checklist")
+                }.buttonStyle(RillButtonStyle(emphasis: .quiet, size: .icon))
+                    .help("Select all visible requests").accessibilityLabel(
+                        "Select all visible requests"
+                    )
+                    .disabled(
+                        visibleRequestIDs.count < 2
+                            || visibleRequestIDs.allSatisfy(selectedRows.contains))
+                Button {
                     store.newCollection()
                 } label: {
                     Image(systemName: "folder.badge.plus")
@@ -178,7 +199,7 @@ struct WorkbenchView: View {
                     .accessibilityLabel("New collection")
             }
             .padding(.horizontal, 20).padding(.top, 25).padding(.bottom, 8)
-            List(selection: $store.selection) {
+            List(selection: sidebarSelection) {
                 ForEach(store.workspace.collections) { collection in
                     Group {
                         Button {
@@ -236,6 +257,13 @@ struct WorkbenchView: View {
                     Section("Unfiled") { ForEach(filtered(nil)) { request in requestRow(request) } }
                 }
             }.listStyle(.sidebar).scrollContentBackground(.hidden)
+                .contextMenu(forSelectionType: UUID.self) { ids in
+                    requestActions(visibleRequestIDs.filter(ids.contains))
+                }
+                .onDeleteCommand {
+                    store.deleteRequests(visibleRequestIDs.filter(selectedRows.contains))
+                }
+                .onExitCommand { clearBulkSelection() }
                 .overlay {
                     if store.workspace.requests.isEmpty && store.workspace.collections.isEmpty {
                         VStack(spacing: 9) {
@@ -250,6 +278,24 @@ struct WorkbenchView: View {
                         ).padding(.top, 22).allowsHitTesting(false)
                     }
                 }
+            let selectedIDs = visibleRequestIDs.filter(selectedRows.contains)
+            if selectedIDs.count > 1 {
+                Divider()
+                HStack(spacing: RillSpacing.controls) {
+                    Menu {
+                        requestActions(selectedIDs)
+                    } label: {
+                        Label("\(selectedIDs.count) selected", systemImage: "checkmark.circle")
+                            .lineLimit(1)
+                    }.menuStyle(.borderlessButton)
+                        .accessibilityHint("Open actions for the selected requests")
+                    Spacer(minLength: 0)
+                    Button(action: clearBulkSelection) {
+                        Image(systemName: "xmark")
+                    }.buttonStyle(RillButtonStyle(emphasis: .quiet, size: .compactIcon))
+                        .help("Clear multi-selection").accessibilityLabel("Clear multi-selection")
+                }.padding(.horizontal, 12).padding(.vertical, 6)
+            }
             Divider()
             VStack(spacing: 6) {
                 NewRequestControl()
@@ -297,11 +343,84 @@ struct WorkbenchView: View {
                 }
             })
     }
+    private var visibleRequestIDs: [UUID] {
+        let visibleCollections = store.workspace.collections.filter {
+            collectionExpansion($0.id).wrappedValue
+        }.map(\.id)
+        let grouped = Dictionary(
+            grouping: store.workspace.requests.filter(matchesSearch), by: \.collectionID)
+        return (visibleCollections.map(Optional.some) + [nil]).flatMap {
+            (grouped[$0] ?? []).map(\.id)
+        }
+    }
+
+    private var sidebarSelection: Binding<Set<UUID>> {
+        Binding(
+            get: { selectedRows.intersection(visibleRequestIDs) },
+            set: { ids in
+                let ordered = visibleRequestIDs.filter(ids.contains)
+                selectedRows = Set(ordered)
+                if let first = ordered.first,
+                    store.selection.map({ !selectedRows.contains($0) }) ?? true
+                {
+                    store.selection = first
+                }
+            })
+    }
+
+    private func selectAllVisibleRequests() {
+        sidebarSelection.wrappedValue = Set(visibleRequestIDs)
+    }
+
+    private func clearBulkSelection() {
+        selectedRows = Set(store.selection.map { [$0] } ?? [])
+    }
+
+    @ViewBuilder private func requestActions(_ ids: [UUID]) -> some View {
+        if !ids.isEmpty {
+            Button(ids.count == 1 ? "Duplicate request" : "Duplicate requests") {
+                store.duplicateRequests(ids)
+            }
+            Button("Copy to collection…") {
+                requestTransfer = RequestTransfer(requestIDs: ids, copy: true)
+            }
+            Button("Move to collection…") {
+                requestTransfer = RequestTransfer(requestIDs: ids, copy: false)
+            }
+            if ids.count == 1, let id = ids.first {
+                Divider()
+                Button("Move earlier") {
+                    store.attempt {
+                        try WorkspaceOperations.move(id, offset: -1, in: &store.workspace)
+                    }
+                }
+                Button("Move later") {
+                    store.attempt {
+                        try WorkspaceOperations.move(id, offset: 1, in: &store.workspace)
+                    }
+                }
+            }
+            Divider()
+            Button(ids.count == 1 ? "Delete request…" : "Delete requests…", role: .destructive) {
+                store.deleteRequests(ids)
+            }
+        }
+        if visibleRequestIDs.count > 1 {
+            if !ids.isEmpty { Divider() }
+            Button("Select all visible requests") {
+                selectAllVisibleRequests()
+            }.disabled(ids.count == visibleRequestIDs.count)
+        }
+    }
+
+    private func matchesSearch(_ request: RequestDraft) -> Bool {
+        store.search.isEmpty || request.name.localizedCaseInsensitiveContains(store.search)
+            || request.url.localizedCaseInsensitiveContains(store.search)
+    }
+
     private func filtered(_ collection: UUID?) -> [RequestDraft] {
         store.workspace.requests.filter {
-            $0.collectionID == collection
-                && (store.search.isEmpty || $0.name.localizedCaseInsensitiveContains(store.search)
-                    || $0.url.localizedCaseInsensitiveContains(store.search))
+            $0.collectionID == collection && matchesSearch($0)
         }
     }
     private func requestRow(_ request: RequestDraft) -> some View {
@@ -319,31 +438,7 @@ struct WorkbenchView: View {
                 store.reorder(id, target: request.id, after: point.y > 19)
                 return true
             }
-            .contextMenu {
-                Button("Duplicate") {
-                    store.duplicate(
-                        store.editor.request(request.id, in: store.workspace) ?? request)
-                }
-                Button("Copy to collection…") {
-                    requestTransfer = RequestTransfer(requestID: request.id, copy: true)
-                }
-                Button("Move to collection…") {
-                    requestTransfer = RequestTransfer(requestID: request.id, copy: false)
-                }
-                Divider()
-                Button("Move earlier") {
-                    store.attempt {
-                        try WorkspaceOperations.move(request.id, offset: -1, in: &store.workspace)
-                    }
-                }
-                Button("Move later") {
-                    store.attempt {
-                        try WorkspaceOperations.move(request.id, offset: 1, in: &store.workspace)
-                    }
-                }
-                Divider()
-                Button("Delete request…", role: .destructive) { store.delete(request) }
-            }
+
     }
     private var tabbar: some View {
         ScrollView(.horizontal, showsIndicators: false) {

@@ -24,6 +24,7 @@ import SwiftUI
         static let selectors = PassthroughSubject<WorkbenchSelector?, Never>()
         static let responseSections = PassthroughSubject<String, Never>()
         static let requestSections = PassthroughSubject<String, Never>()
+        static let selectAllRequests = PassthroughSubject<Void, Never>()
         private static weak var previewStore: WorkbenchStore?
     #endif
     static func makeStore() -> WorkbenchStore {
@@ -38,6 +39,17 @@ import SwiftUI
                         RillCore.Environment(
                             name: "Synthetic environment \(index) with a long descriptive name")
                     }
+                }
+                if state == "bulk-requests" {
+                    let collection = RequestCollection(name: "Sample API")
+                    store.workspace.collections = [collection]
+                    store.workspace.requests = ["List customers", "Create customer", "List orders"]
+                        .map {
+                            var request = RequestDraft(collectionID: collection.id)
+                            request.name = $0
+                            return request
+                        }
+                    store.selection = store.workspace.requests.first?.id
                 }
                 if state == "response-resize" {
                     preferences.set(argument("--ui-layout") ?? "vertical", forKey: "requestLayout")
@@ -100,6 +112,16 @@ import SwiftUI
                 let previewHeight = argument("--ui-height").flatMap(Double.init) ?? 920
                 window.setContentSize(
                     NSSize(width: max(1050, compact), height: max(700, previewHeight)))
+                if argument("--ui-state") == "bulk-requests", let store = previewStore {
+                    let active = store.selection
+                    let tabs = store.editor.openTabs
+                    selectAllRequests.send(())
+                    try await Task.sleep(for: .milliseconds(200))
+                    guard store.selection == active, store.editor.openTabs == tabs else {
+                        throw CocoaError(.coderInvalidValue)
+                    }
+                    print("RILL_BULK_SELECTION_OK")
+                }
                 if argument("--ui-state") == "control-sizes" {
                     try verifyControlSizes()
                 }
@@ -263,7 +285,7 @@ import SwiftUI
                         let host = NSHostingView(
                             rootView: RequestTransferSheet(
                                 transfer: RequestTransfer(
-                                    requestID: request.id, copy: state == "copy-request")
+                                    requestIDs: [request.id], copy: state == "copy-request")
                             ).environmentObject(store).preferredColorScheme(scheme))
                         showSurface(host, size: NSSize(width: 510, height: 510))
                         view = host

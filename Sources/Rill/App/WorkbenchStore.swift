@@ -402,43 +402,56 @@ import UniformTypeIdentifiers
             selection = editor.activeID
         }
     }
-    func duplicate(_ request: RequestDraft) {
-        guard canEdit else { return }
-        attempt {
-            let copy = try WorkspaceOperations.copy(
-                request, to: request.collectionID, in: &workspace)
-            selection = copy.id
-        }
-    }
     func transferRequest(_ id: UUID, to collectionID: UUID?, copy: Bool) throws {
-        guard canEdit, let request = editor.request(id, in: workspace) else {
-            throw EditingError.missingItem
-        }
-        if copy {
-            let duplicate = try WorkspaceOperations.copy(request, to: collectionID, in: &workspace)
-            selection = duplicate.id
-        } else {
-            if workspace.requests.contains(where: { $0.id == id }) {
-                try WorkspaceOperations.relocate(id, to: collectionID, in: &workspace)
-            }
-            if let index = editor.drafts.firstIndex(where: { $0.id == id }) {
-                editor.drafts[index].collectionID = collectionID
-            }
-        }
+        try transferRequests([id], to: collectionID, copy: copy)
+    }
+
+    func transferRequests(_ ids: [UUID], to collectionID: UUID?, copy: Bool) throws {
+        try applyRequestBatch(ids, action: copy ? .copy(to: collectionID) : .move(to: collectionID))
         focusedCollectionID = collectionID
+    }
+
+    func duplicateRequests(_ ids: [UUID]) {
+        attempt { try applyRequestBatch(ids, action: .duplicate) }
+    }
+
+    func deleteRequests(_ ids: [UUID]) {
+        guard canEdit, !ids.isEmpty else { return }
+        let requests = ids.compactMap { editor.request($0, in: workspace) }
+        guard requests.count == ids.count else {
+            error = EditingError.missingItem.localizedDescription
+            return
+        }
+        let alert = NSAlert()
+        alert.messageText =
+            requests.count == 1
+            ? "Delete \(requests[0].name)?" : "Delete \(requests.count) selected requests?"
+        let draftCount = ids.filter { editor.isDirty($0, in: workspace) }.count
+        alert.informativeText =
+            draftCount == 0
+            ? "The selected requests and their open tabs will be removed."
+            : "The selected requests, their open tabs and \(draftCount) unsaved draft(s) will be removed."
+        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: requests.count == 1 ? "Delete Request" : "Delete Requests")
+        alert.buttons.last?.hasDestructiveAction = true
+        guard alert.runModal() == .alertSecondButtonReturn else { return }
+        attempt { try applyRequestBatch(ids, action: .delete) }
+    }
+
+    private func applyRequestBatch(_ ids: [UUID], action: RequestBatchAction) throws {
+        guard canEdit else { throw EditingError.missingItem }
+        var document = workspace
+        var session = editor
+        let copies = try session.applyRequestBatch(ids, action: action, in: &document)
+        if ids.count == 1, let copy = copies.first {
+            try session.open(copy)
+        }
+        if editor != session { editor = session }
+        if workspace != document { workspace = document }
+        if selection != session.activeID { selection = session.activeID }
         persist()
     }
-    func delete(_ request: RequestDraft) {
-        let alert = NSAlert()
-        alert.messageText = "Delete \(request.name)?"
-        alert.informativeText = "The saved request and its unsaved draft will be removed."
-        alert.addButton(withTitle: "Cancel")
-        alert.addButton(withTitle: "Delete Request")
-        guard alert.runModal() == .alertSecondButtonReturn else { return }
-        workspace.requests.removeAll { $0.id == request.id }
-        editor.remove([request.id])
-        selection = editor.activeID
-    }
+
     func reorder(_ id: UUID, target: UUID, after: Bool) {
         guard canEdit else { return }
         attempt {
