@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add read-only `doctor`, primary-command help and parser-derived Bash/zsh/fish completions. Package a standalone macOS CLI ZIP with required resources, relocation checks and provenance; keep architecture-specific checksums separate from the published verification kit.
+
 - Add self-contained offline HTML run reports in desktop and CLI exports, with local request/state filtering, checks and timing bars. Preserve report redaction and constrain the fixed filter script with a content security policy.
 
 - Add explicit `--cookies` for Postman/native file runs and optional shared-runner cookie sessions. Preserve native cookie matching, expiry and redirects; isolate each CLI invocation from Workbench and other runs.

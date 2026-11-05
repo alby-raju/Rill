@@ -53,12 +53,15 @@ jobs:
       - run: python3 scripts/build-verification-kit.py
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
-          subject-path: dist/*.dmg
+          subject-path: |
+            dist/*.dmg
+            dist/RillCLI-*-development.zip
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-${{ matrix.runner }}
           path: |
             dist/*.dmg
+            dist/RillCLI-*-development.zip
             dist/*.sha256
             dist/*.provenance.json
             dist/Rill-Verification-Kit.zip
@@ -86,9 +89,12 @@ jobs:
         run: |
           set -euo pipefail
           mkdir publish
-          cp release-assets/release-macos-15/*.dmg release-assets/release-macos-15/*.sha256 release-assets/release-macos-15/*.provenance.json publish/
-          cp release-assets/release-macos-15-intel/*.dmg release-assets/release-macos-15-intel/*.sha256 release-assets/release-macos-15-intel/*.provenance.json publish/
-          cp release-assets/release-macos-15/Rill-Verification-Kit.zip publish/
+          for architecture in release-macos-15 release-macos-15-intel; do
+            cp release-assets/"$architecture"/*.dmg release-assets/"$architecture"/Rill-*-development.sha256 publish/
+            cp release-assets/"$architecture"/RillCLI-*-development.zip release-assets/"$architecture"/RillCLI-*-development.zip.sha256 publish/
+            cp release-assets/"$architecture"/*.provenance.json publish/
+          done
+          cp release-assets/release-macos-15/Rill-Verification-Kit.zip release-assets/release-macos-15/Rill-Verification-Kit.zip.sha256 publish/
           cp LICENSE THIRD_PARTY_NOTICES.txt Package.resolved publish/
           (cd publish && sha256sum -- *.dmg *.zip LICENSE THIRD_PARTY_NOTICES.txt Package.resolved > SHA256SUMS)
           gh release create "$RELEASE_TAG" publish/* --target "$GITHUB_SHA" --draft --prerelease --title "Rill $RELEASE_TAG — development preview" --notes-file .github/development-release-notes.md

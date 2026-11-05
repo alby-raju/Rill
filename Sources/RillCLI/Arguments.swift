@@ -6,27 +6,29 @@ enum CLIError: Error { case usage(String), assertion, runtime }
 struct Arguments: Sendable {
     var command = "help", operands: [String] = [], values: [String: [String]] = [:],
         flags: Set<String> = []
+    static let booleanOptions: Set<String> = [
+        "quiet", "detail", "json", "apply", "continue-on-failure", "allow-insecure",
+        "allow-lan", "overwrite", "show-messages", "help", "version", "insecure",
+        "include-system-roots", "cookies",
+    ]
+    static let valueOptions: Set<String> = [
+        "color", "workspace", "environment", "tls", "iterations", "delay", "retries",
+        "retry-delay", "report", "report-format", "allure", "output", "format", "source",
+        "endpoint", "query", "query-file", "variables", "header", "metadata", "timeout",
+        "proto", "descriptor", "method", "data", "data-file", "count", "concurrency", "ramp",
+        "port", "routes", "repo", "message", "token-file", "destination", "client-id",
+        "client-secret-name", "scope", "save-secret", "plugins-dir", "trust-file", "plugin",
+        "service", "wait", "send", "auth-profile", "proto-include", "collection",
+        "environment-file", "env-var", "ssl-client-cert", "ssl-client-key", "folder",
+        "iteration-data", "iteration-data-format", "globals", "export-environment",
+        "ca-cert", "ssl-client-p12", "ssl-passphrase-file", "ssl-client-origin",
+    ]
     init(_ input: [String]) throws {
         guard input.count <= 512, input.reduce(0, { $0 + $1.utf8.count }) <= 2 * 1024 * 1024 else {
             throw CLIError.usage("Arguments exceed limits.")
         }
-        let boolean: Set<String> = [
-            "quiet", "detail", "json", "apply", "continue-on-failure", "allow-insecure",
-            "allow-lan", "overwrite", "show-messages", "help", "version", "insecure",
-            "include-system-roots", "cookies",
-        ]
-        let valued: Set<String> = [
-            "color", "workspace", "environment", "tls", "iterations", "delay", "retries",
-            "retry-delay", "report", "report-format", "allure", "output", "format", "source",
-            "endpoint", "query", "query-file", "variables", "header", "metadata", "timeout",
-            "proto", "descriptor", "method", "data", "data-file", "count", "concurrency", "ramp",
-            "port", "routes", "repo", "message", "token-file", "destination", "client-id",
-            "client-secret-name", "scope", "save-secret", "plugins-dir", "trust-file", "plugin",
-            "service", "wait", "send", "auth-profile", "proto-include", "collection",
-            "environment-file", "env-var", "ssl-client-cert", "ssl-client-key", "folder",
-            "iteration-data", "iteration-data-format", "globals", "export-environment",
-            "ca-cert", "ssl-client-p12", "ssl-passphrase-file", "ssl-client-origin",
-        ]
+        let boolean = Self.booleanOptions
+        let valued = Self.valueOptions
         var index = 0
         var foundCommand = false
         while index < input.count {
@@ -109,7 +111,10 @@ struct Arguments: Sendable {
         {
             throw CLIError.usage("Unknown report format.")
         }
-        if flags.contains("help") { command = "help" }
+        if flags.contains("help") {
+            operands = command == "help" ? operands : [command]
+            command = "help"
+        }
         if flags.contains("version") { command = "version" }
     }
     func value(_ name: String) -> String? { values[name]?.first }
@@ -273,6 +278,10 @@ let usage = """
     Rill \(RillVersion.number) — native API workbench CLI (macOS 15+)
 
     Usage: rill COMMAND [input] [--workspace PATH] [options]
+
+      doctor [--workspace FILE] [--json]  Read-only local installation/input diagnostics
+      completion bash|zsh|fish           Print shell completion source
+      help COMMAND                      Show focused command help
 
       preflight FILE               Offline Postman v2 collection inspection; sends no requests
           --folder /Parent/Child   Exact folder names; escape ~ as ~0 and / as ~1

@@ -2,6 +2,36 @@
 
 Requires macOS 15+. Build with `swift build --product RillCLI`; discover the executable directory with `swift build --show-bin-path`, then run its `RillCLI --help`. The packaged app includes `Rill.app/Contents/Helpers/rill`. Use that path directly or create a personal shell alias. The build product uses a distinct name because macOS filesystems commonly ignore filename case.
 
+## Installation and discovery
+
+Keep the full app installation if using its bundled CLI. For a permanent personal command, create `~/.local/bin/rill` containing the following, make it executable, and add `~/.local/bin` to your shell's `PATH`:
+
+```sh
+#!/bin/sh
+exec /Applications/Rill.app/Contents/Helpers/rill "$@"
+```
+
+Development source also builds a CLI-only `RillCLI-VERSION-ARCH-development.zip` through `bash scripts/release-artifacts.sh` (or `python3 scripts/package-cli.py` after packaging the app). This is a macOS archive, not Linux/Windows support. Extract it to a permanent directory and add its `bin` directory to `PATH`. Keep `Resources` and `Frameworks` beside `bin`; copying only the executable loses optional compiler/runtime resources. Packaging checks the signature, relocates the tree to a path with spaces, compiles a well-known protobuf import and performs a loopback HTTP request. The currently published 0.4.5-dev.1 release predates this standalone archive. Homebrew remains a later distribution decision.
+
+```sh
+rill doctor --json
+rill doctor --workspace ./workspace.json --json
+rill help run
+rill run --help
+```
+
+`doctor` makes no network requests, changes no files and does not read Keychain or process secrets. It reports the bundled compiler's presence and optionally validates one explicit workspace read-only. Missing optional `protoc` is a warning for HTTP-only installations; an invalid explicit workspace exits 2. It does not attest signatures, test credentials, validate every protocol or prove endpoint connectivity. Output omits workspace paths/content.
+
+Generate static completions for your shell:
+
+```sh
+rill completion zsh > ~/.zfunc/_rill
+rill completion bash > ~/.local/share/rill.bash
+rill completion fish > ~/.config/fish/completions/rill.fish
+```
+
+Create destination directories first. For zsh, add `~/.zfunc` to `fpath` before `compinit`; for bash, source the generated file from your shell configuration. Fish loads its completions directory automatically. The standalone archive includes the same files in `completions`. Completions list commands/options and local files without invoking Rill during tab completion or accessing credentials. Option lists come from the parser; value suggestions are intentionally generic file suggestions. Bash completion supports macOS's bundled Bash 3.2.
+
 ```
 rill init --workspace ./workspace.json
 rill list --workspace ./workspace.json

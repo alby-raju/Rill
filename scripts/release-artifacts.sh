@@ -45,3 +45,5 @@ record = {
 }
 Path("dist/" + name + ".provenance.json").write_text(json.dumps(record, indent=2) + "\n")
 PY
+
+python3 scripts/package-cli.py
