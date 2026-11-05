@@ -2,6 +2,7 @@ import Foundation
 
 public enum RunReportFormat: String, CaseIterable, Sendable {
     case json = "JSON", markdown = "Markdown", junit = "JUnit XML", allure = "Allure results"
+    case html = "Offline HTML"
 }
 public enum RunReportExporter {
     /// Allowlist only. Labels, URLs, checks' expected values, bodies, fingerprints and errors may contain secrets.
@@ -68,6 +69,8 @@ public enum RunReportExporter {
                 "rill-run.json": try JSONSerialization.data(
                     withJSONObject: object, options: [.prettyPrinted, .sortedKeys])
             ]
+        case .html:
+            files = ["rill-run.html": html(safe)]
         case .markdown:
             let text =
                 "# Rill run\n\nResult: \(safe.passed ? "passed" : "unsuccessful") · Cancelled: \(safe.cancelled) · Budget exhausted: \(safe.exhausted)\n\n| Request ID | Iteration | Attempt | State | Status | Seconds |\n|---|---:|---:|---|---:|---:|\n"

@@ -98,7 +98,7 @@ import XCTest
                 executable: URL(fileURLWithPath: executable),
                 arguments: [
                     "run", input.path, "--format", "native", "--output", output.path,
-                    "--report", report.path, "--overwrite", "--json",
+                    "--report", report.path, "--report-format", "html", "--overwrite", "--json",
                 ] + (enabled ? ["--cookies"] : []))
             XCTAssertEqual(result.status, 0)
             let object = try XCTUnwrap(

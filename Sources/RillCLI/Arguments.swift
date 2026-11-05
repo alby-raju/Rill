@@ -104,7 +104,9 @@ struct Arguments: Sendable {
         if flags.contains("json") && flags.contains("detail") {
             throw CLIError.usage("Choose --json or --detail.")
         }
-        if let format = value("report-format"), !["json", "markdown", "junit"].contains(format) {
+        if let format = value("report-format"),
+            !["json", "markdown", "junit", "html"].contains(format)
+        {
             throw CLIError.usage("Unknown report format.")
         }
         if flags.contains("help") { command = "help" }
@@ -293,7 +295,7 @@ let usage = """
           --iteration-data FILE    JSON/CSV rows; sets iteration count (cannot use --iterations)
           --iteration-data-format json|csv   Optional override for the file extension
           --iterations N --delay MS --retries N --retry-delay MS --continue-on-failure
-          --report FILE --report-format json|markdown|junit --allure DIR
+          --report FILE --report-format json|markdown|junit|html --allure DIR
           --cookies                Private in-memory cookie jar for this run only
           --export-environment FILE  Explicit raw final variables (Postman environment JSON)
           --output FILE --timeout SECONDS   Explicit last-response export and request timeout
@@ -341,7 +343,7 @@ let usage = """
       --iterations N --delay MS --retries N --retry-delay MS --continue-on-failure
       --detail shows individual attempts/checks; --json retains machine-readable output.
       --color auto|always|never (default auto; respects NO_COLOR).
-      --report FILE --report-format json|markdown|junit --allure DIRECTORY
+      --report FILE --report-format json|markdown|junit|html --allure DIRECTORY
       --output FILE explicitly exports raw response data; it may contain secrets.
     Protocols: --header name:value (repeatable), --metadata name:value (gRPC), --timeout SECONDS
       --proto-include DIRECTORY supplies additional local compiler imports (repeatable).
