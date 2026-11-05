@@ -6,27 +6,29 @@ enum CLIError: Error { case usage(String), assertion, runtime }
 struct Arguments: Sendable {
     var command = "help", operands: [String] = [], values: [String: [String]] = [:],
         flags: Set<String> = []
+    static let booleanOptions: Set<String> = [
+        "quiet", "detail", "json", "apply", "continue-on-failure", "allow-insecure",
+        "allow-lan", "overwrite", "show-messages", "help", "version", "insecure",
+        "include-system-roots", "cookies",
+    ]
+    static let valueOptions: Set<String> = [
+        "color", "workspace", "environment", "tls", "iterations", "delay", "retries",
+        "retry-delay", "report", "report-format", "allure", "output", "format", "source",
+        "endpoint", "query", "query-file", "variables", "header", "metadata", "timeout",
+        "proto", "descriptor", "method", "data", "data-file", "count", "concurrency", "ramp",
+        "port", "routes", "repo", "message", "token-file", "destination", "client-id",
+        "client-secret-name", "scope", "save-secret", "plugins-dir", "trust-file", "plugin",
+        "service", "wait", "send", "auth-profile", "proto-include", "collection",
+        "environment-file", "env-var", "ssl-client-cert", "ssl-client-key", "folder",
+        "iteration-data", "iteration-data-format", "globals", "export-environment",
+        "ca-cert", "ssl-client-p12", "ssl-passphrase-file", "ssl-client-origin",
+    ]
     init(_ input: [String]) throws {
         guard input.count <= 512, input.reduce(0, { $0 + $1.utf8.count }) <= 2 * 1024 * 1024 else {
             throw CLIError.usage("Arguments exceed limits.")
         }
-        let boolean: Set<String> = [
-            "quiet", "detail", "json", "apply", "continue-on-failure", "allow-insecure",
-            "allow-lan", "overwrite", "show-messages", "help", "version", "insecure",
-            "include-system-roots",
-        ]
-        let valued: Set<String> = [
-            "color", "workspace", "environment", "tls", "iterations", "delay", "retries",
-            "retry-delay", "report", "report-format", "allure", "output", "format", "source",
-            "endpoint", "query", "query-file", "variables", "header", "metadata", "timeout",
-            "proto", "descriptor", "method", "data", "data-file", "count", "concurrency", "ramp",
-            "port", "routes", "repo", "message", "token-file", "destination", "client-id",
-            "client-secret-name", "scope", "save-secret", "plugins-dir", "trust-file", "plugin",
-            "service", "wait", "send", "auth-profile", "proto-include", "collection",
-            "environment-file", "env-var", "ssl-client-cert", "ssl-client-key", "folder",
-            "iteration-data", "iteration-data-format", "globals",
-            "ca-cert", "ssl-client-p12", "ssl-passphrase-file", "ssl-client-origin",
-        ]
+        let boolean = Self.booleanOptions
+        let valued = Self.valueOptions
         var index = 0
         var foundCommand = false
         while index < input.count {
@@ -92,16 +94,27 @@ struct Arguments: Sendable {
         {
             throw CLIError.usage("Iteration-data options are supported only by file runs.")
         }
+        if command != "run", flags.contains("cookies") {
+            throw CLIError.usage("--cookies is supported only by file runs.")
+        }
+        if command != "run", value("export-environment") != nil {
+            throw CLIError.usage("--export-environment is supported only by file runs.")
+        }
         if let color = value("color"), !["auto", "always", "never"].contains(color) {
             throw CLIError.usage("--color expects auto, always or never.")
         }
         if flags.contains("json") && flags.contains("detail") {
             throw CLIError.usage("Choose --json or --detail.")
         }
-        if let format = value("report-format"), !["json", "markdown", "junit"].contains(format) {
+        if let format = value("report-format"),
+            !["json", "markdown", "junit", "html"].contains(format)
+        {
             throw CLIError.usage("Unknown report format.")
         }
-        if flags.contains("help") { command = "help" }
+        if flags.contains("help") {
+            operands = command == "help" ? operands : [command]
+            command = "help"
+        }
         if flags.contains("version") { command = "version" }
     }
     func value(_ name: String) -> String? { values[name]?.first }
@@ -266,6 +279,10 @@ let usage = """
 
     Usage: rill COMMAND [input] [--workspace PATH] [options]
 
+      doctor [--workspace FILE] [--json]  Read-only local installation/input diagnostics
+      completion bash|zsh|fish           Print shell completion source
+      help COMMAND                      Show focused command help
+
       preflight FILE               Offline Postman v2 collection inspection; sends no requests
           --folder /Parent/Child   Exact folder names; escape ~ as ~0 and / as ~1
           --globals FILE           Postman globals JSON; lower precedence than collection variables
@@ -287,7 +304,9 @@ let usage = """
           --iteration-data FILE    JSON/CSV rows; sets iteration count (cannot use --iterations)
           --iteration-data-format json|csv   Optional override for the file extension
           --iterations N --delay MS --retries N --retry-delay MS --continue-on-failure
-          --report FILE --report-format json|markdown|junit --allure DIR
+          --report FILE --report-format json|markdown|junit|html --allure DIR
+          --cookies                Private in-memory cookie jar for this run only
+          --export-environment FILE  Explicit raw final variables (Postman environment JSON)
           --output FILE --timeout SECONDS   Explicit last-response export and request timeout
           --json | --detail        Unsupported scripts/inputs block before traffic
       request METHOD URL           Ad-hoc HTTP request; no workspace required
@@ -333,7 +352,7 @@ let usage = """
       --iterations N --delay MS --retries N --retry-delay MS --continue-on-failure
       --detail shows individual attempts/checks; --json retains machine-readable output.
       --color auto|always|never (default auto; respects NO_COLOR).
-      --report FILE --report-format json|markdown|junit --allure DIRECTORY
+      --report FILE --report-format json|markdown|junit|html --allure DIRECTORY
       --output FILE explicitly exports raw response data; it may contain secrets.
     Protocols: --header name:value (repeatable), --metadata name:value (gRPC), --timeout SECONDS
       --proto-include DIRECTORY supplies additional local compiler imports (repeatable).

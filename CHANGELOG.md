@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- Add read-only `doctor`, primary-command help and parser-derived Bash/zsh/fish completions. Package a standalone macOS CLI ZIP with required resources, relocation checks and provenance; keep architecture-specific checksums separate from the published verification kit.
+
+- Add self-contained offline HTML run reports in desktop and CLI exports, with local request/state filtering, checks and timing bars. Preserve report redaction and constrain the fixed filter script with a content security policy.
+
+- Add explicit `--cookies` for Postman/native file runs and optional shared-runner cookie sessions. Preserve native cookie matching, expiry and redirects; isolate each CLI invocation from Workbench and other runs.
+
+- Add explicit `--export-environment FILE` to Postman/native file runs, with committed workflow state, deterministic Postman environment JSON, protected inputs and unexpanded secret references. Failed/stopped runs export their committed state; cancelled runs do not. Ordinary reports remain redacted.
+
 ## 0.4.5 development preview — 2026-11-05
 
 [Release and installers](https://github.com/alby-raju/Rill/releases/tag/v0.4.5-dev.1)

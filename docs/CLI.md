@@ -2,6 +2,36 @@
 
 Requires macOS 15+. Build with `swift build --product RillCLI`; discover the executable directory with `swift build --show-bin-path`, then run its `RillCLI --help`. The packaged app includes `Rill.app/Contents/Helpers/rill`. Use that path directly or create a personal shell alias. The build product uses a distinct name because macOS filesystems commonly ignore filename case.
 
+## Installation and discovery
+
+Keep the full app installation if using its bundled CLI. For a permanent personal command, create `~/.local/bin/rill` containing the following, make it executable, and add `~/.local/bin` to your shell's `PATH`:
+
+```sh
+#!/bin/sh
+exec /Applications/Rill.app/Contents/Helpers/rill "$@"
+```
+
+Development source also builds a CLI-only `RillCLI-VERSION-ARCH-development.zip` through `bash scripts/release-artifacts.sh` (or `python3 scripts/package-cli.py` after packaging the app). This is a macOS archive, not Linux/Windows support. Extract it to a permanent directory and add its `bin` directory to `PATH`. Keep `Resources` and `Frameworks` beside `bin`; copying only the executable loses optional compiler/runtime resources. Packaging checks the signature, relocates the tree to a path with spaces, compiles a well-known protobuf import and performs a loopback HTTP request. The currently published 0.4.5-dev.1 release predates this standalone archive. Homebrew remains a later distribution decision.
+
+```sh
+rill doctor --json
+rill doctor --workspace ./workspace.json --json
+rill help run
+rill run --help
+```
+
+`doctor` makes no network requests, changes no files and does not read Keychain or process secrets. It reports the bundled compiler's presence and optionally validates one explicit workspace read-only. Missing optional `protoc` is a warning for HTTP-only installations; an invalid explicit workspace exits 2. It does not attest signatures, test credentials, validate every protocol or prove endpoint connectivity. Output omits workspace paths/content.
+
+Generate static completions for your shell:
+
+```sh
+rill completion zsh > ~/.zfunc/_rill
+rill completion bash > ~/.local/share/rill.bash
+rill completion fish > ~/.config/fish/completions/rill.fish
+```
+
+Create destination directories first. For zsh, add `~/.zfunc` to `fpath` before `compinit`; for bash, source the generated file from your shell configuration. Fish loads its completions directory automatically. The standalone archive includes the same files in `completions`. Completions list commands/options and local files without invoking Rill during tab completion or accessing credentials. Option lists come from the parser; value suggestions are intentionally generic file suggestions. Bash completion supports macOS's bundled Bash 3.2.
+
 ```
 rill init --workspace ./workspace.json
 rill list --workspace ./workspace.json
@@ -37,9 +67,33 @@ Before any request, the entire selected collection/folder and supplied environme
 
 **Success policy: HTTP 2xx checks, not Postman assertions.** Every executed request receives an explicit 2xx status check. Scripts in the selected subtree or its ancestors reject the run rather than executing without their tests. A passed run does not establish Newman or full Postman compatibility. Status-check failures exit **4**, transport/runtime failures **3**, invalid/blocked inputs **2**, and cancellation **130**; successful runs exit **0**.
 
-Options reuse `--iterations`, `--delay`/`--retry-delay` (milliseconds), `--retries`, `--continue-on-failure`, `--timeout` (1–300 seconds), `--report`/`--report-format json|markdown|junit`, `--allure`, `--detail`, `--quiet` and `--json`. Limits remain 10,000 planned/executed steps with bounded retries, variables and response retention. JSON summaries have `schemaVersion: 1`, `passed`, `cancelled`, `exhausted`, executed `attempts`, `folderSelected`, `collectionSelected`, `inputFormat` and optional `iterationDataRows`; static blockers return versioned redacted preflight checks with `sendsRequests: false`. Argument, file and preparation errors use stderr and exit 2. Ctrl+C flushes an explicitly requested unsuccessful report before exit when possible.
+Options reuse `--iterations`, `--delay`/`--retry-delay` (milliseconds), `--retries`, `--continue-on-failure`, `--timeout` (1–300 seconds), `--report`/`--report-format json|markdown|junit|html`, `--allure`, `--detail`, `--quiet` and `--json`. Limits remain 10,000 planned/executed steps with bounded retries, variables and response retention. JSON summaries have `schemaVersion: 1`, `passed`, `cancelled`, `exhausted`, executed `attempts`, `folderSelected`, `collectionSelected`, `inputFormat` and optional `iterationDataRows`; static blockers return versioned redacted preflight checks with `sendsRequests: false`. Argument, file and preparation errors use stderr and exit 2. Ctrl+C flushes an explicitly requested unsuccessful report before exit when possible.
 
-Ordinary reports omit payloads/credentials. `--output FILE` explicitly exports the last received response if retained; unavailable retention is an error, not a silently omitted artifact. Outputs are exclusive unless `--overwrite` is supplied and cannot replace collection/environment/globals/iteration-data/TLS inputs or the desktop workspace. Inputs remain unchanged. Multipart/file bodies and final-environment export remain future increments; their options are not silently ignored. Saved-workspace commands remain available separately.
+Ordinary reports omit payloads/credentials. `--output FILE` explicitly exports the last received response if retained; unavailable retention is an error, not a silently omitted artifact. Outputs are exclusive unless `--overwrite` is supplied and cannot replace collection/environment/globals/iteration-data/TLS inputs or the desktop workspace. Inputs remain unchanged. Multipart/file bodies remain unsupported; their options are not silently ignored. Saved-workspace commands remain available separately.
+
+### Offline HTML reports
+
+`--report ./run.html --report-format html` writes a self-contained report with state/request-ID filters, per-attempt checks, retries, HTTP status and relative timing bars. The desktop runner offers **Offline HTML** in its existing export menu. Open the file locally; it requires no server, CDN, network assets or telemetry. A content security policy permits only the report's fixed, hash-pinned local filter script. Without JavaScript, all rows remain visible and printable. Payloads, URLs, request labels and runtime messages remain omitted under the same allowlist as JSON/JUnit reports. This first version navigates by request ID; folder/source navigation and baseline response diffs remain roadmap work.
+
+### Cookie login chains
+
+```sh
+rill run ./collection.json --cookies
+rill run ./workspace.json --format native --cookies
+```
+
+`--cookies` opts a file run into a private in-memory cookie jar. Responses capture `Set-Cookie`; later matching requests and redirects send cookies using native domain, path, Secure and expiry rules. The jar starts empty for every invocation, is shared across requests/retries/iterations in that run, and is discarded at the end. Cookies are transport session state: failed assertions do not roll back server cookie changes. Runs without the flag retain cookie-free behavior. The jar is separate from Workbench, system/browser storage, environment exports and ordinary reports. No cookie files are read or written. Explicit raw response exports may reveal echoed cookies. Individual `request` commands and offline preflight reject this option. The desktop Collection and Environment matrix tabs offer the same opt-in as **Use run-local cookies**, with a separate empty jar per environment. Load tests retain isolated cookie-free requests.
+
+### Final environment export
+
+```sh
+rill run ./collection.json --export-environment ./final-environment.json
+rill run ./workspace.json --format native --environment Staging --export-environment ./final-environment.json
+```
+
+`--export-environment FILE` explicitly writes effective run variables as sorted Postman environment JSON. It includes enabled merged inputs and committed native hook/extraction updates; failed-attempt updates roll back. With iteration data, it captures the last started row, not an aggregate of all rows. Without iteration data, variables keep flowing across iterations. Failed or stopped runs export their last committed state; cancelled runs and input-preparation failures do not export. Export happens before normal reports and exit-status evaluation, so a nonzero exit can still leave a useful environment artifact.
+
+This is a raw plaintext export: values can include tokens extracted from responses or entered through CLI overrides. Selecting the option authorizes that export. Templates and named-secret references stay unexpanded; Keychain/process/transient credential values are never resolved for export. An exported secret reference needs its original credential source supplied separately when reused. Reuse with Postman-format `--environment-file`; this is a flattened snapshot, not a native workspace or an export of separate variable scopes. The destination must differ from reports, raw responses, run inputs and the desktop workspace. Existing files require `--overwrite`. Ordinary reports/stdout do not contain the exported variable map.
 
 ### Explicit Postman globals
 

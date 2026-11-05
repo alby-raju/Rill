@@ -69,6 +69,15 @@ struct RunnerView: View {
                         number("Retry delay (ms)", $configuration.retryDelayMilliseconds)
                         Toggle("Stop on failure", isOn: $configuration.stopOnFailure)
                     }
+                    Toggle(
+                        "Use run-local cookies",
+                        isOn: Binding(
+                            get: { configuration.cookieSession ?? false },
+                            set: { configuration.cookieSession = $0 })
+                    )
+                    .help(
+                        "Start an empty private jar per run/environment; share cookies across its requests and iterations."
+                    )
                     if mode == "Environment matrix" {
                         Stepper(
                             "Concurrent environments: \(matrixConcurrency)",

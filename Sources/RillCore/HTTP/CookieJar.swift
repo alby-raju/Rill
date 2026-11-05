@@ -1,6 +1,6 @@
 import Foundation
 
-/// A private, in-memory cookie store shared by the HTTP requests of one workbench.
+/// A private, in-memory cookie store shared only by explicitly participating HTTP requests.
 public final class CookieJar: Sendable {
     private let storage = URLSessionConfiguration.ephemeral.httpCookieStorage
 

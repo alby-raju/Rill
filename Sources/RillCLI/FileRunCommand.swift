@@ -9,11 +9,11 @@ extension RillCLI {
                     "environment-file", "env-var", "iterations", "delay", "retries", "retry-delay",
                     "report", "report-format", "allure", "output", "timeout", "color", "folder",
                     "format", "collection", "environment",
-                    "iteration-data", "iteration-data-format", "globals",
+                    "iteration-data", "iteration-data-format", "globals", "export-environment",
                 ]).union(FileTLSOptions.values)),
             args.flags.isSubset(of: [
                 "json", "quiet", "detail", "continue-on-failure", "overwrite", "allow-insecure",
-                "insecure", "include-system-roots",
+                "insecure", "include-system-roots", "cookies",
             ]
             ),
             args.value("report-format") == nil || args.value("report") != nil
@@ -56,10 +56,13 @@ extension RillCLI {
         guard
             !args.flags.contains("overwrite") || args.value("report") != nil
                 || args.value("output") != nil || args.value("allure") != nil
+                || args.value("export-environment") != nil
         else {
             throw CLIError.usage("--overwrite requires a report/output destination.")
         }
-        let destinations = [args.value("report"), args.value("output")].compactMap { $0 }
+        let destinations = [
+            args.value("report"), args.value("output"), args.value("export-environment"),
+        ].compactMap { $0 }
         let normalized = destinations.map { URL(fileURLWithPath: $0).resolvingSymlinksInPath() }
         let inputs = args.fileRunInputs
         guard Set(normalized).count == normalized.count, Set(normalized).isDisjoint(with: inputs),
@@ -203,8 +206,16 @@ extension RillCLI {
                 "Rill file run · \(format) · \(args.value("folder") != nil ? "selected folder" : args.value("collection") != nil ? "selected collection" : "entire file") · \(requests.count) requests · \(config.iterations) iterations · \(plan.policy)"
             )
         }
+        let environmentExport: CollectionRunner.EnvironmentExport? =
+            args.value("export-environment").map { path in
+                { @Sendable values in
+                    try args.write(try FinalEnvironmentExport.encode(values), to: path)
+                }
+            }
         let report = try await plan.run(
-            configuration: config, timeout: args.value("timeout") == nil ? nil : timeout)
+            configuration: config, timeout: args.value("timeout") == nil ? nil : timeout,
+            exportEnvironment: environmentExport,
+            cookieJar: args.flags.contains("cookies") ? CookieJar() : nil)
         try await reports(report, arguments: args)
         if let output = args.value("output") {
             guard let body = report.outcomes.last(where: { $0.status != nil })?.retainedBody else {
@@ -310,10 +321,23 @@ private enum FileRunPlan {
         case .native: "native checks; unchecked responses require HTTP 2xx"
         }
     }
-    func run(configuration: RunConfiguration, timeout: Double?) async throws -> RunReport {
+    func run(
+        configuration: RunConfiguration, timeout: Double?,
+        exportEnvironment: CollectionRunner.EnvironmentExport?, cookieJar: CookieJar?
+    ) async throws -> RunReport {
         switch self {
-        case .postman(let plan): try await plan.run(configuration: configuration, timeout: timeout)
-        case .native(let plan): try await plan.run(configuration: configuration, timeout: timeout)
+        case .postman(let plan):
+            try await plan.run(
+                configuration: configuration, timeout: timeout,
+                exportEnvironment: exportEnvironment,
+                cookieJar: cookieJar
+            )
+        case .native(let plan):
+            try await plan.run(
+                configuration: configuration, timeout: timeout,
+                exportEnvironment: exportEnvironment,
+                cookieJar: cookieJar
+            )
         }
     }
 }

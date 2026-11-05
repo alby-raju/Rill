@@ -81,3 +81,7 @@ column. Use RillControlWidth for repeated numeric, method, selector and search w
 Use an 8 pt gap in control rows, 16 pt section padding and 24 pt sheet padding through
 RillSpacing. Native controls such as toggles, steppers and menus use the system regular size
 in forms, and the system small size when embedded in a compact toolbar.
+
+## Architecture decisions
+
+- [ADR 0001: collection-script compatibility](adr/0001-collection-script-compatibility.md) selects bounded translation for the first future opt-in subset. Foreign JavaScript remains blocked; the ADR is not shipped syntax support.

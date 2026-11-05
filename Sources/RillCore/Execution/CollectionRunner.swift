@@ -9,6 +9,8 @@ public struct RunConfiguration: Codable, Equatable, Sendable {
     public var retryDelayMilliseconds = 0
     public var stopOnFailure = true
     public var retentionBytes = 32 * 1024 * 1024
+    /// Missing in older saved configurations; each enabled run receives a fresh private jar.
+    public var cookieSession: Bool? = nil
     public init() {}
     public func validate() throws {
         guard (1...10_000).contains(iterations), (1...10_000).contains(executionLimit),
@@ -74,12 +76,16 @@ public struct RunProgress: Sendable {
 public enum CollectionRunner {
     public typealias Executor =
         @Sendable (RequestDraft, [String: String]) async throws -> WorkflowStepResult
+    /// Opt-in raw variable handoff; values never enter RunReport or ordinary diagnostics.
+    public typealias EnvironmentExport = @Sendable ([String: String]) async throws -> Void
     public static func run(
         requests: [RequestDraft], environment: Environment?, configuration: RunConfiguration,
         profiles: [AuthenticationProfile] = [], secrets: NamedSecretResolver? = nil,
         tlsProfiles: [TLSProfile] = [], definitions: [APIDefinitionSource] = [],
         iterationData: IterationData? = nil, iterationOverrides: [String: String] = [:],
-        progress: (@Sendable (RunProgress) async -> Void)? = nil, executor: Executor? = nil
+        progress: (@Sendable (RunProgress) async -> Void)? = nil,
+        exportEnvironment: EnvironmentExport? = nil, cookieJar: CookieJar? = nil,
+        executor: Executor? = nil
     ) async throws -> RunReport {
         try configuration.validate()
         guard requests.count <= 10_000, requests.count * configuration.iterations <= 10_000,
@@ -105,11 +111,12 @@ public enum CollectionRunner {
         var retained = 0
         var retainedChecks = 0
         try WorkflowEngine.validateVariables(variables)
+        let cookieJar = cookieJar ?? (configuration.cookieSession == true ? CookieJar() : nil)
         let execute: Executor =
             executor ?? { request, values in
                 try await WorkflowEngine.execute(
                     request, variables: values, profiles: profiles, secrets: secrets,
-                    tlsProfiles: tlsProfiles, definitions: definitions)
+                    tlsProfiles: tlsProfiles, definitions: definitions, cookieJar: cookieJar)
             }
         func pause(_ milliseconds: Int) async throws {
             try Task.checkCancellation()
@@ -274,6 +281,10 @@ public enum CollectionRunner {
             }
         }
         report.duration = ProcessInfo.processInfo.systemUptime - started
+        if !report.cancelled {
+            try Task.checkCancellation()
+            try await exportEnvironment?(variables)
+        }
         return report
     }
 }

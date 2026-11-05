@@ -98,9 +98,10 @@ public struct PostmanFileRun: Sendable {
     }
 
     /// File-run success explicitly requires HTTP 2xx, not unexecuted Postman assertions.
-    public func run(configuration: RunConfiguration, timeout: Double? = nil) async throws
-        -> RunReport
-    {
+    public func run(
+        configuration: RunConfiguration, timeout: Double? = nil,
+        exportEnvironment: CollectionRunner.EnvironmentExport? = nil, cookieJar: CookieJar? = nil
+    ) async throws -> RunReport {
         var requests = self.requests
         if let timeout {
             guard timeout.isFinite, (1...300).contains(timeout) else {
@@ -110,12 +111,15 @@ public struct PostmanFileRun: Sendable {
         }
         let secrets = self.secrets
         let fileTLS = self.fileTLS
+        let cookieJar = cookieJar ?? (configuration.cookieSession == true ? CookieJar() : nil)
         return try await CollectionRunner.run(
             requests: requests, environment: environment, configuration: configuration,
             iterationData: iterationData, iterationOverrides: iterationOverrides,
+            exportEnvironment: exportEnvironment,
             executor: { request, variables in
                 var result = try await WorkflowEngine.execute(
-                    request, variables: variables, secrets: secrets, fileTLS: fileTLS)
+                    request, variables: variables, secrets: secrets, fileTLS: fileTLS,
+                    cookieJar: cookieJar)
                 result.exchange.checks.append(
                     CheckResult(
                         title: "HTTP status is 2xx",

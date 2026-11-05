@@ -14,7 +14,7 @@ python3 scripts/collect-dependency-notices.py --check
 bash scripts/release-artifacts.sh
 ```
 
-The packaging pipeline stages a clean `dist/Rill.app` with the app/CLI, official protobuf compiler/includes, first-party icon/offline help, MIT license, third-party notices/resources and required Swift runtime compatibility libraries. Nested code and the app receive verified ad-hoc signatures. Packaging also launches a relocated optimized app with an isolated workspace, temporarily hides build-tree resource bundles, verifies its window/icon/offline help, and rejects a deliberately missing-help test copy. It creates an architecture-specific compressed DMG, SHA-256 checksum and provenance record containing source revision/dirty state and dependency/notice hashes.
+The packaging pipeline stages a clean `dist/Rill.app` with the app/CLI, official protobuf compiler/includes, first-party icon/offline help, MIT license, third-party notices/resources and required Swift runtime compatibility libraries. Nested code and the app receive verified ad-hoc signatures. Packaging also launches a relocated optimized app with an isolated workspace, temporarily hides build-tree resource bundles, verifies its window/icon/offline help, and rejects a deliberately missing-help test copy. It creates an architecture-specific compressed DMG, SHA-256 checksum and provenance record containing source revision/dirty state and dependency/notice hashes. Development source additionally packages a CLI-only ZIP with its required resources/frameworks, completion files, license notices, SHA-256 sidecar and provenance. The CLI tree is checked after relocation using doctor, signature verification, a well-known protobuf import and a loopback HTTP request.
 
 Use only a clean expected revision for a reviewable artifact. Verify its version, signature, checksum, resources and bundled CLI. Build separately on Intel and Apple Silicon; do not label a single-architecture artifact universal. Keep generated output out of Git.
 
@@ -39,7 +39,7 @@ Use the [manual kit](../verification/README.md) and [testing guide](TESTING.md),
 
 ## GitHub development prereleases
 
-Run **Development release** manually on `main`, supplying a new tag matching the source version, such as `v0.4.5-dev.2` for another 0.4.5 preview. Run the **Security** workflow manually on the intended main revision and wait for deep Swift analysis before starting release preparation (the nightly run also qualifies if it analyzed that exact revision). The release workflow rejects other branches, mismatched/reused tags and revisions without successful build, dependency scan and both CodeQL checks. Routine PR security checks do not substitute for deep Swift analysis. It tests and packages on separate Apple Silicon and Intel runners, audits dependencies, verifies notices, and attests each DMG using GitHub OIDC (no stored signing key).
+Run **Development release** manually on `main`, supplying a new tag matching the source version, such as `v0.4.5-dev.2` for another 0.4.5 preview. Run the **Security** workflow manually on the intended main revision and wait for deep Swift analysis before starting release preparation (the nightly run also qualifies if it analyzed that exact revision). The release workflow rejects other branches, mismatched/reused tags and revisions without successful build, dependency scan and both CodeQL checks. Routine PR security checks do not substitute for deep Swift analysis. It tests and packages on separate Apple Silicon and Intel runners, audits dependencies, verifies notices, and attests each DMG and CLI-only ZIP using GitHub OIDC (no stored signing key).
 
 Only after both builds pass does it create a **draft prerelease** containing both installers, checksums, provenance, verification kit, MIT license, third-party notices and dependency pins. A failed build creates no release. A failed draft upload may leave an incomplete draft: inspect/delete that unpublished draft before retrying; never replace a published tag. Review all assets and replace the notes' maintainer placeholder with highlights, limitations and actual acceptance results, then publish explicitly:
 
@@ -55,5 +55,7 @@ Download the assets into one directory. Verify the combined manifest, and verify
 shasum -a 256 -c SHA256SUMS
 gh attestation verify Rill-0.4.5-arm64-development.dmg --repo alby-raju/Rill
 ```
+
+New CLI-only ZIPs can be verified with the same command, using the ZIP filename. Staging copies architecture-specific DMG/CLI checksum files separately, then copies the verification kit and its checksum together from Apple Silicon; an Intel kit checksum must not replace the checksum for the published kit.
 
 The attestation proves the GitHub build identity and artifact digest; it does not establish Apple trust or guarantee absence of vulnerabilities. Preserve the workflow run, exact source revision and acceptance evidence with release notes.

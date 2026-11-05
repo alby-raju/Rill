@@ -47,7 +47,9 @@ import RillCore
     }
     static func execute(_ args: Arguments) async throws {
         switch args.command {
-        case "help": try args.text(usage)
+        case "help": try help(args)
+        case "doctor": try doctor(args)
+        case "completion": try completion(args)
         case "preflight": try await preflight(args)
         case "request": try await request(args)
         case "run": try await runFile(args)
