@@ -25,7 +25,7 @@ Our next focus is **CLI-first API testing**: direct collection/environment file 
 ## What you can do
 
 - Organize collections, tabs, drafts and inherited environments; recover edits and create backups.
-- Command-click to select individual requests or Shift-click for a range. Use the selection menu to move, copy, duplicate or delete the batch.
+- Command-click to select individual requests or Shift-click for a range. Use the selection menu to move, copy, duplicate or delete the batch. Select all visible requests from Collection actions.
 - Send HTTP requests with JSON/XML/text, forms, multipart and binary uploads; configure auth, named Keychain secrets and TLS profiles.
 - Reuse cookies automatically across matching Workbench HTTP requests and inspect or clear them in Cookie Manager. The jar lasts until Rill quits.
 - Inspect bodies, headers, checks and timelines. Validation results stay visible separately from HTTP status.

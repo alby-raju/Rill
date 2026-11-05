@@ -251,7 +251,28 @@ import SwiftUI
                     panel.orderFront(nil)
                 }
                 if let state = argument("--ui-state"), let store = previewStore {
-                    if state == "workspace-tools" {
+                    if state == "authentication-profiles" || state == "authentication-secrets" {
+                        var profile = AuthenticationProfile()
+                        profile.name = "Sample service"
+                        profile.oauth = OAuthConfiguration()
+                        profile.secretName = "sample_access"
+                        store.workspace.authProfiles = [profile]
+                        store.workspace.namedSecrets = [NamedSecret(name: "sample_access")]
+                        let host = NSHostingView(
+                            rootView: AuthenticationManager(
+                                showSecrets: state == "authentication-secrets"
+                            )
+                            .environmentObject(store).preferredColorScheme(scheme))
+                        showSurface(host, size: NSSize(width: 850, height: 620))
+                        view = host
+                    } else if state == "tls-profiles" {
+                        store.workspace.tlsProfiles = [TLSProfile()]
+                        let host = NSHostingView(
+                            rootView: TLSManagerView().environmentObject(store)
+                                .preferredColorScheme(scheme))
+                        showSurface(host, size: NSSize(width: 850, height: 600))
+                        view = host
+                    } else if state == "workspace-tools" {
                         let host = NSHostingView(
                             rootView: WorkspaceToolsBrowser { _ in }
                                 .environmentObject(store).preferredColorScheme(scheme))
