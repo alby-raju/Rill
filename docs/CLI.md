@@ -23,7 +23,7 @@ Extensions are versioned JSON manifests, not executable code. Discovery lists st
 
 The CLI is intentionally explicit: it does not install itself, push Git changes, refresh tokens automatically or execute foreign scripts. gRPC sends one supplied message then half-closes; desktop supports interactive streaming. MQTT/AMQP/Kafka remain desktop workbenches. See [features and limits](FEATURES.md) and [release acceptance](RELEASE.md).
 
-## Direct Postman v2 file runs (development source)
+## Direct Postman v2 file runs (since 0.4.5)
 
 ```sh
 rill run ./collection.json --environment-file ./environment.json \
@@ -31,7 +31,7 @@ rill run ./collection.json --environment-file ./environment.json \
   --report ./results.json --report-format json --json
 ```
 
-This first file-run increment executes the supported Postman v2/v2.1 JSON subset through RillCore, in depth-first source order, without creating a desktop workspace or importing credentials into Keychain. Enabled globals provide fallback values; collection variables override them, followed by enabled environment-file values, iteration-data rows and repeatable `--env-var` options (last occurrence wins; empty values are valid). Secret-typed input values stay in a transient in-memory credential provider. Ambient process-secret fallback and personal Keychain credentials are not read by this file-run path.
+The file runner executes the supported Postman v2/v2.1 JSON subset through RillCore, in depth-first source order, without creating a desktop workspace or importing credentials into Keychain. Enabled globals provide fallback values; collection variables override them, followed by enabled environment-file values, iteration-data rows and repeatable `--env-var` options (last occurrence wins; empty values are valid). Secret-typed input values stay in a transient in-memory credential provider. Ambient process-secret fallback and personal Keychain credentials are not read by this file-run path.
 
 Before any request, the entire selected collection/folder and supplied environment are checked for static blockers and every supported request is prepared to validate expanded URLs, headers, credentials and resource limits. Nonempty foreign scripts, missing/cyclic variables, unsupported transport/import representations and multipart/binary/upload bodies block the run. Referenced upload files are never opened. Supported native dynamic templates may be generated during preparation and again at execution; no deterministic-seed promise is made.
 

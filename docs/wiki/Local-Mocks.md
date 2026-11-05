@@ -2,7 +2,7 @@
 
 Mocks already exist in Rill. In the app open:
 
-**Request → API Definitions / Contracts / Mocks… → Mocks**
+**Workspace tools → Sessions and testing → API Definitions and Tools → Mocks**
 
 Edit method/path/status/header/body routes as JSON, choose a port (0 chooses a free one), and click **Start mock server**. Copy the displayed address to a request. The current server binds to loopback, runs no route scripts and stops when this tool window closes. It is not a persistent background service.
 

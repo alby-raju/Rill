@@ -1,6 +1,13 @@
 # Changelog
 
-## 0.4.5 (unreleased)
+## 0.4.5 development preview — 2026-11-05
+
+[Release and installers](https://github.com/alby-raju/Rill/releases/tag/v0.4.5-dev.1)
+
+- Add a searchable Workspace tools browser and organize the macOS Workspace, Request, and File menus by task. Standardize control sizing and use a continuous title-bar surface.
+- Select multiple sidebar requests and duplicate, copy, move, or delete them together. Moves retain identities, pinned tabs, and unsaved edits. Delete confirms the selection and affected drafts.
+- Capture and replay matching HTTP cookies for Workbench sends. Cookie Manager filters, reveals, and removes cookies from the private in-memory jar, which clears on quit.
+- Split Authentication and Secrets into tabs, align TLS controls, and consolidate Collection actions. Fix the environment deletion crash by binding editable records by ID.
 
 - Add explicit Postman `--globals` inputs to file runs and offline preflight, below collection/environment/data/CLI overrides. Reuse transient secret handling, validate all selected rows before traffic and protect globals from output overwrite. Align importer/preflight disabling flags and correct stale preflight execution guidance.
 
