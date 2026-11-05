@@ -180,25 +180,27 @@ struct WorkbenchView: View {
                 Text("COLLECTIONS").font(.system(size: 10, weight: .semibold)).foregroundStyle(
                     .secondary)
                 Spacer()
-                Button {
-                    selectAllVisibleRequests()
-                } label: {
-                    Image(systemName: "checklist")
-                }.buttonStyle(RillButtonStyle(emphasis: .quiet, size: .icon))
-                    .help("Select all visible requests").accessibilityLabel(
-                        "Select all visible requests"
-                    )
-                    .disabled(
+                Menu {
+                    Button("New collection", systemImage: "folder.badge.plus") {
+                        store.newCollection()
+                    }
+                    Divider()
+                    Button("Select all visible requests", systemImage: "checklist") {
+                        selectAllVisibleRequests()
+                    }.disabled(
                         visibleRequestIDs.count < 2
                             || visibleRequestIDs.allSatisfy(selectedRows.contains))
-                Button {
-                    store.newCollection()
                 } label: {
-                    Image(systemName: "folder.badge.plus")
-                }.buttonStyle(RillButtonStyle(emphasis: .quiet, size: .icon)).help("New collection")
-                    .accessibilityLabel("New collection")
+                    Image(systemName: "ellipsis")
+                        .frame(
+                            width: RillControlSize.icon.height, height: RillControlSize.icon.height
+                        )
+                        .contentShape(Rectangle())
+                }.menuStyle(.borderlessButton).menuIndicator(.hidden)
+                    .frame(width: RillControlSize.icon.height, height: RillControlSize.icon.height)
+                    .help("Collection actions").accessibilityLabel("Collection actions")
             }
-            .padding(.horizontal, 20).padding(.top, 25).padding(.bottom, 8)
+            .padding(.horizontal, 14).padding(.top, RillSpacing.section).padding(.bottom, 4)
             List(selection: sidebarSelection) {
                 ForEach(store.workspace.collections) { collection in
                     Group {

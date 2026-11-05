@@ -12,6 +12,10 @@ typealias ViewState<Value> = SwiftUI.State<Value>
     var body: some Scene {
         WindowGroup {
             WorkbenchView().environmentObject(store).defaultAppStorage(RillPreview.preferences)
+                // Give the window one toolbar surface. The native toolbar sidebar inset
+                // has a different edge from the resizable navigation column below.
+                .toolbarBackground(RillPalette.canvas, for: .windowToolbar)
+                .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
                 .onAppear {
                     delegate.store = store
                     if let url = RillResources.url(forResource: "Rill", withExtension: "icns") {

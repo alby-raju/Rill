@@ -21,7 +21,7 @@ struct TLSManagerView: View {
                 }
                 Button("Done") { dismiss() }.keyboardShortcut(.cancelAction).disabled(busy)
             }
-            HSplitView {
+            HStack(alignment: .top, spacing: RillSpacing.section) {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("PROFILES · \((store.workspace.tlsProfiles ?? []).count)")
                         .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
@@ -44,7 +44,7 @@ struct TLSManagerView: View {
                         selection = profile.id
                     }.buttonStyle(RillButtonStyle(emphasis: .primary))
                 }.padding(14)
-                    .frame(minWidth: 190, idealWidth: 220, maxWidth: 260, maxHeight: .infinity)
+                    .frame(width: 205).frame(maxHeight: .infinity)
                     .rillToolPanel()
                 Group {
                     if let profile = (store.workspace.tlsProfiles ?? []).first(where: {
@@ -58,7 +58,7 @@ struct TLSManagerView: View {
                                 "Create a profile to customize certificate trust or attach a Keychain identity.",
                             icon: "lock.shield")
                     }
-                }.frame(minWidth: 430, maxWidth: .infinity, maxHeight: .infinity)
+                }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }.frame(maxWidth: .infinity, maxHeight: .infinity)
                 .disabled(busy)
         }.padding(RillSpacing.sheet).frame(width: 850, height: 600).rillToolControls()
@@ -74,6 +74,18 @@ struct TLSManagerView: View {
                     store.workspace.tlsProfiles?[index] = updated
                 }
             })
+        let identity = Binding<Data?>(
+            get: { profile.wrappedValue.identityReference },
+            set: { reference in
+                if let reference {
+                    guard let choice = identities.first(where: { $0.reference == reference }) else {
+                        return
+                    }
+                    setIdentity(choice, on: profile)
+                } else {
+                    setIdentity(nil, on: profile)
+                }
+            })
         return ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 RillSection(
@@ -81,8 +93,12 @@ struct TLSManagerView: View {
                     subtitle: "Choose how Rill verifies the server certificate.",
                     icon: "checkmark.shield"
                 ) {
-                    TextField("Name", text: profile.name)
-                    Picker("Verification", selection: profile.mode) {
+                    TextField("Profile name", text: profile.name)
+                        .accessibilityLabel("Profile name")
+                    RillSelect(
+                        title: "Verification", value: original.mode.rawValue,
+                        selection: profile.mode
+                    ) {
                         ForEach(TLSMode.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                     }
                     if profile.wrappedValue.mode == .insecure {
@@ -131,73 +147,73 @@ struct TLSManagerView: View {
                     subtitle: "Select a macOS Keychain identity for mutual TLS.",
                     icon: "person.badge.key"
                 ) {
-                    Text(
-                        profile.wrappedValue.identityLabel
-                            ?? (profile.wrappedValue.requiresClientIdentity
-                                ? "Identity needs selection" : "None"))
-                    Menu("Select Keychain identity") {
-                        Button("None") {
-                            profile.wrappedValue.identityReference = nil
-                            profile.wrappedValue.identityLabel = nil
-                            profile.wrappedValue.requiresClientIdentity = false
+                    RillSelect(
+                        title: "Keychain identity",
+                        value: original.identityLabel
+                            ?? (original.requiresClientIdentity
+                                ? "Choose an identity" : "No client identity"),
+                        selection: identity
+                    ) {
+                        Text("No client identity").tag(nil as Data?)
+                        if let current = original.identityReference,
+                            !identities.contains(where: { $0.reference == current })
+                        {
+                            Text(original.identityLabel ?? "Current identity").tag(
+                                Optional(current))
                         }
-                        ForEach(identities) { identity in
-                            Button(identity.label) {
-                                profile.wrappedValue.identityReference = identity.reference
-                                profile.wrappedValue.identityLabel = identity.label
-                                profile.wrappedValue.requiresClientIdentity = true
-                            }
-                        }
-                    }
-                    Button("Load Keychain identities") {
-                        busy = true
-                        store.importing = true
-                        Task {
-                            defer {
-                                busy = false
-                                store.importing = false
-                            }
-                            do { identities = try await manager.choices() } catch {
-                                store.error = error.localizedDescription
-                            }
+                        ForEach(identities) { choice in
+                            Text(choice.label).tag(Optional(choice.reference))
                         }
                     }
-                    Button("Import PKCS#12…") {
-                        let panel = NSOpenPanel()
-                        panel.canChooseDirectories = false
-                        guard panel.runModal() == .OK, let url = panel.url else { return }
-                        let alert = NSAlert()
-                        alert.messageText = "Import client identity into macOS Keychain"
-                        alert.informativeText =
-                            "The identity and private key will be added to your default Keychain. Its password is used only for import."
-                        let password = NSSecureTextField(
-                            frame: NSRect(x: 0, y: 0, width: 280, height: 24))
-                        alert.accessoryView = password
-                        alert.addButton(withTitle: "Import")
-                        alert.addButton(withTitle: "Cancel")
-                        guard alert.runModal() == .alertFirstButtonReturn else { return }
-                        let passphrase = password.stringValue
-                        password.stringValue = ""
-                        busy = true
-                        store.importing = true
-                        Task {
-                            defer {
-                                busy = false
-                                store.importing = false
-                            }
-                            do {
-                                let data = try await Task.detached {
-                                    try TLSProfiles.readFile(url, maximum: 4 * 1024 * 1024)
-                                }.value
-                                let imported = try await manager.importPKCS12(
-                                    data, passphrase: passphrase)
-                                identities = imported
-                                if let first = imported.first {
-                                    profile.wrappedValue.identityReference = first.reference
-                                    profile.wrappedValue.identityLabel = first.label
-                                    profile.wrappedValue.requiresClientIdentity = true
+                    HStack(spacing: RillSpacing.controls) {
+                        Button("Load from Keychain") {
+                            busy = true
+                            store.importing = true
+                            Task {
+                                defer {
+                                    busy = false
+                                    store.importing = false
                                 }
-                            } catch { store.error = error.localizedDescription }
+                                do { identities = try await manager.choices() } catch {
+                                    store.error = error.localizedDescription
+                                }
+                            }
+                        }
+                        Button("Import PKCS#12…") {
+                            let panel = NSOpenPanel()
+                            panel.canChooseDirectories = false
+                            guard panel.runModal() == .OK, let url = panel.url else { return }
+                            let alert = NSAlert()
+                            alert.messageText = "Import client identity into macOS Keychain"
+                            alert.informativeText =
+                                "The identity and private key will be added to your default Keychain. Its password is used only for import."
+                            let password = NSSecureTextField(
+                                frame: NSRect(x: 0, y: 0, width: 280, height: 24))
+                            alert.accessoryView = password
+                            alert.addButton(withTitle: "Import")
+                            alert.addButton(withTitle: "Cancel")
+                            guard alert.runModal() == .alertFirstButtonReturn else { return }
+                            let passphrase = password.stringValue
+                            password.stringValue = ""
+                            busy = true
+                            store.importing = true
+                            Task {
+                                defer {
+                                    busy = false
+                                    store.importing = false
+                                }
+                                do {
+                                    let data = try await Task.detached {
+                                        try TLSProfiles.readFile(url, maximum: 4 * 1024 * 1024)
+                                    }.value
+                                    let imported = try await manager.importPKCS12(
+                                        data, passphrase: passphrase)
+                                    identities = imported
+                                    if let first = imported.first {
+                                        setIdentity(first, on: profile)
+                                    }
+                                } catch { store.error = error.localizedDescription }
+                            }
                         }
                     }
                 }
@@ -216,7 +232,16 @@ struct TLSManagerView: View {
                         selection = store.workspace.tlsProfiles?.first?.id
                     }
                 }
-            }.padding(.leading, 14).padding(.trailing, 2)
+            }.padding(2)
         }
     }
+
+    private func setIdentity(_ identity: TLSIdentityChoice?, on profile: Binding<TLSProfile>) {
+        var updated = profile.wrappedValue
+        updated.identityReference = identity?.reference
+        updated.identityLabel = identity?.label
+        updated.requiresClientIdentity = identity != nil
+        profile.wrappedValue = updated
+    }
+
 }
