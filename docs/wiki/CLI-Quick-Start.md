@@ -36,8 +36,14 @@ rill run-collection "Smoke" \
 
 The environment is a saved name/ID, not an environment-file path. Report files are exclusive unless `--overwrite` is supplied. Ctrl+C cancels a run. Exit statuses include 0 success, 2 configuration/input, 3 runtime, 4 checks failed and 130 cancellation.
 
-## Moving from Newman
+## Run a collection file in 0.4.5
 
-Current Rill can run supported imported requests and native workflow checks. It does not execute arbitrary Postman pre-request/test JavaScript, accept `--env-var` overrides or accept separate certificate/key file arguments for collection runs. A successful imported request run does not establish that the original scripted suite passed.
+Run offline preflight first, then send requests if the file is supported.
 
-Direct file execution and explicit compatibility are [roadmap priorities](https://github.com/alby-raju/Rill/blob/main/ROADMAP.md). Keep Newman as the reference for suites depending on unsupported scripting. See the authoritative [CLI reference](https://github.com/alby-raju/Rill/blob/main/docs/CLI.md) and `rill --help` for supported options.
+```sh
+rill preflight ./collection.json --environment-file ./environment.json --json
+rill run ./collection.json --environment-file ./environment.json \
+  --env-var region=local --report ./file-results.json --report-format json
+```
+
+Postman v2 file runs support exact nested folder selection, explicit globals, JSON/CSV iteration data, and file-based TLS. For a native workspace file, use `rill run ./workspace.json --format native --collection "Smoke"`. Native runs support saved Rill workflow checks; the Postman file path checks for HTTP 2xx and blocks foreign scripts before sending traffic. Use the [CLI reference](https://github.com/alby-raju/Rill/blob/main/docs/CLI.md) for syntax, precedence, TLS scope, and unsupported inputs.

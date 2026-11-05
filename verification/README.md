@@ -13,10 +13,10 @@ Synthetic data and local endpoints for **your own hands-on checks**. This kit do
 
    In a repository checkout, use `cd verification` first. Startup must print **Rill verification kit ready**. If any port is occupied, startup fails and releases its other ports. All listeners bind to 127.0.0.1. Ctrl+C stops them.
 
-2. Open Rill. Choose **File → Import Rill Workspace…** (or sidebar **Workspace files → Import Rill workspace…**) and select `materials/rill-workspace.json`. **Do not select Import HTTPie Desktop JSON, Postman, or command import for this native file.** Review the preview and apply. It contains 19 requests in four clearly named `Kit — …` collections. Existing requests should remain intact. Choose the imported **Verification local** environment so `{{base_url}}` resolves.
+2. Open Rill. Choose **Workspace tools → Files and integrations → Import Rill Workspace** and select `materials/rill-workspace.json`. **Do not select Import HTTPie Desktop JSON, Postman, or command import for this native file.** Review the preview and apply. It contains 19 requests in four clearly named `Kit — …` collections. Existing requests should remain intact. Choose the imported **Verification local** environment so `{{base_url}}` resolves.
 3. Run **Kit — Smoke**: every request should pass. Run **Kit — Workflow** in saved order: session creation returns 201; extraction makes the next authenticated profile request pass. Sending the second request alone has no run-local token and should fail before sending.
 4. Reset retry state by sending **POST http://127.0.0.1:18990/reset** with body `{}`. Run **Kit — Retry** with **one retry**: attempt 1 returns 503, attempt 2 returns 200; the final run passes with one recovered retry.
-5. **Kit — Expected failures is supposed to fail.** It contains a wrong expected status, short timeout, missing authentication and oversized response. Test separately before trying continue-on-failure. A passing **check result** for these unchanged cases is a problem. HTTP 200 can still be correct for the intentional assertion failure: it expects 201, so its response check must fail. Use the persistent red failed-check banner and **Review checks** to inspect this independently of the HTTP badge.
+5. **Kit — Expected failures is supposed to fail.** It contains a wrong expected status, short timeout, missing authentication and oversized response. Test separately before trying continue-on-failure. A passing **check result** for these unchanged cases is a problem. HTTP 200 can still be correct for the intentional assertion failure: it expects 201, so its response check must fail. Use the failed-check status and **Review checks** to inspect this independently of the HTTP badge.
 6. Copy `CHECKLIST.csv` to `results/` and record pass/fail, Rill version, macOS/CPU and notes/screenshots. Close/reopen Rill and retest persistence. Synthetic fixtures exercise functionality; they do not establish full standards conformance or independent broker acceptance.
 
 ### Quick self-check (separate from manual acceptance)
@@ -32,7 +32,7 @@ Use the actual installation path. From a checkout, the development CLI can be `.
 
 ### If import says “Expected a bounded HTTPie Desktop 1.0.0 JSON …”
 
-The HTTPie Desktop importer was selected for a different file format. For the kit workspace use **File → Import Rill Workspace… → materials/rill-workspace.json → Apply Import**, then select **Verification local**. Importer validation errors occur before incoming changes are applied. The welcome screen's **Import request** action is for commands/HAR, not native workspaces.
+The HTTPie Desktop importer was selected for a different file format. For the kit workspace use **Workspace tools → Files and integrations → Import Rill Workspace**. Select `materials/rill-workspace.json` and apply the preview, then select **Verification local**. Importer validation errors occur before incoming changes are applied. The welcome screen's **Import request** action is for commands/HAR, not native workspaces.
 
 ## Endpoint directory
 
