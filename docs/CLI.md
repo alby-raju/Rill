@@ -41,6 +41,15 @@ Options reuse `--iterations`, `--delay`/`--retry-delay` (milliseconds), `--retri
 
 Ordinary reports omit payloads/credentials. `--output FILE` explicitly exports the last received response if retained; unavailable retention is an error, not a silently omitted artifact. Outputs are exclusive unless `--overwrite` is supplied and cannot replace collection/environment/globals/iteration-data/TLS inputs or the desktop workspace. Inputs remain unchanged. Multipart/file bodies remain unsupported; their options are not silently ignored. Saved-workspace commands remain available separately.
 
+### Cookie login chains
+
+```sh
+rill run ./collection.json --cookies
+rill run ./workspace.json --format native --cookies
+```
+
+`--cookies` opts a file run into a private in-memory cookie jar. Responses capture `Set-Cookie`; later matching requests and redirects send cookies using native domain, path, Secure and expiry rules. The jar starts empty for every invocation, is shared across requests/retries/iterations in that run, and is discarded at the end. Cookies are transport session state: failed assertions do not roll back server cookie changes. Runs without the flag retain cookie-free behavior. The jar is separate from Workbench, system/browser storage, environment exports and ordinary reports. No cookie files are read or written. Explicit raw response exports may reveal echoed cookies. Individual `request` commands and offline preflight reject this option. The desktop Collection and Environment matrix tabs offer the same opt-in as **Use run-local cookies**, with a separate empty jar per environment. Load tests retain isolated cookie-free requests.
+
 ### Final environment export
 
 ```sh

@@ -9,6 +9,8 @@ public struct RunConfiguration: Codable, Equatable, Sendable {
     public var retryDelayMilliseconds = 0
     public var stopOnFailure = true
     public var retentionBytes = 32 * 1024 * 1024
+    /// Missing in older saved configurations; each enabled run receives a fresh private jar.
+    public var cookieSession: Bool? = nil
     public init() {}
     public func validate() throws {
         guard (1...10_000).contains(iterations), (1...10_000).contains(executionLimit),
@@ -82,7 +84,8 @@ public enum CollectionRunner {
         tlsProfiles: [TLSProfile] = [], definitions: [APIDefinitionSource] = [],
         iterationData: IterationData? = nil, iterationOverrides: [String: String] = [:],
         progress: (@Sendable (RunProgress) async -> Void)? = nil,
-        exportEnvironment: EnvironmentExport? = nil, executor: Executor? = nil
+        exportEnvironment: EnvironmentExport? = nil, cookieJar: CookieJar? = nil,
+        executor: Executor? = nil
     ) async throws -> RunReport {
         try configuration.validate()
         guard requests.count <= 10_000, requests.count * configuration.iterations <= 10_000,
@@ -108,11 +111,12 @@ public enum CollectionRunner {
         var retained = 0
         var retainedChecks = 0
         try WorkflowEngine.validateVariables(variables)
+        let cookieJar = cookieJar ?? (configuration.cookieSession == true ? CookieJar() : nil)
         let execute: Executor =
             executor ?? { request, values in
                 try await WorkflowEngine.execute(
                     request, variables: values, profiles: profiles, secrets: secrets,
-                    tlsProfiles: tlsProfiles, definitions: definitions)
+                    tlsProfiles: tlsProfiles, definitions: definitions, cookieJar: cookieJar)
             }
         func pause(_ milliseconds: Int) async throws {
             try Task.checkCancellation()

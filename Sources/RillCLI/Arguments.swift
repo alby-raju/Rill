@@ -13,7 +13,7 @@ struct Arguments: Sendable {
         let boolean: Set<String> = [
             "quiet", "detail", "json", "apply", "continue-on-failure", "allow-insecure",
             "allow-lan", "overwrite", "show-messages", "help", "version", "insecure",
-            "include-system-roots",
+            "include-system-roots", "cookies",
         ]
         let valued: Set<String> = [
             "color", "workspace", "environment", "tls", "iterations", "delay", "retries",
@@ -91,6 +91,9 @@ struct Arguments: Sendable {
         if command != "run", value("iteration-data") != nil || value("iteration-data-format") != nil
         {
             throw CLIError.usage("Iteration-data options are supported only by file runs.")
+        }
+        if command != "run", flags.contains("cookies") {
+            throw CLIError.usage("--cookies is supported only by file runs.")
         }
         if command != "run", value("export-environment") != nil {
             throw CLIError.usage("--export-environment is supported only by file runs.")
@@ -291,6 +294,7 @@ let usage = """
           --iteration-data-format json|csv   Optional override for the file extension
           --iterations N --delay MS --retries N --retry-delay MS --continue-on-failure
           --report FILE --report-format json|markdown|junit --allure DIR
+          --cookies                Private in-memory cookie jar for this run only
           --export-environment FILE  Explicit raw final variables (Postman environment JSON)
           --output FILE --timeout SECONDS   Explicit last-response export and request timeout
           --json | --detail        Unsupported scripts/inputs block before traffic

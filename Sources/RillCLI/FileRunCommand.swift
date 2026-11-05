@@ -13,7 +13,7 @@ extension RillCLI {
                 ]).union(FileTLSOptions.values)),
             args.flags.isSubset(of: [
                 "json", "quiet", "detail", "continue-on-failure", "overwrite", "allow-insecure",
-                "insecure", "include-system-roots",
+                "insecure", "include-system-roots", "cookies",
             ]
             ),
             args.value("report-format") == nil || args.value("report") != nil
@@ -214,7 +214,8 @@ extension RillCLI {
             }
         let report = try await plan.run(
             configuration: config, timeout: args.value("timeout") == nil ? nil : timeout,
-            exportEnvironment: environmentExport)
+            exportEnvironment: environmentExport,
+            cookieJar: args.flags.contains("cookies") ? CookieJar() : nil)
         try await reports(report, arguments: args)
         if let output = args.value("output") {
             guard let body = report.outcomes.last(where: { $0.status != nil })?.retainedBody else {
@@ -322,16 +323,20 @@ private enum FileRunPlan {
     }
     func run(
         configuration: RunConfiguration, timeout: Double?,
-        exportEnvironment: CollectionRunner.EnvironmentExport?
+        exportEnvironment: CollectionRunner.EnvironmentExport?, cookieJar: CookieJar?
     ) async throws -> RunReport {
         switch self {
         case .postman(let plan):
             try await plan.run(
-                configuration: configuration, timeout: timeout, exportEnvironment: exportEnvironment
+                configuration: configuration, timeout: timeout,
+                exportEnvironment: exportEnvironment,
+                cookieJar: cookieJar
             )
         case .native(let plan):
             try await plan.run(
-                configuration: configuration, timeout: timeout, exportEnvironment: exportEnvironment
+                configuration: configuration, timeout: timeout,
+                exportEnvironment: exportEnvironment,
+                cookieJar: cookieJar
             )
         }
     }
