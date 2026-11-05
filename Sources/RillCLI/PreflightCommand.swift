@@ -7,10 +7,10 @@ extension RillCLI {
             Set(args.values.keys).isSubset(of: [
                 "environment-file", "env-var", "ssl-client-cert", "ssl-client-key", "color",
                 "folder", "globals",
-            ]), args.flags.isSubset(of: ["json", "quiet", "detail"])
+            ]), args.flags.isSubset(of: ["json", "quiet", "detail", "script-inventory"])
         else {
             throw CLIError.usage(
-                "Use preflight FILE with --folder, --globals, --environment-file, --env-var, a PEM certificate/key pair, --json or --quiet."
+                "Use preflight FILE with --folder, --globals, --environment-file, --env-var, a PEM certificate/key pair, --script-inventory, --json or --quiet."
             )
         }
         var report: CollectionPreflight
@@ -34,7 +34,7 @@ extension RillCLI {
                 globals: try args.value("globals").map {
                     try BoundedFileInput.read(
                         URL(fileURLWithPath: $0), limit: ResourceLimits.workspaceBytes)
-                })
+                }, includeScriptInventory: args.flags.contains("script-inventory"))
         } catch let error as PostmanFolderSelectionError {
             throw folderSelectionUsage(error)
         } catch CollectionPreflightInputError.insomnia {
@@ -105,6 +105,25 @@ extension RillCLI {
             if report.issueCount > displayed.count {
                 try args.text(
                     "\(report.issueCount - displayed.count) additional blockers; use --detail or --json (up to 1000 records retained)."
+                )
+            }
+            if let inventory = report.scriptInventory {
+                try args.text(
+                    "Script inventory: \(inventory.sourceCount) sources · \(inventory.omittedSources) omitted · inspection complete: \(inventory.complete) · supported/translated foreign constructs: 0/0"
+                )
+                for source in inventory.sources.prefix(args.flags.contains("detail") ? 1000 : 20) {
+                    try args.text(
+                        "  \(source.scope.rawValue)/\(source.phase.rawValue) · \(source.disposition.rawValue) at \(source.location) · affects \(source.affectedRequests) requests · declared disabled: \(source.declaredDisabled) · \(source.coverage.rawValue)"
+                    )
+                    for feature in source.features.prefix(args.flags.contains("detail") ? 4000 : 10)
+                    {
+                        try args.text(
+                            "    \(feature.code) at joined source line \(feature.line), UTF-8 column \(feature.byteColumn)"
+                        )
+                    }
+                }
+                try args.text(
+                    "Lexical hints only; all nonempty foreign source remains blocked. No script text, names or values included. Use --json for all retained records."
                 )
             }
             let guidance = [
