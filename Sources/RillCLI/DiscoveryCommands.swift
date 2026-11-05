@@ -19,7 +19,7 @@ extension RillCLI {
             "run":
                 "run FILE [--format postman|native]\nPostman: --folder /Parent/Child --globals FILE --environment-file FILE\nNative: --collection NAME_OR_ID --environment NAME_OR_ID\nBoth: --env-var key=value --iteration-data FILE --cookies --export-environment FILE\n--iterations N --retries N --delay MS --retry-delay MS --continue-on-failure\n--report FILE --report-format json|markdown|junit|html --allure DIR --output FILE --overwrite\n--json|--detail|--quiet; see full help for bounded TLS inputs. Foreign scripts/uploads block before traffic. No desktop workspace or Keychain access.",
             "preflight":
-                "preflight FILE [--folder /Parent/Child] [--globals FILE] [--environment-file FILE] [--env-var key=value] [--json]\nOffline Postman validation; no requests or credential hydration. Does not execute scripts, iteration data or cookie chains.",
+                "preflight FILE [--script-inventory] [--folder /Parent/Child] [--globals FILE] [--environment-file FILE] [--env-var key=value] [--json]\nOffline Postman validation; no requests or credential hydration. Does not execute scripts, iteration data or cookie chains.",
             "request":
                 "request METHOD URL [--header 'Name: value'] [--data TEXT|--data-file FILE] [--env-var key=value] [--output FILE] [--json]\nOne explicit HTTP request; no saved workflows, foreign scripts or cookie session. Raw output can contain secrets.",
         ]

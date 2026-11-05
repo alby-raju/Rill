@@ -9,7 +9,7 @@ struct Arguments: Sendable {
     static let booleanOptions: Set<String> = [
         "quiet", "detail", "json", "apply", "continue-on-failure", "allow-insecure",
         "allow-lan", "overwrite", "show-messages", "help", "version", "insecure",
-        "include-system-roots", "cookies",
+        "include-system-roots", "cookies", "script-inventory",
     ]
     static let valueOptions: Set<String> = [
         "color", "workspace", "environment", "tls", "iterations", "delay", "retries",
@@ -93,6 +93,10 @@ struct Arguments: Sendable {
         if command != "run", value("iteration-data") != nil || value("iteration-data-format") != nil
         {
             throw CLIError.usage("Iteration-data options are supported only by file runs.")
+        }
+        if command != "preflight", flags.contains("script-inventory") {
+            throw CLIError.usage(
+                "--script-inventory is supported only by offline Postman preflight.")
         }
         if command != "run", flags.contains("cookies") {
             throw CLIError.usage("--cookies is supported only by file runs.")
@@ -285,6 +289,7 @@ let usage = """
 
       preflight FILE               Offline Postman v2 collection inspection; sends no requests
           --folder /Parent/Child   Exact folder names; escape ~ as ~0 and / as ~1
+          --script-inventory       Redacted source locations, inheritance counts and lexical API hints
           --globals FILE           Postman globals JSON; lower precedence than collection variables
           --environment-file FILE --env-var key=value (repeatable)
           --ssl-client-cert FILE --ssl-client-key FILE (unencrypted PEM key)

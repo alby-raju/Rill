@@ -20,22 +20,24 @@ public struct CollectionPreflight: Encodable, Sendable {
     public var folderSelected = false
     public var globalsSupplied = false
     public var scripts = 0
+    public var scriptInventory: ScriptCompatibilityInventory? = nil
     public var issueCount = 0
     public var issues: [Issue] = []
     public var passed: Bool { requests > 0 && issues.isEmpty }
 
     public static func inspect(
         collection: Data, environment: Data? = nil, overrides: [String: String] = [:],
-        folder: String? = nil, globals: Data? = nil
+        folder: String? = nil, globals: Data? = nil, includeScriptInventory: Bool = false
     ) throws -> Self {
         try inspect(
             PostmanFolderSelection.prepare(collection, folder: folder),
-            environment: environment, overrides: overrides, globals: globals)
+            environment: environment, overrides: overrides, globals: globals,
+            includeScriptInventory: includeScriptInventory)
     }
 
     static func inspect(
         _ selection: PostmanFolderSelection, environment: Data?, overrides: [String: String],
-        globals: Data? = nil
+        globals: Data? = nil, includeScriptInventory: Bool = false
     ) throws -> Self {
         func object(_ data: Data) throws -> [String: Any] {
             try WorkspaceFile.checkJSONBounds(data)
@@ -191,6 +193,9 @@ public struct CollectionPreflight: Encodable, Sendable {
         try walk(root, path: "", depth: 0)
         try Task.checkCancellation()
         if result.requests == 0 { issue("collection.empty", "/item") }
+        if includeScriptInventory {
+            result.scriptInventory = try ScriptCompatibilityInventory.inspect(selection)
+        }
         return result
     }
 }
