@@ -129,9 +129,10 @@ public struct NativeFileRun: Sendable {
     }
 
     /// Native checks retain their semantics; unchecked responses receive an explicit 2xx check.
-    public func run(configuration: RunConfiguration, timeout: Double? = nil) async throws
-        -> RunReport
-    {
+    public func run(
+        configuration: RunConfiguration, timeout: Double? = nil,
+        exportEnvironment: CollectionRunner.EnvironmentExport? = nil
+    ) async throws -> RunReport {
         var requests = self.requests
         if let timeout {
             guard timeout.isFinite, (1...300).contains(timeout) else {
@@ -147,6 +148,7 @@ public struct NativeFileRun: Sendable {
         return try await CollectionRunner.run(
             requests: requests, environment: environment, configuration: configuration,
             iterationData: iterationData, iterationOverrides: iterationOverrides,
+            exportEnvironment: exportEnvironment,
             executor: { request, variables in
                 var result: WorkflowStepResult
                 do {

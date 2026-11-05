@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Add explicit `--export-environment FILE` to Postman/native file runs, with committed workflow state, deterministic Postman environment JSON, protected inputs and unexpanded secret references. Failed/stopped runs export their committed state; cancelled runs do not. Ordinary reports remain redacted.
+
 ## 0.4.5 development preview — 2026-11-05
 
 [Release and installers](https://github.com/alby-raju/Rill/releases/tag/v0.4.5-dev.1)

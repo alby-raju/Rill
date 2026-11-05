@@ -170,6 +170,7 @@ import XCTest
         let data = root.appendingPathComponent("data.json")
         let report = root.appendingPathComponent("report.json")
         let output = root.appendingPathComponent("raw.json")
+        let finalEnvironment = root.appendingPathComponent("final environment.json")
         let inputs = [
             source: try collection(
                 "{{base}}/echo", rows: [["key": "c", "value": "collection"]],
@@ -202,12 +203,22 @@ import XCTest
         let run = try await cli(
             ["run"] + options + [
                 "--iteration-data", data.path, "--report", report.path, "--output", output.path,
+                "--export-environment", finalEnvironment.path,
             ])
         XCTAssertEqual(run.status, 0, String(decoding: run.diagnostics, as: UTF8.self))
         let summary = try XCTUnwrap(
             JSONSerialization.jsonObject(with: run.output) as? [String: Any])
         XCTAssertEqual(summary["globalsSupplied"] as? Bool, true)
         XCTAssertEqual(summary["attempts"] as? Int, 2)
+        let exported = try PostmanImporter.parse(Data(contentsOf: finalEnvironment))
+        let finalValues = WorkflowEngine.variables(in: exported.workspace.environments.first)
+        XCTAssertEqual(finalValues["d"], "data-two")
+        XCTAssertEqual(finalValues["o"], "cli")
+        XCTAssertEqual(finalValues["empty"], "")
+        XCTAssertTrue(finalValues["token"]?.hasPrefix("{{secret:") == true)
+        XCTAssertFalse(
+            String(decoding: try Data(contentsOf: finalEnvironment), as: UTF8.self).contains(
+                "private-global-token"))
         let raw = try XCTUnwrap(
             JSONSerialization.jsonObject(with: Data(contentsOf: output)) as? [String: Any])
         XCTAssertEqual(
@@ -279,7 +290,7 @@ import XCTest
         try collection("http://127.0.0.1:1").write(to: source)
         try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: global)
         for path in [global, alias] {
-            for option in ["--report", "--output", "--allure"] {
+            for option in ["--report", "--output", "--allure", "--export-environment"] {
                 let result = try await cli([
                     "run", source.path, "--globals", global.path, option, path.path, "--overwrite",
                 ])

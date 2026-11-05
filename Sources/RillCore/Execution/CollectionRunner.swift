@@ -74,12 +74,15 @@ public struct RunProgress: Sendable {
 public enum CollectionRunner {
     public typealias Executor =
         @Sendable (RequestDraft, [String: String]) async throws -> WorkflowStepResult
+    /// Opt-in raw variable handoff; values never enter RunReport or ordinary diagnostics.
+    public typealias EnvironmentExport = @Sendable ([String: String]) async throws -> Void
     public static func run(
         requests: [RequestDraft], environment: Environment?, configuration: RunConfiguration,
         profiles: [AuthenticationProfile] = [], secrets: NamedSecretResolver? = nil,
         tlsProfiles: [TLSProfile] = [], definitions: [APIDefinitionSource] = [],
         iterationData: IterationData? = nil, iterationOverrides: [String: String] = [:],
-        progress: (@Sendable (RunProgress) async -> Void)? = nil, executor: Executor? = nil
+        progress: (@Sendable (RunProgress) async -> Void)? = nil,
+        exportEnvironment: EnvironmentExport? = nil, executor: Executor? = nil
     ) async throws -> RunReport {
         try configuration.validate()
         guard requests.count <= 10_000, requests.count * configuration.iterations <= 10_000,
@@ -274,6 +277,10 @@ public enum CollectionRunner {
             }
         }
         report.duration = ProcessInfo.processInfo.systemUptime - started
+        if !report.cancelled {
+            try Task.checkCancellation()
+            try await exportEnvironment?(variables)
+        }
         return report
     }
 }

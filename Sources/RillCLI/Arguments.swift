@@ -24,7 +24,7 @@ struct Arguments: Sendable {
             "client-secret-name", "scope", "save-secret", "plugins-dir", "trust-file", "plugin",
             "service", "wait", "send", "auth-profile", "proto-include", "collection",
             "environment-file", "env-var", "ssl-client-cert", "ssl-client-key", "folder",
-            "iteration-data", "iteration-data-format", "globals",
+            "iteration-data", "iteration-data-format", "globals", "export-environment",
             "ca-cert", "ssl-client-p12", "ssl-passphrase-file", "ssl-client-origin",
         ]
         var index = 0
@@ -91,6 +91,9 @@ struct Arguments: Sendable {
         if command != "run", value("iteration-data") != nil || value("iteration-data-format") != nil
         {
             throw CLIError.usage("Iteration-data options are supported only by file runs.")
+        }
+        if command != "run", value("export-environment") != nil {
+            throw CLIError.usage("--export-environment is supported only by file runs.")
         }
         if let color = value("color"), !["auto", "always", "never"].contains(color) {
             throw CLIError.usage("--color expects auto, always or never.")
@@ -288,6 +291,7 @@ let usage = """
           --iteration-data-format json|csv   Optional override for the file extension
           --iterations N --delay MS --retries N --retry-delay MS --continue-on-failure
           --report FILE --report-format json|markdown|junit --allure DIR
+          --export-environment FILE  Explicit raw final variables (Postman environment JSON)
           --output FILE --timeout SECONDS   Explicit last-response export and request timeout
           --json | --detail        Unsupported scripts/inputs block before traffic
       request METHOD URL           Ad-hoc HTTP request; no workspace required

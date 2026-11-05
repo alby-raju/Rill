@@ -39,7 +39,18 @@ Before any request, the entire selected collection/folder and supplied environme
 
 Options reuse `--iterations`, `--delay`/`--retry-delay` (milliseconds), `--retries`, `--continue-on-failure`, `--timeout` (1–300 seconds), `--report`/`--report-format json|markdown|junit`, `--allure`, `--detail`, `--quiet` and `--json`. Limits remain 10,000 planned/executed steps with bounded retries, variables and response retention. JSON summaries have `schemaVersion: 1`, `passed`, `cancelled`, `exhausted`, executed `attempts`, `folderSelected`, `collectionSelected`, `inputFormat` and optional `iterationDataRows`; static blockers return versioned redacted preflight checks with `sendsRequests: false`. Argument, file and preparation errors use stderr and exit 2. Ctrl+C flushes an explicitly requested unsuccessful report before exit when possible.
 
-Ordinary reports omit payloads/credentials. `--output FILE` explicitly exports the last received response if retained; unavailable retention is an error, not a silently omitted artifact. Outputs are exclusive unless `--overwrite` is supplied and cannot replace collection/environment/globals/iteration-data/TLS inputs or the desktop workspace. Inputs remain unchanged. Multipart/file bodies and final-environment export remain future increments; their options are not silently ignored. Saved-workspace commands remain available separately.
+Ordinary reports omit payloads/credentials. `--output FILE` explicitly exports the last received response if retained; unavailable retention is an error, not a silently omitted artifact. Outputs are exclusive unless `--overwrite` is supplied and cannot replace collection/environment/globals/iteration-data/TLS inputs or the desktop workspace. Inputs remain unchanged. Multipart/file bodies remain unsupported; their options are not silently ignored. Saved-workspace commands remain available separately.
+
+### Final environment export
+
+```sh
+rill run ./collection.json --export-environment ./final-environment.json
+rill run ./workspace.json --format native --environment Staging --export-environment ./final-environment.json
+```
+
+`--export-environment FILE` explicitly writes effective run variables as sorted Postman environment JSON. It includes enabled merged inputs and committed native hook/extraction updates; failed-attempt updates roll back. With iteration data, it captures the last started row, not an aggregate of all rows. Without iteration data, variables keep flowing across iterations. Failed or stopped runs export their last committed state; cancelled runs and input-preparation failures do not export. Export happens before normal reports and exit-status evaluation, so a nonzero exit can still leave a useful environment artifact.
+
+This is a raw plaintext export: values can include tokens extracted from responses or entered through CLI overrides. Selecting the option authorizes that export. Templates and named-secret references stay unexpanded; Keychain/process/transient credential values are never resolved for export. An exported secret reference needs its original credential source supplied separately when reused. Reuse with Postman-format `--environment-file`; this is a flattened snapshot, not a native workspace or an export of separate variable scopes. The destination must differ from reports, raw responses, run inputs and the desktop workspace. Existing files require `--overwrite`. Ordinary reports/stdout do not contain the exported variable map.
 
 ### Explicit Postman globals
 

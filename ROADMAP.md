@@ -1,6 +1,6 @@
 # Roadmap: CLI-first API testing
 
-Updated 31 October 2026. **This is a proposed delivery plan, not a list of shipped features or promised dates.** Current behavior is documented in [features and limits](docs/FEATURES.md) and the [CLI guide](docs/CLI.md).
+Updated 5 November 2026. **This is a proposed delivery plan, not a list of shipped features or promised dates.** Current behavior is documented in [features and limits](docs/FEATURES.md) and the [CLI guide](docs/CLI.md).
 
 Rill has reached an MVP development milestone. The next goal is a fast, local API testing workflow that moves from a collection file to a trustworthy CI result with minimal setup. Prioritize reproducibility, useful failure explanations and smooth migration over accumulating protocol names.
 
@@ -48,7 +48,7 @@ Milestones are delivery groups, not a promise to fit each into one PR. Use indep
 
 Ad-hoc development-source increment: `rill request METHOD URL` sends a single request through the shared HTTP engine, with temporary variable overrides and explicit optional saved profile selection. This addresses one-off calls without fulfilling CLI-01 direct collection-file execution.
 
-First CLI-01/02 increment: development source provides conservative Postman v2 `run` with environment files, overrides, whole-input preparation, explicit HTTP 2xx checks, reports and cancellation. Multipart/file bodies and foreign scripts block. Exact nested Postman folder selection works in run/preflight. Native v1 file runs support collection/environment selection and shared workflows with process-only secrets. Bounded JSON/CSV data rows now drive either file format with explicit precedence and per-row isolation; explicit Postman globals are now supported with matching offline preflight; final-environment export remains open.
+First CLI-01/02 increment: development source provides conservative Postman v2 `run` with environment files, overrides, whole-input preparation, explicit HTTP 2xx checks, reports and cancellation. Multipart/file bodies and foreign scripts block. Exact nested Postman folder selection works in run/preflight. Native v1 file runs support collection/environment selection and shared workflows with process-only secrets. Bounded JSON/CSV data rows now drive either file format with explicit precedence and per-row isolation; explicit Postman globals are now supported with matching offline preflight; explicit final-environment export now captures committed effective variables without resolving named secrets. CLI-02 still needs independent acceptance.
 
 First CLI-03 increment: both file formats accept bounded CA roots, unencrypted PEM or PKCS#12 client identities, passphrase files and explicit insecure mode. One exact HTTPS origin scopes the identity; same-origin redirects remain allowed and cross-origin redirects remain unfollowed. Native identity requirements can use files without Keychain lookup. Synthetic fixtures cover trust/hostname rejection, RSA/EC identities, intermediate chains, redaction and input protection. Multiple destination identities, encrypted PEM keys and independent/installed acceptance remain open. See the [CLI guide](docs/CLI.md).
 
