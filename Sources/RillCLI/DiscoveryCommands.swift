@@ -12,6 +12,8 @@ extension RillCLI {
             throw CLIError.usage("Unknown help command; use --help.")
         }
         let focused: [String: String] = [
+            "mock-serve":
+                "mock-serve --project FILE|--routes FILE [--port N] [--json] [--control-stdin] [--quiet]\nLoopback-only HTTP. Port 0 chooses an available port. Project version 1 is shared with the desktop. --json emits one compact readiness record. --control-stdin accepts newline-terminated status/reset/stop (64 bytes maximum); EOF stops. Ctrl+C/SIGTERM stops and exits 130. No personal workspace or Keychain access.",
             "doctor":
                 "doctor [--workspace FILE] [--json|--quiet]\nChecks local installation and optional explicit workspace without network, Keychain access or mutation. Optional compiler absence is a warning; invalid workspace exits 2.",
             "completion":

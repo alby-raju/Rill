@@ -55,6 +55,11 @@ struct WorkspaceTool: Identifiable {
                     icon: "tray.full"
                 ) { $0.showCookies = true },
                 WorkspaceTool(
+                    title: "Local Mocks",
+                    detail: "Save mock projects, match requests and inspect calls.",
+                    icon: "server.rack"
+                ) { $0.showMocks = true },
+                WorkspaceTool(
                     title: "Collection Runner",
                     detail: "Run collections, environment matrices and load tests.",
                     icon: "play.rectangle"

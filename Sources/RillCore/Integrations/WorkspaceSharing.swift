@@ -42,6 +42,7 @@ public enum WorkspaceSharing {
         workspace.tlsProfiles = nil
         workspace.namedSecrets = nil
         workspace.apiDefinitions = nil
+        workspace.mockProjects = nil
         for index in workspace.environments.indices {
             for field in workspace.environments[index].variables.indices {
                 workspace.environments[index].variables[field].value = ""

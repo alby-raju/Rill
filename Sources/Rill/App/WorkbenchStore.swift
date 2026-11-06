@@ -5,6 +5,11 @@ import UniformTypeIdentifiers
 @MainActor final class WorkbenchStore: ObservableObject {
     @Published var workspace = Workspace.starter {
         didSet {
+            let removedMocks = Set((oldValue.mockProjects ?? []).map(\.id))
+                .subtracting((workspace.mockProjects ?? []).map(\.id))
+            if !removedMocks.isEmpty {
+                Task { for id in removedMocks { await mockSessions.stop(id) } }
+            }
             guard !loading, !applyingWorkspace, workspace.needsSave(comparedTo: oldValue) else {
                 return
             }
@@ -90,6 +95,8 @@ import UniformTypeIdentifiers
     @Published var showCommandExport = false
     @Published var showRunner = false
     @Published var showAPITools = false
+    @Published var showMocks = false
+    let mockSessions = MockSessions()
     @Published var showLiveStreams = false
     @Published var showBrokers = false
     @Published var showGRPC = false
@@ -592,7 +599,9 @@ import UniformTypeIdentifiers
             }
         }
         guard await saveWorkspaceNow() else { return false }
-        return await checkpoint()
+        guard await checkpoint() else { return false }
+        await mockSessions.stopAll()
+        return true
     }
     func send() {
         guard canEdit, !running, let draft = selected else { return }

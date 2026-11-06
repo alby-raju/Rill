@@ -78,13 +78,15 @@ Acceptance: a run with unsupported scripts cannot look green; intentional assert
 
 ## 3. First-class mock workbench
 
-**Already available:** app menu **Workspace tools → Sessions and testing → API Definitions and Tools → Mocks**, plus CLI `mock-serve --routes FILE`. The current UI edits route JSON, binds to loopback and stops its server when the tool window closes. This milestone improves discoverability and capability; it does not add a second mock engine.
+**Entry points:** app menu **Workspace tools → Sessions and testing → Local Mocks** (development source), the Mocks tab in API Definitions and Tools, and CLI `mock-serve --routes FILE` / `--project FILE`. Development source now adds a dedicated Local Mocks destination, saved projects, route forms/JSON drafts, editor-independent listeners, predicates, scenarios, faults, a bounded call journal and a common versioned CLI project format. The published preview still has the earlier JSON-only editor. This milestone improves discoverability and capability; it does not add a second mock engine.
 
 - [ ] **MOCK-01 — Dedicated navigation.** Add a visible Mocks entry, persistent saved mock projects, an empty-state walkthrough, route forms with JSON editing, start/stop controls, running status and copyable base URL/cURL.
 - [ ] **MOCK-02 — Predictable lifecycle.** Keep a mock running when its editor closes; stop on explicit action or app termination. Surface port conflicts, running servers and unsaved changes. No implicit background daemon or automatic exposure to LAN.
 - [ ] **MOCK-03 — Useful responses.** Request matching by method/path/query/header/body; ordered scenarios, seeded examples, latency/error injection and bounded request journals. Define unmatched-route behavior and deterministic reset. Bound concurrent connections, journal retention and payload sizes.
 - [ ] **MOCK-04 — Contracts and fixtures.** Generate routes from supported OpenAPI examples and saved responses, validate fixture structure, and replay sanitized recordings. Record provenance and redact credentials before saving; interactive examples are not proof of full schema conformance.
 - [ ] **MOCK-05 — One app/CLI format.** Export/version the same route/project definition; CLI readiness output, ephemeral port discovery, CI teardown and reset controls. Request matching and scenario results must agree across app and CLI.
+
+Development-source details and limits are in [Local mocks](docs/wiki/Local-Mocks.md). Saved response fixtures are structural templates with every scalar replaced; arbitrary captured recordings are not replayed. Seeded value synthesis and independent acceptance remain open.
 
 Acceptance: create and run a mock without discovering a hidden submenu, close its editor while requests continue, inspect calls, reset a scenario, export it and reproduce the same behavior with the CLI. Exercise port collisions, cancellation, oversized requests and process termination.
 

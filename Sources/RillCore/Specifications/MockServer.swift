@@ -8,6 +8,13 @@ public struct MockRoute: Codable, Identifiable, Equatable, Sendable {
     public var status = 200
     public var headers: [Field] = [Field(name: "Content-Type", value: "application/json")]
     public var body = "{}"
+    public var query: [Field]?
+    public var requestHeaders: [Field]?
+    public var expectedBody: String?
+    public var delayMilliseconds: Int?
+    public var fault: MockFault?
+    public var scenario: MockScenario?
+    public var origin: MockFixtureOrigin?
     public init() {}
 }
 public actor MockServer {
@@ -15,19 +22,26 @@ public actor MockServer {
     private var ready: CheckedContinuation<URL, Error>?
     private var connections: [UUID: NWConnection] = [:]
     private var routes: [MockRoute] = []
+    private var responding: Set<UUID> = []
+    private var scenarioStates: [String: String] = [:]
+    private var records: [MockRequestRecord] = []
+    private var observedRequests = 0
     private var generation = UUID()
     private let queue = DispatchQueue(label: "app.rill.mock")
     public init() {}
     public static func validate(_ routes: [MockRoute]) throws {
+        try MockProject.validateStorage([MockProject(routes: routes)])
         guard routes.count <= 1000,
-            Set(routes.map { $0.method.rawValue + " " + $0.path }).count == routes.count,
+            Set(try routes.map(MockMatching.signature)).count == routes.count,
             routes.reduce(0, { $0 + $1.body.utf8.count }) <= 16 * 1024 * 1024,
             routes.reduce(
                 0, { $0 + $1.headers.reduce(0, { $0 + $1.name.utf8.count + $1.value.utf8.count }) })
                 <= 4 * 1024 * 1024
         else { throw WorkflowError.limit }
         for route in routes {
-            guard route.path.hasPrefix("/"), !route.path.contains("?"), !route.path.contains("#"),
+            try MockMatching.validate(route)
+            guard route.path.removingPercentEncoding != nil, route.path.hasPrefix("/"),
+                !route.path.contains("?"), !route.path.contains("#"),
                 route.path.utf8.count <= 4096,
                 !route.path.unicodeScalars.contains(where: { $0.value < 33 || $0.value == 127 }),
                 (200...599).contains(route.status), route.body.utf8.count <= 1024 * 1024,
@@ -57,6 +71,10 @@ public actor MockServer {
         let listener = try NWListener(using: parameters)
         self.listener = listener
         self.routes = routes
+        records = []
+        observedRequests = 0
+        scenarioStates = [:]
+        responding = []
         generation = UUID()
         let id = generation
         listener.stateUpdateHandler = { [weak self] state in
@@ -86,7 +104,19 @@ public actor MockServer {
         for connection in connections.values { connection.cancel() }
         connections.removeAll()
         routes = []
+        responding.removeAll()
     }
+    public func journal() -> [MockRequestRecord] { records }
+    public func requestCount() -> Int { observedRequests }
+    public func clearJournal() {
+        records = []
+        observedRequests = 0
+    }
+    public func resetScenarios(clearJournal: Bool = true) {
+        scenarioStates = [:]
+        if clearJournal { self.clearJournal() }
+    }
+    private func readTimeout(_ key: UUID) { if !responding.contains(key) { close(key) } }
     private func startupTimeout(_ id: UUID) { if generation == id && ready != nil { stop() } }
     private func state(_ state: NWListener.State, generation id: UUID) {
         guard id == generation else { return }
@@ -118,10 +148,15 @@ public actor MockServer {
             }
         }
         connection.start(queue: queue)
-        queue.asyncAfter(deadline: .now() + 5) { [weak self] in Task { await self?.close(key) } }
+        queue.asyncAfter(deadline: .now() + 5) { [weak self] in
+            Task { await self?.readTimeout(key) }
+        }
         receive(connection, key: key, data: Data())
     }
-    private func close(_ key: UUID) { connections.removeValue(forKey: key)?.cancel() }
+    private func close(_ key: UUID) {
+        responding.remove(key)
+        connections.removeValue(forKey: key)?.cancel()
+    }
     private func receive(_ connection: NWConnection, key: UUID, data: Data) {
         connection.receive(
             minimumIncompleteLength: 1, maximumLength: min(65536, 1024 * 1024 + 16384 - data.count)
@@ -193,10 +228,31 @@ public actor MockServer {
             if complete { close(key) } else { receive(connection, key: key, data: data) }
             return
         }
+        let target = String(first[1])
         let path =
-            String(first[1]).split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false)
-            .first.map(String.init) ?? "/"
-        let route = routes.first { $0.method == method && Self.matches($0.path, path) }
+            target.split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false).first.map(
+                String.init) ?? "/"
+        let query = URLComponents(string: "http://127.0.0.1" + target)?.queryItems ?? []
+        let body = Data(data[end.upperBound..<(end.upperBound + length)])
+        let routeIndex = routes.firstIndex {
+            MockMatching.matches(
+                $0, method: method, path: path, query: query, headers: headers, body: body,
+                states: scenarioStates)
+        }
+        let route = routeIndex.map { routes[$0] }
+        if let scenario = route?.scenario, let next = scenario.nextState {
+            scenarioStates[scenario.name] = next
+        }
+        observedRequests += 1
+        records.append(
+            MockRequestRecord(
+                id: UUID(), date: Date(), method: method, path: RunConsole.label(path, limit: 128),
+                routeIndex: routeIndex,
+                responseStatus: route?.fault == nil ? route?.status ?? 404 : nil,
+                requestBytes: end.upperBound + length,
+                configuredDelayMilliseconds: route?.delayMilliseconds ?? 0))
+        if records.count > 1000 { records.removeFirst(records.count - 1000) }
+        responding.insert(key)
         let status = route?.status ?? 404
         let payload =
             [204, 304].contains(status) ? Data() : Data((route?.body ?? "No mock route").utf8)
@@ -209,18 +265,24 @@ public actor MockServer {
         response += "\r\n"
         var output = Data(response.utf8)
         if method != .HEAD { output.append(payload) }
+        let id = generation
+        let responseData = output
+        let fault = route?.fault
+        queue.asyncAfter(deadline: .now() + .milliseconds(route?.delayMilliseconds ?? 0)) {
+            [weak self] in
+            Task { await self?.respond(key, output: responseData, generation: id, fault: fault) }
+        }
+    }
+    private func respond(_ key: UUID, output: Data, generation id: UUID, fault: MockFault?) {
+        guard generation == id, let connection = connections[key] else { return }
+        if fault == .disconnect {
+            close(key)
+            return
+        }
+        queue.asyncAfter(deadline: .now() + 5) { [weak self] in Task { await self?.close(key) } }
         connection.send(
             content: output,
             completion: .contentProcessed { [weak self] _ in Task { await self?.close(key) } })
-    }
-    private static func matches(_ pattern: String, _ path: String) -> Bool {
-        let a = pattern.split(separator: "/", omittingEmptySubsequences: false)
-        let b = path.split(separator: "/", omittingEmptySubsequences: false)
-        return a.count == b.count
-            && zip(a, b).allSatisfy {
-                String($0).removingPercentEncoding == String($1).removingPercentEncoding
-                    || ($0.hasPrefix("{") && $0.hasSuffix("}") && !$1.isEmpty)
-            }
     }
     deinit {
         listener?.cancel()
@@ -269,62 +331,11 @@ public enum DefinitionMocks {
                 route.body = ""
                 route.headers = []
             }
+            route.origin = MockFixtureOrigin(
+                kind: .definition, sourceID: definition.source.id, operation: operation.key)
             routes.append(route)
         }
         try MockServer.validate(routes)
         return routes
-    }
-}
-
-public enum MockRouteFile {
-    public static func decode(_ data: Data) throws -> [MockRoute] {
-        guard data.count <= 2 * 1024 * 1024 else { throw WorkflowError.limit }
-        let parsed = try JSONValueParser(data).parse()
-        guard let parsedRows = parsed.array,
-            let rows = try JSONSerialization.jsonObject(with: data) as? [[String: Any]],
-            rows.count <= 1000
-        else { throw WorkflowError.invalidConfiguration }
-        let routes = try rows.enumerated().map { index, row in
-            guard Set(row.keys).isSubset(of: ["method", "path", "status", "headers", "body"]),
-                let method = (row["method"] as? String).flatMap(HTTPMethod.init(rawValue:)),
-                let path = row["path"] as? String,
-                let statusValue = parsedRows[index]["status"],
-                let status = try ExactSchemaNumber(statusValue).nonnegativeInt,
-                let body = row["body"] as? String
-            else { throw WorkflowError.invalidConfiguration }
-            var route = MockRoute()
-            route.method = method
-            route.path = path
-            route.status = status
-            route.body = body
-            if let headers = row["headers"] {
-                guard let headers = headers as? [String: String] else {
-                    throw WorkflowError.invalidConfiguration
-                }
-                route.headers = headers.sorted { $0.key < $1.key }.map {
-                    Field(name: $0.key, value: $0.value)
-                }
-            } else {
-                route.headers = []
-            }
-            return route
-        }
-        try MockServer.validate(routes)
-        return routes
-    }
-    public static func encode(_ routes: [MockRoute]) throws -> Data {
-        try MockServer.validate(routes)
-        let rows: [[String: Any]] = routes.map {
-            [
-                "method": $0.method.rawValue, "path": $0.path, "status": $0.status,
-                "headers": Dictionary(
-                    uniqueKeysWithValues: $0.headers.filter(\.enabled).map { ($0.name, $0.value) }),
-                "body": $0.body,
-            ]
-        }
-        let data = try JSONSerialization.data(
-            withJSONObject: rows, options: [.prettyPrinted, .sortedKeys])
-        guard data.count <= 2 * 1024 * 1024 else { throw WorkflowError.limit }
-        return data
     }
 }

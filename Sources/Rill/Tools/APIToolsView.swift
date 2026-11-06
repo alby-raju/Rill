@@ -16,11 +16,6 @@ struct APIToolsView: View {
     @ViewState<Bool> private var busy = false
     @ViewState<Task<Void, Never>?> private var task: Task<Void, Never>?
     @ViewState<UUID> private var generation = UUID()
-    @ViewState<MockServer> private var server = MockServer()
-    @ViewState<String> private var mockAddress = ""
-    @ViewState<Int> private var port = 0
-    @ViewState<String> private var mockJSON =
-        #"[{"method":"GET","path":"/hello","status":200,"headers":{"Content-Type":"application/json"},"body":"{\"message\":\"hello\"}"}]"#
     @ViewState<ActiveProbeKind> private var probe = .reflection
     @ViewState<String> private var probeURL = ""
     @ViewState<String> private var queryName = ""
@@ -56,8 +51,7 @@ struct APIToolsView: View {
             .onDisappear {
                 generation = UUID()
                 task?.cancel()
-                let server = server
-                Task { await server.stop() }
+
             }
             .onChange(of: section) { _, _ in
                 result = ""
@@ -110,8 +104,11 @@ struct APIToolsView: View {
                     Button("Generate editable mock routes") {
                         perform {
                             let routes = try await detached { try DefinitionMocks.routes(preview) }
-                            mockJSON = String(
-                                decoding: try MockRouteFile.encode(routes), as: UTF8.self)
+                            let project = MockProject(name: preview.source.title, routes: routes)
+                            var projects = store.workspace.mockProjects ?? []
+                            projects.append(project)
+                            try MockProject.validateStorage(projects)
+                            store.workspace.mockProjects = projects
                             section = "Mocks"
                         }
                     }
@@ -195,45 +192,7 @@ struct APIToolsView: View {
         }
     }
     private var mocks: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(
-                "Loopback-only HTTP mock server. Edit method/path/status/headers/body JSON. Paths can use {parameter} segments. No scripts run. Mock responses are examples, not proof of schema conformance. Closing this window stops the server."
-            ).font(.caption).foregroundStyle(.secondary)
-            Label("Route definitions", systemImage: "curlybraces").font(.headline)
-            CodeEditor(text: $mockJSON, contentType: "application/json", completions: []).disabled(
-                !mockAddress.isEmpty || busy)
-            HStack {
-                Text("Port (0 chooses a free port)")
-                TextField("Port", value: $port, format: .number).frame(
-                    width: RillControlWidth.number
-                ).disabled(
-                    !mockAddress.isEmpty || busy)
-                Button("Start mock server") {
-                    guard (0...65535).contains(port) else {
-                        error = "Choose a port between 0 and 65535."
-                        return
-                    }
-                    let data = Data(mockJSON.utf8)
-                    let port = UInt16(port)
-                    perform {
-                        let routes = try await detached { try MockRouteFile.decode(data) }
-                        mockAddress = try await server.start(routes: routes, port: port)
-                            .absoluteString
-                    }
-                }.disabled(busy || !mockAddress.isEmpty)
-                Button("Stop") {
-                    perform {
-                        await server.stop()
-                        mockAddress = ""
-                    }
-                }.disabled(busy || mockAddress.isEmpty)
-                Spacer()
-                if !mockAddress.isEmpty { Text(mockAddress).textSelection(.enabled) }
-                RillToolStatus(
-                    title: mockAddress.isEmpty ? "Stopped" : "Listening",
-                    active: !mockAddress.isEmpty)
-            }
-        }
+        MockWorkbenchContent().environmentObject(store)
     }
     private var inspection: some View {
         VStack(alignment: .leading, spacing: 10) {

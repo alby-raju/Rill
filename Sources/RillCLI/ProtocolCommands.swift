@@ -69,15 +69,48 @@ extension RillCLI {
             return
         }
         if args.command == "mock-serve" {
-            let routes = try MockRouteFile.decode(
-                BoundedFileInput.read(
-                    URL(fileURLWithPath: args.required("routes")), limit: 2 * 1024 * 1024))
-            let port = try args.integer("port", default: 0)
+            guard args.operands.isEmpty,
+                Set(args.values.keys).isSubset(of: ["routes", "project", "port"]),
+                args.flags.isSubset(of: ["quiet", "json", "control-stdin"]),
+                (args.value("routes") != nil) != (args.value("project") != nil)
+            else {
+                throw CLIError.usage(
+                    "Choose exactly one --project or --routes file; optional --port, --json, --quiet and --control-stdin."
+                )
+            }
+            let project: MockProject
+            if let path = args.value("project") {
+                project = try MockProjectFile.decode(
+                    BoundedFileInput.read(
+                        URL(fileURLWithPath: path), limit: MockProjectFile.maximumBytes))
+            } else {
+                project = MockProject(
+                    routes: try MockRouteFile.decode(
+                        BoundedFileInput.read(
+                            URL(fileURLWithPath: args.required("routes")),
+                            limit: MockRouteFile.maximumBytes)))
+            }
+            let port = try args.integer("port", default: Int(project.port))
             guard (0...65535).contains(port) else { throw CLIError.usage("Invalid port.") }
             let server = MockServer()
-            let url = try await server.start(routes: routes, port: UInt16(port))
-            try args.text(url.absoluteString)
-            do { try await waitForCancellation() } catch {
+            let url = try await server.start(routes: project.routes, port: UInt16(port))
+            do {
+                if args.flags.contains("json") {
+                    try MockControlOutput(
+                        state: "ready", baseURL: url.absoluteString,
+                        routeCount: project.routes.count
+                    ).write(quiet: args.quiet)
+                } else {
+                    try args.text(url.absoluteString)
+                }
+                if args.flags.contains("control-stdin") {
+                    try await mockControl(server: server, args: args)
+                } else {
+                    try await waitForCancellation()
+                }
+                await server.stop()
+                return
+            } catch {
                 await server.stop()
                 throw error
             }

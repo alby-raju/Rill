@@ -4,7 +4,7 @@ This describes the MVP's implemented scope. Automated tests and an implemented c
 
 ## Everyday API work
 
-Open **Workspace tools** from the sidebar or **Workspace → Browse Tools…**. Use **Request setup** for environments, authentication, and TLS, and **Sessions and testing** for response history, Cookie Manager, the runner, and API definitions.
+Open **Workspace tools** from the sidebar or **Workspace → Browse Tools…**. Use **Request setup** for environments, authentication, and TLS, and **Sessions and testing** for response history, Cookie Manager, the runner, local mocks, and API definitions.
 
 | Area | Available | Boundaries |
 |---|---|---|
@@ -35,7 +35,7 @@ Rill 0.4.5 supports `rill run COLLECTION.json` for a conservative Postman v2 JSO
 - **Reports:** redacted JSON, Markdown, JUnit and Allure results. Development source also exports self-contained offline HTML with request/state filters and timing bars. Allure needs an external viewer. Empty/cancelled/exhausted runs cannot pass.
 - **Definitions:** Swagger 2/OpenAPI 3 JSON/YAML, local references, request/positive-contract generation and identity-preserving previewed refresh. External references are not fetched automatically.
 - **Schema:** an explicit subset of type/required/properties/additionalProperties, enum/const, array items, numeric/string/array/object limits, nullable, allOf/anyOf/oneOf and local JSON Pointer references. Unsupported rules must not silently pass; full dialect conformance is not claimed.
-- **Mocks/inspection:** editable loopback route/status/header/body mocks, passive header indicators and separately enabled bounded active probes. This is not full DAST or proof that an endpoint is secure.
+- **Mocks/inspection:** saved loopback mock projects with route forms/JSON drafts, query/header/body predicates, scenarios, delay/disconnect faults, editor-independent listeners, bounded call journals and a shared desktop/CLI project format (development source; see [Local mocks](wiki/Local-Mocks.md)), passive header indicators and separately enabled bounded active probes. This is not full DAST or proof that an endpoint is secure.
 - **Formats:** native Rill; cURL/HTTPie commands; HTTPie Desktop 1.0.0; Postman v2.0/v2.1 collections/environments; Insomnia v4 JSON/v5 YAML; HAR; Bruno `.bru` file/folder/ZIP. Support differs by representation. Scoped variables, uncommon auth/body variants, cookies, plugins, transport settings and scripts may warn or reject. Bruno OpenCollection YAML is not implemented. File references are not attached files. Postman unselected upload placeholders are retained with warnings; enabled uploads require local file selection before Send.
 - **Client generation:** cURL/HTTPie plus Python requests/httpx, Node fetch/axios, Java HttpClient/OkHttp, Go, Rust and C#. These are frozen-request source programs, not installed SDKs or universal wire-equivalence guarantees. Some header/body/TLS combinations reject explicitly; review generated source before sharing or execution.
 

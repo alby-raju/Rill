@@ -167,6 +167,7 @@ public struct Workspace: Codable, Equatable, Sendable {
     public var requests: [RequestDraft] = []
     public var environments: [Environment] = []
     public var apiDefinitions: [APIDefinitionSource]?
+    public var mockProjects: [MockProject]?
     public var authProfiles: [AuthenticationProfile]?
     public var namedSecrets: [NamedSecret]?
     public var tlsProfiles: [TLSProfile]?

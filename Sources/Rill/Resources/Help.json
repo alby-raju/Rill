@@ -27,7 +27,7 @@
   {
     "id": "api",
     "title": "Definitions, contracts, mocks and inspection",
-    "body": "API Definitions / Contracts / Mocks loads bounded OpenAPI 3.x or Swagger 2 JSON/YAML/local refs. Refresh previews drift and preserves local edits and IDs. Unknown schema assertions do not silently pass. The Schema tab supports an explicit JSON Schema subset. Linked contracts validate the same prepared request and response used by sends/runners. Mocks bind loopback only and use editable routes. Passive inspection sends no traffic; active probes require an explicit target and are limited to GET/HEAD and small sequential samples. These checks are indicators, not a security certification."
+    "body": "API Definitions / Contracts / Mocks loads bounded OpenAPI 3.x or Swagger 2 JSON/YAML/local refs. Refresh previews drift and preserves local edits and IDs. Unknown schema assertions do not silently pass. The Schema tab supports an explicit JSON Schema subset. Linked contracts validate the same prepared request and response used by sends/runners. Local Mocks saves projects and unapplied JSON drafts, with query/header/body predicates, scenarios, bounded calls and delays/disconnect faults. Listeners bind loopback only and survive editor closure; Stop, project deletion or Quit tears them down. Edited routes require Restart. Exported projects run with mock-serve --project; response templates replace scalar values and omit captured URLs/headers. Passive inspection sends no traffic; active probes require an explicit target and are limited to GET/HEAD and small sequential samples. These checks are indicators, not a security certification."
   },
   {
     "id": "graphql",
