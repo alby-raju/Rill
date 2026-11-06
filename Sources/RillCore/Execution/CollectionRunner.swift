@@ -20,7 +20,7 @@ public struct RunConfiguration: Codable, Equatable, Sendable {
         else { throw WorkflowError.invalidConfiguration }
     }
 }
-public enum RunState: String, Codable, Sendable { case passed, failed, cancelled, notRun }
+public enum RunState: String, Codable, Sendable { case passed, failed, cancelled, notRun, skipped }
 public struct RunAttempt: Codable, Identifiable, Sendable {
     public var id = UUID()
     public var requestID: UUID
@@ -64,7 +64,7 @@ public struct RunReport: Codable, Identifiable, Sendable {
                     return true
                 }
             }
-            return outcome.state == .passed
+            return outcome.state == .passed || outcome.state == .skipped
         }
     }
 }
@@ -73,9 +73,17 @@ public struct RunProgress: Sendable {
     public let requestID: UUID
     public let state: RunState
 }
+public struct RunStepContext: Sendable {
+    public let iteration: Int
+    public let attempt: Int
+}
+
 public enum CollectionRunner {
     public typealias Executor =
         @Sendable (RequestDraft, [String: String]) async throws -> WorkflowStepResult
+    public typealias ContextualExecutor =
+        @Sendable (RequestDraft, [String: String], RunStepContext) async throws ->
+        WorkflowStepResult
     /// Opt-in raw variable handoff; values never enter RunReport or ordinary diagnostics.
     public typealias EnvironmentExport = @Sendable ([String: String]) async throws -> Void
     public static func run(
@@ -85,9 +93,12 @@ public enum CollectionRunner {
         iterationData: IterationData? = nil, iterationOverrides: [String: String] = [:],
         progress: (@Sendable (RunProgress) async -> Void)? = nil,
         exportEnvironment: EnvironmentExport? = nil, cookieJar: CookieJar? = nil,
-        executor: Executor? = nil
+        executor: Executor? = nil, contextualExecutor: ContextualExecutor? = nil
     ) async throws -> RunReport {
         try configuration.validate()
+        guard executor == nil || contextualExecutor == nil else {
+            throw WorkflowError.invalidConfiguration
+        }
         guard requests.count <= 10_000, requests.count * configuration.iterations <= 10_000,
             Set(requests.map(\.id)).count == requests.count
         else { throw WorkflowError.invalidConfiguration }
@@ -163,19 +174,30 @@ public enum CollectionRunner {
                         let attemptStarted = Date()
                         let before = ProcessInfo.processInfo.systemUptime
                         do {
-                            let result = try await execute(request, variables)
+                            let result: WorkflowStepResult
+                            if let contextualExecutor {
+                                result = try await contextualExecutor(
+                                    request, variables,
+                                    RunStepContext(iteration: iteration, attempt: attempt))
+                            } else {
+                                result = try await execute(request, variables)
+                            }
                             try Task.checkCancellation()
                             var outcome = RunAttempt(
                                 requestID: request.id, started: attemptStarted,
                                 iteration: iteration, attempt: attempt,
-                                state: result.passed ? .passed : .failed,
-                                status: result.exchange.status, duration: result.exchange.duration,
+                                state: result.skipped
+                                    ? .skipped : result.passed ? .passed : .failed,
+                                status: result.skipped ? nil : result.exchange.status,
+                                duration: result.exchange.duration,
                                 checks: result.exchange.checks,
-                                fingerprint: SHA256.hash(data: result.exchange.body).map {
-                                    String(format: "%02x", $0)
-                                }.joined(), bodyBytes: result.exchange.body.count,
-                                bodyOmitted: false)
-                            if result.passed {
+                                fingerprint: result.skipped
+                                    ? nil
+                                    : SHA256.hash(data: result.exchange.body).map {
+                                        String(format: "%02x", $0)
+                                    }.joined(), bodyBytes: result.exchange.body.count,
+                                bodyOmitted: result.skipped)
+                            if result.passed || result.commitVariablesOnFailure {
                                 do {
                                     if let target = result.next {
                                         next = try branch(target, from: request)
@@ -185,7 +207,9 @@ public enum CollectionRunner {
                                     outcome.failure = WorkflowError.invalidBranch.rawValue
                                 }
                             }
-                            if result.exchange.body.count <= configuration.retentionBytes - retained
+                            if !result.skipped,
+                                result.exchange.body.count <= configuration.retentionBytes
+                                    - retained
                             {
                                 outcome.retainedBody = result.exchange.body
                                 retained += result.exchange.body.count
@@ -208,8 +232,10 @@ public enum CollectionRunner {
                                 outcome.checks = []
                                 outcome.checksOmitted = true
                             }
-                            finalPassed = outcome.state == .passed
-                            if finalPassed {
+                            finalPassed = outcome.state == .passed || outcome.state == .skipped
+                            if finalPassed
+                                || (result.commitVariablesOnFailure && outcome.failure == nil)
+                            {
                                 do {
                                     try WorkflowEngine.validateVariables(result.variables)
                                     variables = result.variables

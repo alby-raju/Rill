@@ -5,6 +5,8 @@ import io
 import json
 import os
 import re
+import shutil
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -20,6 +22,29 @@ def load(name):
 
 
 class RepositoryChecks(unittest.TestCase):
+    def test_docs_check_excludes_installed_dependencies_but_still_checks_first_party_links(self):
+        checker = load("check-docs")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "docs").mkdir()
+            shutil.copy2(checker.ROOT / "docs/CAPABILITIES.csv", root / "docs/CAPABILITIES.csv")
+            (root / "LICENSE").write_text("MIT License\n")
+            (root / "README.md").write_text("First-party documentation.\n")
+            dependency = root / "scripts/conformance/node_modules/example"
+            dependency.mkdir(parents=True)
+            (dependency / "README.md").write_text(
+                "[External package source](not-in-installed-package)\n"
+            )
+            with (
+                patch.object(checker, "ROOT", root),
+                patch.object(checker, "REQUIRED", ["LICENSE", "README.md"]),
+                patch("sys.stdout", new=io.StringIO()),
+            ):
+                checker.check()
+                (root / "README.md").write_text("[First-party broken link](missing.md)\n")
+                with self.assertRaisesRegex(ValueError, "Broken link in README.md"):
+                    checker.check()
+
     def test_only_explicit_documentation_changes_skip_native_builds(self):
         plan = load("ci-plan")
         self.assertTrue(

@@ -5,7 +5,9 @@ import Foundation
 public struct ScriptCompatibilityInventory: Encodable, Sendable {
     public enum Scope: String, Encodable, Sendable { case collection, folder, request }
     public enum Phase: String, Encodable, Sendable { case prerequest, test, other }
-    public enum Disposition: String, Encodable, Sendable { case empty, unsupported, invalid }
+    public enum Disposition: String, Encodable, Sendable {
+        case empty, unsupported, invalid, translated
+    }
     public enum Coverage: String, Encodable, Sendable { case lexical, partial, limited }
     public struct Feature: Encodable, Sendable {
         public let code: String
@@ -17,16 +19,16 @@ public struct ScriptCompatibilityInventory: Encodable, Sendable {
         public let scope: Scope
         public let phase: Phase
         public let declaredDisabled: Bool
-        public let disposition: Disposition
+        public internal(set) var disposition: Disposition
         public var affectedRequests: Int
         public let coverage: Coverage
         public let features: [Feature]
     }
     public let schemaVersion = 1
-    public let strategy = "foreign-source-blocked"
+    public private(set) var strategy = "foreign-source-blocked"
     public let analysis = "lexical-hints-only"
     public let supportedForeignConstructs = 0
-    public let translatedForeignConstructs = 0
+    public private(set) var translatedForeignConstructs = 0
     public private(set) var sourceCount = 0
     public private(set) var requests = 0
     public private(set) var sources: [Source] = []
@@ -53,6 +55,15 @@ public struct ScriptCompatibilityInventory: Encodable, Sendable {
         try values.encode(sources, forKey: .sources)
         try values.encode(omittedSources, forKey: .omittedSources)
         try values.encode(complete, forKey: .complete)
+    }
+
+    mutating func applyTranslation(_ plan: PostmanScriptPlan) {
+        strategy = "bounded-native-translation"
+        translatedForeignConstructs = plan.programs.reduce(0) { $0 + $1.operationCount }
+        let translated = Set(plan.sourceLocations)
+        for index in sources.indices where translated.contains(sources[index].location) {
+            sources[index].disposition = .translated
+        }
     }
 
     public static func inspect(collection: Data, folder: String? = nil) throws -> Self {

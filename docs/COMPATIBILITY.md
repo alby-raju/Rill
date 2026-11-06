@@ -2,11 +2,12 @@
 
 This inventory describes development source, not unrestricted Postman/Newman compatibility.
 Rill executes its own bounded native JSON operations, response assertions and extraction.
-It currently executes **zero Postman JavaScript constructs** and translates **zero constructs**.
-All nonempty imported foreign script blocks remain blocked before file-run traffic.
+It executes **no JavaScript runtime**. Default file runs block nonempty foreign script blocks.
+Development source also provides explicit [bounded native translation](SCRIPT-SUBSET.md) with
+`--translate-scripts`; only its fully validated finite grammar can run.
 
-The next strategy is [bounded translation](adr/0001-collection-script-compatibility.md).
-Its grammar and differential acceptance are separate work. The inventory does not enable it.
+[ADR 0001](adr/0001-collection-script-compatibility.md) defines the bounded translation strategy.
+The inventory alone does not enable it; broader grammar and independent acceptance remain open.
 
 ## Inspect a collection offline
 
@@ -21,8 +22,10 @@ It accepts the existing environment/globals/override inputs and optional PEM ins
 it makes no API requests, fetches no external scripts, executes no source and changes no
 workspace, source file or Keychain. Other commands reject `--script-inventory`.
 
-An inventory does not change preflight's exit status: nonempty scripts, including declared
-disabled scripts, remain blockers with exit 2. Empty whitespace-only `exec` arrays do not
+An inventory alone does not change preflight's exit status: nonempty scripts, including declared
+disabled scripts, remain blockers with exit 2. Combining it with `--translate-scripts` reports
+fully validated source as `translated`, counts compiled native operation nodes, and preserves
+source/feature coordinates. The standalone lexical hints never grant that classification. Empty whitespace-only `exec` arrays do not
 block by themselves. Comments-only scripts remain nonempty foreign source. Other variable,
 transport, import and resource blockers still apply.
 
@@ -39,7 +42,7 @@ remote and malformed entries. Each retained source includes:
 - `affectedRequests`: the number of selected structural request leaves below that source.
   Ancestor events therefore cover their selected descendants. This includes declared-disabled
   request items and is not an executed-request count or a simulation of script ordering.
-- `disposition`: `empty`, `unsupported` or `invalid`. A known API hint never upgrades this
+- `disposition`: `empty`, `unsupported`, `invalid` or explicitly validated `translated`. A known API hint never upgrades this
   classification to supported or translated.
 - `coverage`: `lexical`, `partial` or `limited`, plus an array of fixed diagnostic hints.
 
@@ -94,5 +97,6 @@ markers where available. `complete: true` only means the bounded lexical inspect
 it never means a JavaScript program was parsed, validated or shown compatible. No retained
 sample is extrapolated into a compatibility percentage.
 
-Grammar-aware construct classification, variable-scope/order semantics, opt-in translation
-and pinned Newman differential suites remain open under [COMPAT-01/03/04](../ROADMAP.md).
+The [finite translated subset](SCRIPT-SUBSET.md) adds grammar-checked operations, separate
+variable scopes and a pinned synthetic differential corpus. Every construct outside it remains
+unsupported; broader compatibility/independent acceptance stays on [COMPAT-01/03/04](../ROADMAP.md).

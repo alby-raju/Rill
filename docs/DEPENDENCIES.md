@@ -45,3 +45,7 @@ python3 scripts/collect-dependency-notices.py --check
 Swift formatting and C formatting use the selected Xcode toolchain. Python formatting uses Ruff 0.17.3 from `requirements-dev.txt`; Bash formatting uses [shfmt 3.14.1](https://github.com/mvdan/sh/releases/tag/v3.14.1). These are not bundled runtime dependencies. The optional verification gRPC server uses separately installed grpcio 1.80.0. Client-validation SDK versions are pinned in CI and the validation harness; their libraries are not copied into the app.
 
 Kafka 1.0.0 reviewed 1 November 2026 at revision `f457437e3c5ba4bb0bd501201e7dac2278a6c4d2`. Upstream changes include producer byte APIs and consumer shutdown/metrics fixes. Rill release compilation passed in PR CI; regenerated exact-source notices accompany this update. Runtime, packaging and architecture acceptance remain subject to the updated-head checks.
+
+## Optional synthetic script reference
+
+`scripts/script-conformance` pins stock Newman 6.2.3 and its npm lockfile for manually invoked synthetic differential tests. Node/Newman/node_modules are not application dependencies or bundled artifacts. The reference dependency audit has known findings; its [README](../scripts/script-conformance/README.md) records the scope and audit status. Normal Swift builds/tests do not install it, and its results do not replace production dependency or release-security gates.

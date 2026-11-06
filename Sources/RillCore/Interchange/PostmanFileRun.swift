@@ -11,15 +11,19 @@ public struct PostmanFileRun: Sendable {
     public let requests: [RequestDraft]
     public let environment: Environment
     public let secrets: NamedSecretResolver
+    public var translatesScripts: Bool { scriptPlan != nil }
     private let iterationData: IterationData?
     private let iterationOverrides: [String: String]
     private let fileTLS: FileTLSConfiguration?
+    private let scriptPlan: PostmanScriptPlan?
+    private let scriptVariables: ScriptVariables?
+    private let scriptOverrides: [String: String]
 
     public static func prepare(
         collection: Data, environment inputEnvironment: Data? = nil,
         overrides: [String: String] = [:], folder: String? = nil,
         iterationData: IterationData? = nil, fileTLS: FileTLSConfiguration? = nil,
-        globals: Data? = nil
+        globals: Data? = nil, translateScripts: Bool = false
     ) throws -> Self {
         try Task.checkCancellation()
         guard overrides.count <= 10_000,
@@ -30,11 +34,17 @@ public struct PostmanFileRun: Sendable {
                 <= ResourceLimits.workspaceBytes
         else { throw PostmanFileRunError.invalidOverrides }
         let selection = try PostmanFolderSelection.prepare(collection, folder: folder)
+        let scriptPlan = translateScripts ? try PostmanScriptPlan.prepare(selection) : nil
+        if let scriptPlan, !scriptPlan.writes.isDisjoint(with: overrides.keys) {
+            throw PostmanScriptPlanError(
+                code: "script.overrideMutation", location: "/options/env-var", line: 1,
+                byteColumn: 1)
+        }
         var preflightOverrides = iterationData?.rows.first ?? [:]
         preflightOverrides.merge(overrides) { _, override in override }
         let preflight = try CollectionPreflight.inspect(
             selection, environment: inputEnvironment, overrides: preflightOverrides,
-            globals: globals)
+            globals: globals, translateScripts: translateScripts, preparedScripts: scriptPlan)
         guard preflight.passed else { throw PostmanFileRunError.blocked(preflight) }
         let imported = try PostmanImporter.parse(selection.data)
         guard imported.workspace.requests.count * (iterationData?.rows.count ?? 1) <= 10_000 else {
@@ -49,12 +59,15 @@ public struct PostmanFileRun: Sendable {
             throw PostmanFileRunError.unsupportedBody
         }
         var fields: [String: Field] = [:]
+        var layers: [ScriptVariableScope: [String: String]] = [:]
+        var currentScope = ScriptVariableScope.collection
         var catalog: [NamedSecret] = []
         var secretValues: [UUID: String] = [:]
         func apply(_ environments: [Environment]) {
             for environment in environments {
                 for field in environment.variables where field.enabled {
                     fields[field.name] = field
+                    layers[currentScope, default: [:]][field.name] = field.value
                 }
             }
         }
@@ -63,13 +76,22 @@ public struct PostmanFileRun: Sendable {
             catalog += imported.workspace.namedSecrets ?? []
             secretValues.merge(imported.secretValues) { _, new in new }
         }
-        if let globals { applyImport(try PostmanImporter.parseGlobals(globals)) }
+        if let globals {
+            currentScope = .globals
+            applyImport(try PostmanImporter.parseGlobals(globals))
+        }
+        currentScope = .collection
         applyImport(imported)
         if let inputEnvironment {
+            currentScope = .environment
             let importedEnvironment = try PostmanImporter.parse(inputEnvironment)
             applyImport(importedEnvironment)
         }
         for (name, value) in overrides { fields[name] = Field(name: name, value: value) }
+        for (name, value) in overrides { layers[.environment, default: [:]][name] = value }
+        layers[.local] = overrides
+        let scopedVariables = ScriptVariables(layers: layers)
+        if scriptPlan != nil { try scopedVariables.validate() }
         var environment = Environment(name: "Collection file")
         environment.variables = fields.keys.sorted().compactMap { fields[$0] }
         try WorkflowEngine.validateVariables(WorkflowEngine.variables(in: environment))
@@ -83,17 +105,34 @@ public struct PostmanFileRun: Sendable {
                 ?? baseVariables
             let rowEnvironment =
                 iterationData == nil ? environment : WorkflowEngine.environment(values)
+            var validationValues = values
+            for name in scriptPlan?.writes ?? [] where validationValues[name] == nil {
+                validationValues[name] = "https://rill-dynamic.invalid"
+            }
             for request in imported.workspace.requests {
                 try Task.checkCancellation()
                 _ = try RequestEngine.prepare(
-                    request, environment: rowEnvironment, secrets: secrets)
+                    request,
+                    environment: scriptPlan == nil
+                        ? rowEnvironment : WorkflowEngine.environment(validationValues),
+                    secrets: secrets)
             }
         }
+        var requests = imported.workspace.requests
+        if let scriptPlan {
+            guard scriptPlan.requests.count == requests.count else {
+                throw WorkflowError.invalidConfiguration
+            }
+            let collectionID = UUID()
+            for index in requests.indices { requests[index].collectionID = collectionID }
+        }
         return Self(
-            requests: imported.workspace.requests, environment: environment, secrets: secrets,
+            requests: requests, environment: environment, secrets: secrets,
             iterationData: iterationData,
             iterationOverrides: iterationData == nil ? [:] : overrides,
-            fileTLS: fileTLS
+            fileTLS: fileTLS, scriptPlan: scriptPlan,
+            scriptVariables: scriptPlan == nil ? nil : scopedVariables,
+            scriptOverrides: overrides
         )
     }
 
@@ -112,6 +151,26 @@ public struct PostmanFileRun: Sendable {
         let secrets = self.secrets
         let fileTLS = self.fileTLS
         let cookieJar = cookieJar ?? (configuration.cookieSession == true ? CookieJar() : nil)
+        if let scriptPlan, let scriptVariables {
+            let session = PostmanScriptSession(
+                plan: scriptPlan, requests: requests, initial: scriptVariables, data: iterationData,
+                overrides: scriptOverrides, secrets: secrets)
+            let report = try await CollectionRunner.run(
+                requests: requests, environment: environment, configuration: configuration,
+                iterationData: iterationData, iterationOverrides: iterationOverrides,
+                contextualExecutor: { request, _, context in
+                    try await session.run(
+                        request, context: context, fileTLS: fileTLS, cookieJar: cookieJar)
+                })
+            if !report.cancelled {
+                try Task.checkCancellation()
+                if let exportEnvironment {
+                    let values = await session.snapshot()
+                    try await exportEnvironment(values)
+                }
+            }
+            return report
+        }
         return try await CollectionRunner.run(
             requests: requests, environment: environment, configuration: configuration,
             iterationData: iterationData, iterationOverrides: iterationOverrides,

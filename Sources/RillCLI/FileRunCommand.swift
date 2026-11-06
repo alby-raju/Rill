@@ -13,7 +13,7 @@ extension RillCLI {
                 ]).union(FileTLSOptions.values)),
             args.flags.isSubset(of: [
                 "json", "quiet", "detail", "continue-on-failure", "overwrite", "allow-insecure",
-                "insecure", "include-system-roots", "cookies",
+                "insecure", "include-system-roots", "cookies", "translate-scripts",
             ]
             ),
             args.value("report-format") == nil || args.value("report") != nil
@@ -36,7 +36,7 @@ extension RillCLI {
                     && !args.flags.contains("allow-insecure")),
             format != "native"
                 || (args.value("folder") == nil && args.value("environment-file") == nil
-                    && args.value("globals") == nil)
+                    && args.value("globals") == nil && !args.flags.contains("translate-scripts"))
         else {
             throw CLIError.usage(
                 "Postman runs use --folder/--globals/--environment-file; native runs use --collection/--environment and optional --allow-insecure. Choose --format postman|native explicitly; no requests sent."
@@ -139,8 +139,12 @@ extension RillCLI {
                         globals: try args.value("globals").map {
                             try BoundedFileInput.read(
                                 URL(fileURLWithPath: $0), limit: ResourceLimits.workspaceBytes)
-                        }))
+                        }, translateScripts: args.flags.contains("translate-scripts")))
             }
+        } catch let error as PostmanScriptPlanError {
+            throw CLIError.usage(
+                "Bounded script translation blocked: \(error.code) at \(error.location), source line \(error.line), UTF-8 column \(error.byteColumn). No requests sent; source omitted."
+            )
         } catch let error as NativeFileRunError {
             let reason: String
             switch error {
@@ -241,6 +245,7 @@ extension RillCLI {
                 let globalsSupplied: Bool
                 let tlsPolicy: String?
                 let clientIdentityConfigured: Bool?
+                let scriptTranslation: Bool?
             }
             try args.json(
                 Summary(
@@ -252,7 +257,8 @@ extension RillCLI {
                     globalsSupplied: args.value("globals") != nil,
                     tlsPolicy: fileTLS?.overridesTrust == true || format == "postman"
                         ? fileTLS?.profile.mode.rawValue : nil,
-                    clientIdentityConfigured: fileTLS?.hasClientIdentity))
+                    clientIdentityConfigured: fileTLS?.hasClientIdentity,
+                    scriptTranslation: args.flags.contains("translate-scripts") ? true : nil))
         } else {
             try args.text(
                 RunConsole.render(
@@ -317,7 +323,10 @@ private enum FileRunPlan {
     }
     var policy: String {
         switch self {
-        case .postman: "HTTP 2xx checks; no Postman scripts"
+        case .postman(let plan):
+            plan.translatesScripts
+                ? "bounded native script subset; no foreign runtime"
+                : "HTTP 2xx checks; no Postman scripts"
         case .native: "native checks; unchecked responses require HTTP 2xx"
         }
     }

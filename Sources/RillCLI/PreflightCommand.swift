@@ -7,7 +7,10 @@ extension RillCLI {
             Set(args.values.keys).isSubset(of: [
                 "environment-file", "env-var", "ssl-client-cert", "ssl-client-key", "color",
                 "folder", "globals",
-            ]), args.flags.isSubset(of: ["json", "quiet", "detail", "script-inventory"])
+            ]),
+            args.flags.isSubset(of: [
+                "json", "quiet", "detail", "script-inventory", "translate-scripts",
+            ])
         else {
             throw CLIError.usage(
                 "Use preflight FILE with --folder, --globals, --environment-file, --env-var, a PEM certificate/key pair, --script-inventory, --json or --quiet."
@@ -34,7 +37,8 @@ extension RillCLI {
                 globals: try args.value("globals").map {
                     try BoundedFileInput.read(
                         URL(fileURLWithPath: $0), limit: ResourceLimits.workspaceBytes)
-                }, includeScriptInventory: args.flags.contains("script-inventory"))
+                }, includeScriptInventory: args.flags.contains("script-inventory"),
+                translateScripts: args.flags.contains("translate-scripts"))
         } catch let error as PostmanFolderSelectionError {
             throw folderSelectionUsage(error)
         } catch CollectionPreflightInputError.insomnia {
@@ -100,6 +104,11 @@ extension RillCLI {
             try args.text(
                 "Requests: \(report.requests) · Script blocks: \(report.scripts) · Blockers: \(report.issueCount)"
             )
+            if let translation = report.scriptTranslation {
+                try args.text(
+                    "Bounded script subset v\(translation.subsetVersion): \(translation.sourceBlocks) source blocks validated; no foreign runtime. Preflight executes no scripts."
+                )
+            }
             let displayed = report.issues.prefix(args.flags.contains("detail") ? 1000 : 20)
             for issue in displayed { try args.text("  \(issue.code) at \(issue.location)") }
             if report.issueCount > displayed.count {
@@ -109,7 +118,7 @@ extension RillCLI {
             }
             if let inventory = report.scriptInventory {
                 try args.text(
-                    "Script inventory: \(inventory.sourceCount) sources · \(inventory.omittedSources) omitted · inspection complete: \(inventory.complete) · supported/translated foreign constructs: 0/0"
+                    "Script inventory: \(inventory.sourceCount) sources · \(inventory.omittedSources) omitted · inspection complete: \(inventory.complete) · supported/translated foreign constructs: \(inventory.supportedForeignConstructs)/\(inventory.translatedForeignConstructs)"
                 )
                 for source in inventory.sources.prefix(args.flags.contains("detail") ? 1000 : 20) {
                     try args.text(
@@ -123,7 +132,7 @@ extension RillCLI {
                     }
                 }
                 try args.text(
-                    "Lexical hints only; all nonempty foreign source remains blocked. No script text, names or values included. Use --json for all retained records."
+                    "Lexical hints are not execution guarantees. Translation requires --translate-scripts and whole-plan validation. No script text, names or values included. Use --json for all retained records."
                 )
             }
             let guidance = [

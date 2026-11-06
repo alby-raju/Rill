@@ -5,6 +5,8 @@ public struct WorkflowStepResult: Sendable {
     public var variables: [String: String]
     public var next: String?
     public var stop: Bool
+    public var skipped = false
+    public var commitVariablesOnFailure = false
     public var passed: Bool { exchange.checks.allSatisfy(\.passed) }
 }
 public enum WorkflowEngine {
