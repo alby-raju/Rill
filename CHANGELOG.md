@@ -2,8 +2,9 @@
 
 ## Unreleased
 
-- Development source: first-class saved mock workbench, route forms and persistent unapplied JSON, shared versioned CLI projects, query/header/body matching, deterministic scenarios/reset, delay/disconnect faults and bounded transient call journals. Listeners survive editor closure and stop explicitly or at quit. Sanitized response templates replace all scalar values; original payload/header/URL values are not copied.
+- Development source: reproducible run configs, SplitMix64-v1 template seeds, monotonic execution deadlines, versioned JSON/NDJSON and source-aware offline reports. Explicit raw snapshots feed redacted baseline comparisons for status/check/retry, normalized JSON/header/type-shape and latency drift; omitted data remains unknown.
 
+- Development source: first-class saved mock workbench, route forms and persistent unapplied JSON, shared versioned CLI projects, query/header/body matching, deterministic scenarios/reset, delay/disconnect faults and bounded transient call journals. Listeners survive editor closure and stop explicitly or at quit. Sanitized response templates replace all scalar values; original payload/header/URL values are not copied.
 
 - Add explicit bounded Postman script translation into native operations: scoped string variables, inherited pre/post ordering, grouped status assertions, string extraction and conditional skip/branch/stop. Reject unsupported selected source before traffic; preserve default blocking and report redaction. Validate seven synthetic workflows against pinned stock Newman, with the reference kept outside app/build/package dependencies.
 

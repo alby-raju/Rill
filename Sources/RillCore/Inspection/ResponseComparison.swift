@@ -32,7 +32,28 @@ public enum ComparisonError: LocalizedError {
     }
 }
 public enum ResponseComparator {
-    public static func compare(_ first: Exchange, _ second: Exchange) throws -> ResponseComparison {
+    public static func validPointer(_ value: String) -> Bool {
+        guard value.utf8.count <= 4096, value.isEmpty || value.hasPrefix("/") else { return false }
+        let bytes = Array(value.utf8)
+        var index = 0
+        while index < bytes.count {
+            if bytes[index] == 126 {
+                index += 1
+                guard index < bytes.count, bytes[index] == 48 || bytes[index] == 49 else {
+                    return false
+                }
+            }
+            index += 1
+        }
+        return true
+    }
+    public static func compare(
+        _ first: Exchange, _ second: Exchange, ignoring pointers: [String] = []
+    ) throws -> ResponseComparison {
+        guard pointers.count <= 100, pointers.allSatisfy(validPointer) else {
+            throw ComparisonError.unsupported
+        }
+        let ignored = Set(pointers.map { Data($0.utf8) })
         guard first.bodyWasTruncated != true, second.bodyWasTruncated != true else {
             throw ComparisonError.incomplete
         }
@@ -42,6 +63,7 @@ public enum ResponseComparator {
         var limited = false
         func record(_ path: String, _ before: JSONValue?, _ after: JSONValue?) throws {
             guard path.utf8.count <= 8192 else { throw ComparisonError.limit }
+            if ignored.contains(Data(path.utf8)) { return }
             if differences.count >= 1000 {
                 limited = true
                 return
@@ -53,7 +75,7 @@ public enum ResponseComparator {
         }
         func descend(_ before: JSONValue, _ after: JSONValue, path: String) throws {
             guard path.utf8.count <= 8192 else { throw ComparisonError.limit }
-            if before == after || limited { return }
+            if before == after || limited || ignored.contains(Data(path.utf8)) { return }
             switch (before, after) {
             case (.object(let lhs), .object(let rhs)):
                 for key in Set(lhs.keys).union(rhs.keys).sorted(by: {

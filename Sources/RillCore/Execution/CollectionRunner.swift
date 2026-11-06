@@ -11,8 +11,16 @@ public struct RunConfiguration: Codable, Equatable, Sendable {
     public var retentionBytes = 32 * 1024 * 1024
     /// Missing in older saved configurations; each enabled run receives a fresh private jar.
     public var cookieSession: Bool? = nil
+    public var seed: UInt64?
+    public var seedTimestamp: Int64?
+    public var totalDeadlineSeconds: Double?
+    public var retainComparisonHeaders: Bool?
     public init() {}
     public func validate() throws {
+        guard seedTimestamp == nil || seed != nil,
+            seedTimestamp.map({ (0...253402300799).contains($0) }) ?? true,
+            totalDeadlineSeconds.map({ $0.isFinite && (0.01...86400).contains($0) }) ?? true
+        else { throw WorkflowError.invalidConfiguration }
         guard (1...10_000).contains(iterations), (1...10_000).contains(executionLimit),
             (0...5).contains(retries),
             (0...60_000).contains(delayMilliseconds), (0...60_000).contains(retryDelayMilliseconds),
@@ -36,8 +44,11 @@ public struct RunAttempt: Codable, Identifiable, Sendable {
     public var checksOmitted: Bool? = nil
     public var checkSignature: String? = nil
     public var failure: String?
+    public var failureKind: RunFailureKind? = nil
     public var fingerprint: String?
     public var retainedBody: Data?
+    public var responseHeaders: [Field]? = nil
+    public var headersOmitted: Bool? = nil
     public var bodyBytes: Int
     public var bodyOmitted: Bool
 }
@@ -49,10 +60,13 @@ public struct RunReport: Codable, Identifiable, Sendable {
     public var cancelled = false
     public var exhausted = false
     public var stopped = false
+    public var timedOut: Bool?
+    public var sourceFormat: String?
+    public var sources: [String: String]?
     public var requestedSteps: Int
     /// A failed attempt recovered by an explicit retry does not fail the whole run.
     public var passed: Bool {
-        guard !outcomes.isEmpty, !cancelled, !exhausted else { return false }
+        guard !outcomes.isEmpty, !cancelled, !exhausted, timedOut != true else { return false }
         let executed = outcomes.filter { $0.state != .notRun }
         guard !executed.isEmpty else { return false }
         return executed.enumerated().allSatisfy { index, outcome in
@@ -96,6 +110,37 @@ public enum CollectionRunner {
         executor: Executor? = nil, contextualExecutor: ContextualExecutor? = nil
     ) async throws -> RunReport {
         try configuration.validate()
+        if let seed = configuration.seed {
+            return try await DynamicTemplates.withSeed(
+                seed, epochSeconds: configuration.seedTimestamp ?? 0
+            ) {
+                try await executeRun(
+                    requests: requests, environment: environment, configuration: configuration,
+                    profiles: profiles, secrets: secrets, tlsProfiles: tlsProfiles,
+                    definitions: definitions,
+                    iterationData: iterationData, iterationOverrides: iterationOverrides,
+                    progress: progress, exportEnvironment: exportEnvironment, cookieJar: cookieJar,
+                    executor: executor, contextualExecutor: contextualExecutor)
+            }
+        }
+        return try await executeRun(
+            requests: requests, environment: environment, configuration: configuration,
+            profiles: profiles, secrets: secrets, tlsProfiles: tlsProfiles,
+            definitions: definitions,
+            iterationData: iterationData, iterationOverrides: iterationOverrides,
+            progress: progress, exportEnvironment: exportEnvironment, cookieJar: cookieJar,
+            executor: executor, contextualExecutor: contextualExecutor)
+    }
+    private static func executeRun(
+        requests: [RequestDraft], environment: Environment?, configuration: RunConfiguration,
+        profiles: [AuthenticationProfile] = [], secrets: NamedSecretResolver? = nil,
+        tlsProfiles: [TLSProfile] = [], definitions: [APIDefinitionSource] = [],
+        iterationData: IterationData? = nil, iterationOverrides: [String: String] = [:],
+        progress: (@Sendable (RunProgress) async -> Void)? = nil,
+        exportEnvironment: EnvironmentExport? = nil, cookieJar: CookieJar? = nil,
+        executor: Executor? = nil, contextualExecutor: ContextualExecutor? = nil
+    ) async throws -> RunReport {
+        try configuration.validate()
         guard executor == nil || contextualExecutor == nil else {
             throw WorkflowError.invalidConfiguration
         }
@@ -103,6 +148,9 @@ public enum CollectionRunner {
             Set(requests.map(\.id)).count == requests.count
         else { throw WorkflowError.invalidConfiguration }
         let started = ProcessInfo.processInfo.systemUptime
+        let deadline = configuration.totalDeadlineSeconds.map {
+            ContinuousClock.now.advanced(by: .seconds($0))
+        }
         var report = RunReport(requestedSteps: requests.count * configuration.iterations)
         report.cancelled = Task.isCancelled
         var variables = WorkflowEngine.variables(in: environment)
@@ -121,6 +169,7 @@ public enum CollectionRunner {
         }
         var retained = 0
         var retainedChecks = 0
+        var retainedHeaderBytes = 0
         try WorkflowEngine.validateVariables(variables)
         let cookieJar = cookieJar ?? (configuration.cookieSession == true ? CookieJar() : nil)
         let execute: Executor =
@@ -131,7 +180,9 @@ public enum CollectionRunner {
             }
         func pause(_ milliseconds: Int) async throws {
             try Task.checkCancellation()
-            if milliseconds > 0 { try await Task.sleep(for: .milliseconds(milliseconds)) }
+            try await RunDeadline.perform(until: deadline) {
+                if milliseconds > 0 { try await Task.sleep(for: .milliseconds(milliseconds)) }
+            }
         }
         func branch(_ target: String, from request: RequestDraft) throws -> Int {
             if let id = UUID(uuidString: target),
@@ -174,13 +225,14 @@ public enum CollectionRunner {
                         let attemptStarted = Date()
                         let before = ProcessInfo.processInfo.systemUptime
                         do {
-                            let result: WorkflowStepResult
-                            if let contextualExecutor {
-                                result = try await contextualExecutor(
-                                    request, variables,
-                                    RunStepContext(iteration: iteration, attempt: attempt))
-                            } else {
-                                result = try await execute(request, variables)
+                            let stepVariables = variables
+                            let context = RunStepContext(iteration: iteration, attempt: attempt)
+                            let result = try await RunDeadline.perform(until: deadline) {
+                                if let contextualExecutor {
+                                    return try await contextualExecutor(
+                                        request, stepVariables, context)
+                                }
+                                return try await execute(request, stepVariables)
                             }
                             try Task.checkCancellation()
                             var outcome = RunAttempt(
@@ -196,7 +248,24 @@ public enum CollectionRunner {
                                     : SHA256.hash(data: result.exchange.body).map {
                                         String(format: "%02x", $0)
                                     }.joined(), bodyBytes: result.exchange.body.count,
-                                bodyOmitted: result.skipped)
+                                bodyOmitted: result.skipped
+                                    || result.exchange.bodyWasTruncated == true)
+                            if configuration.retainComparisonHeaders == true && !result.skipped {
+                                let headers = result.exchange.headers
+                                let bytes = headers.reduce(0) {
+                                    $0 + $1.name.utf8.count + $1.value.utf8.count
+                                }
+                                if headers.count <= 100 && bytes <= 65536
+                                    && retainedHeaderBytes + bytes <= 4 * 1024 * 1024
+                                {
+                                    outcome.responseHeaders = headers
+                                    outcome.headersOmitted = false
+                                    retainedHeaderBytes += bytes
+                                } else {
+                                    outcome.headersOmitted = true
+                                }
+                            }
+                            if outcome.state == .failed { outcome.failureKind = .assertion }
                             if result.passed || result.commitVariablesOnFailure {
                                 do {
                                     if let target = result.next {
@@ -205,6 +274,7 @@ public enum CollectionRunner {
                                 } catch {
                                     outcome.state = .failed
                                     outcome.failure = WorkflowError.invalidBranch.rawValue
+                                    outcome.failureKind = .configuration
                                 }
                             }
                             if !result.skipped,
@@ -244,6 +314,7 @@ public enum CollectionRunner {
                                     finalPassed = false
                                     outcome.state = .failed
                                     outcome.failure = WorkflowError.limit.rawValue
+                                    outcome.failureKind = .configuration
                                     next = nil
                                 }
                             }
@@ -257,13 +328,17 @@ public enum CollectionRunner {
                         } catch is CancellationError { throw CancellationError() } catch let error
                             as URLError where error.code == .cancelled
                         { throw CancellationError() } catch {
-                            let outcome = RunAttempt(
+                            if error is RunDeadlineError { report.timedOut = true }
+                            var outcome = RunAttempt(
                                 requestID: request.id, started: attemptStarted,
                                 iteration: iteration, attempt: attempt, state: .failed,
                                 duration: ProcessInfo.processInfo.systemUptime - before, checks: [],
-                                failure: (error as? WorkflowError)?.rawValue
-                                    ?? DiagnosticFailure.classify(error).rawValue,
+                                failure: error is RunDeadlineError
+                                    ? "totalDeadline"
+                                    : (error as? WorkflowError)?.rawValue
+                                        ?? DiagnosticFailure.classify(error).rawValue,
                                 bodyBytes: 0, bodyOmitted: true)
+                            outcome.failureKind = RunFailureKind.classify(error)
                             report.outcomes.append(outcome)
                             if let progress {
                                 await progress(
@@ -272,6 +347,15 @@ public enum CollectionRunner {
                                         state: .failed))
                             }
                         }
+                    } catch is RunDeadlineError {
+                        report.timedOut = true
+                        report.stopped = true
+                        report.outcomes.append(
+                            RunAttempt(
+                                requestID: request.id, iteration: iteration,
+                                attempt: attempt, state: .failed, duration: 0, checks: [],
+                                failure: "totalDeadline", bodyBytes: 0, bodyOmitted: true))
+                        break loop
                     } catch {
                         report.cancelled = true
                         report.outcomes.append(
@@ -279,6 +363,10 @@ public enum CollectionRunner {
                                 requestID: request.id, iteration: iteration, attempt: attempt,
                                 state: .cancelled, duration: 0, checks: [], failure: "cancelled",
                                 bodyBytes: 0, bodyOmitted: true))
+                        break loop
+                    }
+                    if report.timedOut == true {
+                        report.stopped = true
                         break loop
                     }
                     if finalPassed { break }
@@ -302,8 +390,20 @@ public enum CollectionRunner {
                         requestID: request.id, iteration: iteration, attempt: 0, state: .notRun,
                         duration: 0, checks: [],
                         failure: report.cancelled
-                            ? "cancelled" : report.exhausted ? "executionLimit" : "branchOrStop",
+                            ? "cancelled"
+                            : report.timedOut == true
+                                ? "totalDeadline"
+                                : report.exhausted ? "executionLimit" : "branchOrStop",
                         bodyBytes: 0, bodyOmitted: true))
+            }
+        }
+        for index in report.outcomes.indices where report.outcomes[index].failureKind == nil {
+            if report.outcomes[index].state == .cancelled {
+                report.outcomes[index].failureKind = .cancelled
+            } else if report.outcomes[index].failure == "totalDeadline" {
+                report.outcomes[index].failureKind = .deadline
+            } else if report.outcomes[index].failure == "executionLimit" {
+                report.outcomes[index].failureKind = .resourceLimit
             }
         }
         report.duration = ProcessInfo.processInfo.systemUptime - started

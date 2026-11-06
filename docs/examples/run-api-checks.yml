@@ -1,0 +1,51 @@
+# Copy into your own .github/workflows after providing the referenced native workspace/config.
+# Uses development-source features newer than the published v0.4.5-dev.1 installer.
+name: API checks with Rill
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: api-checks-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  api:
+    runs-on: macos-15
+    timeout-minutes: 20
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      # This example lives in a Rill source checkout. If invoking from another repository,
+      # install a reviewed complete CLI archive and point RILL_CLI_PATH to its bin/rill.
+      - name: Build exact checked-out source
+        shell: bash
+        run: swift build --product RillCLI
+      - name: Run reviewed native suite
+        shell: bash
+        env:
+          # api-tests/workspace.json must declare the matching api-token named-secret descriptor.
+          # Never interpolate credential values into shell source or command arguments.
+          RILL_SECRET_API_TOKEN: ${{ secrets.API_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p results
+          RILL_CLI_PATH="$(swift build --show-bin-path)/RillCLI"
+          "$RILL_CLI_PATH" run ./api-tests/workspace.json \
+            --format native --config ./api-tests/run-config.json \
+            --deadline 120 --seed 42 --seed-time 1735689600 \
+            --github-annotations --report ./results/run.json --report-format json --json
+      - name: Retain redacted result
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: api-check-results
+          path: results/run.json
+          if-no-files-found: warn
+          retention-days: 7
+# Raw --comparison-output/--output/--export-environment files are deliberately not uploaded.
+# For mTLS, provision bounded certificate/key/passphrase files via your CI secret facility,
+# reference their paths in reviewed inputs and keep the exact HTTPS origin explicit.
+# This example is not Rill's release-security or installed-GUI acceptance workflow.

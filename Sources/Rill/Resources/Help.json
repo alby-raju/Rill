@@ -22,7 +22,7 @@
   {
     "id": "runner",
     "title": "Assertions, hooks, runners and reports",
-    "body": "Request Workflow configures status/header/body/JSON assertions and extraction. Native hooks are finite versioned JSON operations, disabled until explicitly enabled; they are not JavaScript and cannot call host/file/network/process APIs. Pre-hooks run before variable substitution; successful extraction/post-hook changes remain local to the workflow. Collection Runner supports iterations, bounded retries/delays, branches and stop/continue. Matrix runs isolate environments. Load runs bound concurrency and record end-to-end latency percentiles. Portable JSON/Markdown/JUnit/Allure reports omit payloads and runtime values. Empty, cancelled and exhausted runs cannot pass."
+    "body": "Request Workflow configures status/header/body/JSON assertions and extraction. Native hooks are finite versioned JSON operations, disabled until explicitly enabled; they are not JavaScript and cannot call host/file/network/process APIs. Pre-hooks run before variable substitution; successful extraction/post-hook changes remain local to the workflow. Collection Runner supports iterations, bounded retries/delays, branches and stop/continue. Matrix runs isolate environments. Load runs bound concurrency and record end-to-end latency percentiles. Portable JSON/NDJSON/Markdown/JUnit/Allure/HTML reports omit payloads and runtime values. CLI file runs accept reviewed config defaults, scoped deterministic template seeds and an execution deadline. Explicit raw comparison snapshots can retain response bodies/headers; report-diff compares normalized changes without echoing those values. Missing data remains unknown. Empty, cancelled and exhausted runs cannot pass."
   },
   {
     "id": "api",

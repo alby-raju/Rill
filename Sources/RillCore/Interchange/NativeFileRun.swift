@@ -12,6 +12,7 @@ public enum NativeFileRunError: Error {
 /// Read-only native file execution. No WorkspaceSession, personal credentials or TLS identities.
 public struct NativeFileRun: Sendable {
     public let requests: [RequestDraft]
+    public let sourceLocations: [String: String]
     public let environment: Environment
     public let secrets: NamedSecretResolver
     private let profiles: [AuthenticationProfile]
@@ -119,7 +120,12 @@ public struct NativeFileRun: Sendable {
             catalog: catalog, credentials: TransientCredentials(values: values),
             processEnvironment: processEnvironment.filter { $0.key.hasPrefix("RILL_SECRET_") })
         return Self(
-            requests: requests, environment: WorkflowEngine.environment(variables),
+            requests: requests,
+            sourceLocations: Dictionary(
+                uniqueKeysWithValues: workspace.requests.enumerated().map {
+                    ($0.element.id.uuidString, "/requests/\($0.offset)")
+                }),
+            environment: WorkflowEngine.environment(variables),
             secrets: secrets,
             profiles: profiles, tlsProfiles: tlsProfiles, definitions: definitions,
             iterationData: iterationData,
@@ -130,6 +136,18 @@ public struct NativeFileRun: Sendable {
 
     /// Native checks retain their semantics; unchecked responses receive an explicit 2xx check.
     public func run(
+        configuration: RunConfiguration, timeout: Double? = nil,
+        exportEnvironment: CollectionRunner.EnvironmentExport? = nil, cookieJar: CookieJar? = nil
+    ) async throws -> RunReport {
+        var report = try await executeRun(
+            configuration: configuration, timeout: timeout, exportEnvironment: exportEnvironment,
+            cookieJar: cookieJar)
+        let ids = Set(requests.map { $0.id.uuidString })
+        report.sources = sourceLocations.filter { ids.contains($0.key) }
+        report.sourceFormat = "native-id-v1"
+        return report
+    }
+    private func executeRun(
         configuration: RunConfiguration, timeout: Double? = nil,
         exportEnvironment: CollectionRunner.EnvironmentExport? = nil, cookieJar: CookieJar? = nil
     ) async throws -> RunReport {

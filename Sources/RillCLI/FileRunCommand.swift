@@ -4,18 +4,8 @@ import RillCore
 extension RillCLI {
     static func runFile(_ args: Arguments) async throws {
         guard args.operands.count == 1,
-            Set(args.values.keys).isSubset(
-                of: Set([
-                    "environment-file", "env-var", "iterations", "delay", "retries", "retry-delay",
-                    "report", "report-format", "allure", "output", "timeout", "color", "folder",
-                    "format", "collection", "environment",
-                    "iteration-data", "iteration-data-format", "globals", "export-environment",
-                ]).union(FileTLSOptions.values)),
-            args.flags.isSubset(of: [
-                "json", "quiet", "detail", "continue-on-failure", "overwrite", "allow-insecure",
-                "insecure", "include-system-roots", "cookies", "translate-scripts",
-            ]
-            ),
+            Set(args.values.keys).isSubset(of: FileRunOptions.values.union(["config"])),
+            args.flags.isSubset(of: FileRunOptions.flags),
             args.value("report-format") == nil || args.value("report") != nil
         else {
             throw CLIError.usage(
@@ -29,6 +19,10 @@ extension RillCLI {
                 "--iteration-data determines the iteration count and cannot be combined with --iterations. --iteration-data-format requires --iteration-data. No requests sent."
             )
         }
+        guard
+            ["json", "markdown", "junit", "html", "ndjson"].contains(
+                args.value("report-format") ?? "json")
+        else { throw CLIError.usage("Unknown report format. No requests sent.") }
         let format = args.value("format") ?? "postman"
         guard ["postman", "native"].contains(format),
             format != "postman"
@@ -47,7 +41,32 @@ extension RillCLI {
         config.retries = try args.integer("retries", default: 0)
         config.delayMilliseconds = try args.integer("delay", default: 0)
         config.retryDelayMilliseconds = try args.integer("retry-delay", default: 0)
+        guard !args.flags.isSuperset(of: ["fail-fast", "continue-on-failure"]) else {
+            throw CLIError.usage("Choose --fail-fast or --continue-on-failure.")
+        }
         config.stopOnFailure = !args.flags.contains("continue-on-failure")
+        if let value = args.value("seed") {
+            guard let seed = UInt64(value) else {
+                throw CLIError.usage("--seed requires an unsigned 64-bit integer.")
+            }
+            config.seed = seed
+        }
+        if let value = args.value("seed-time") {
+            guard let epoch = Int64(value) else {
+                throw CLIError.usage("--seed-time requires Unix epoch seconds.")
+            }
+            config.seedTimestamp = epoch
+        }
+        if let value = args.value("deadline") {
+            guard let seconds = Double(value) else {
+                throw CLIError.usage("--deadline requires seconds from 0.01 to 86400.")
+            }
+            config.totalDeadlineSeconds = seconds
+        }
+        if args.value("comparison-output") != nil {
+            config.retainComparisonHeaders = true
+            config.retentionBytes = 8 * 1024 * 1024
+        }
         do { try config.validate() } catch { throw CLIError.usage("Run limits are invalid.") }
         let timeout = try args.seconds()
         guard timeout >= 1 else {
@@ -56,12 +75,13 @@ extension RillCLI {
         guard
             !args.flags.contains("overwrite") || args.value("report") != nil
                 || args.value("output") != nil || args.value("allure") != nil
-                || args.value("export-environment") != nil
+                || args.value("export-environment") != nil || args.value("comparison-output") != nil
         else {
             throw CLIError.usage("--overwrite requires a report/output destination.")
         }
         let destinations = [
             args.value("report"), args.value("output"), args.value("export-environment"),
+            args.value("comparison-output"),
         ].compactMap { $0 }
         let normalized = destinations.map { URL(fileURLWithPath: $0).resolvingSymlinksInPath() }
         let inputs = args.fileRunInputs
@@ -221,6 +241,10 @@ extension RillCLI {
             exportEnvironment: environmentExport,
             cookieJar: args.flags.contains("cookies") ? CookieJar() : nil)
         try await reports(report, arguments: args)
+        if let output = args.value("comparison-output") {
+            try args.write(try RunSnapshotFile.encode(report), to: output)
+        }
+        if args.flags.contains("github-annotations") && !args.quiet { try annotations(report) }
         if let output = args.value("output") {
             guard let body = report.outcomes.last(where: { $0.status != nil })?.retainedBody else {
                 try? FileHandle.standardError.write(
@@ -237,6 +261,7 @@ extension RillCLI {
                 let passed: Bool
                 let cancelled: Bool
                 let exhausted: Bool
+                let timedOut: Bool
                 let attempts: Int
                 let folderSelected: Bool
                 let collectionSelected: Bool
@@ -250,6 +275,7 @@ extension RillCLI {
             try args.json(
                 Summary(
                     passed: report.passed, cancelled: report.cancelled, exhausted: report.exhausted,
+                    timedOut: report.timedOut ?? false,
                     attempts: report.outcomes.filter { $0.state != .notRun }.count,
                     folderSelected: args.value("folder") != nil,
                     collectionSelected: args.value("collection") != nil, inputFormat: format,

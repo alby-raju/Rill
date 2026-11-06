@@ -258,3 +258,7 @@ Exit 0 means these static checks passed, **not** that the suite executed or matc
 ## Saved mock projects (development source)
 
 `mock-serve --project FILE [--port N] --json` reads the desktop's version 1 project format without opening a personal workspace. `--routes FILE` retains legacy route-array support; choose exactly one input. Readiness is compact one-line JSON, including the ephemeral loopback port. `--control-stdin` accepts bounded newline-terminated `status`, `reset` and `stop`; EOF stops normally. Ctrl+C/SIGTERM stops and exits 130. See [Local mocks](wiki/Local-Mocks.md) for matching, scenario, file and resource limits. No listener starts implicitly and no LAN bind is available.
+
+## Reproducible runs and comparison (development source)
+
+Versioned `run --config FILE` defaults, scoped `--seed`/`--seed-time`, `--deadline`, redacted GitHub annotations, NDJSON events and explicit raw `--comparison-output` snapshots are documented in [Run investigation](RUN-INVESTIGATION.md). `report-diff BEFORE AFTER` compares normalized JSON/header/shape, status/check/retry and latency drift; ordinary redacted reports require `--metadata-only`. Unknown data cannot prove equality. Raw snapshots can contain credentials; they are separate from safe ordinary JSON/HTML exports.
