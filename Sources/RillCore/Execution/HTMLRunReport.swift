@@ -66,7 +66,7 @@ extension RunReportExporter {
             · \(report.outcomes.count) attempts · \(report.duration.formatted(.number.precision(.fractionLength(3)))) s
             <p>Cancelled: \(report.cancelled) · Execution budget exhausted: \(report.exhausted) · Stopped: \(report.stopped)</p></div>
             <div class="controls">
-            <label>State <select id="state"><option value="all">All</option><option value="failed">Failed</option><option value="passed">Passed</option><option value="cancelled">Cancelled</option><option value="notRun">Not run</option></select></label>
+            <label>State <select id="state"><option value="all">All</option><option value="failed">Failed</option><option value="passed">Passed</option><option value="cancelled">Cancelled</option><option value="notRun">Not run</option><option value="skipped">Skipped</option></select></label>
             <label>Request ID <input id="search" type="search" placeholder="Filter by request ID"></label>
             <span id="visible" role="status" aria-live="polite">\(report.outcomes.count) attempts</span></div>
             <noscript><p>All attempts are shown. Enable JavaScript for local filters.</p></noscript>

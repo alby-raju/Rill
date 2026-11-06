@@ -38,7 +38,8 @@ def check():
         p
         for p in ROOT.rglob("*.md")
         if not any(
-            part in {".git", ".build", ".venv", "dist"} for part in p.relative_to(ROOT).parts
+            part in {".git", ".build", ".venv", "dist", "node_modules"}
+            for part in p.relative_to(ROOT).parts
         )
     ]
     links = 0

@@ -80,8 +80,10 @@ public enum RunReportExporter {
             files = ["rill-run.md": Data(text.utf8)]
         case .junit:
             let failures = safe.outcomes.filter { $0.state == .failed }.count
-            let skipped = safe.outcomes.filter { $0.state == .notRun || $0.state == .cancelled }
-                .count
+            let skipped = safe.outcomes.filter {
+                $0.state == .notRun || $0.state == .cancelled || $0.state == .skipped
+            }
+            .count
             var cases = safe.outcomes.map { outcome in
                 let tag =
                     outcome.state == .failed

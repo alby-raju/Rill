@@ -9,7 +9,7 @@ struct Arguments: Sendable {
     static let booleanOptions: Set<String> = [
         "quiet", "detail", "json", "apply", "continue-on-failure", "allow-insecure",
         "allow-lan", "overwrite", "show-messages", "help", "version", "insecure",
-        "include-system-roots", "cookies", "script-inventory",
+        "include-system-roots", "cookies", "script-inventory", "translate-scripts",
     ]
     static let valueOptions: Set<String> = [
         "color", "workspace", "environment", "tls", "iterations", "delay", "retries",
@@ -93,6 +93,10 @@ struct Arguments: Sendable {
         if command != "run", value("iteration-data") != nil || value("iteration-data-format") != nil
         {
             throw CLIError.usage("Iteration-data options are supported only by file runs.")
+        }
+        if !["run", "preflight"].contains(command), flags.contains("translate-scripts") {
+            throw CLIError.usage(
+                "--translate-scripts requires a Postman file run or offline preflight.")
         }
         if command != "preflight", flags.contains("script-inventory") {
             throw CLIError.usage(
@@ -289,6 +293,7 @@ let usage = """
 
       preflight FILE               Offline Postman v2 collection inspection; sends no requests
           --folder /Parent/Child   Exact folder names; escape ~ as ~0 and / as ~1
+          --translate-scripts      Validate the finite native script subset; never evaluate JavaScript
           --script-inventory       Redacted source locations, inheritance counts and lexical API hints
           --globals FILE           Postman globals JSON; lower precedence than collection variables
           --environment-file FILE --env-var key=value (repeatable)
@@ -310,6 +315,7 @@ let usage = """
           --iteration-data-format json|csv   Optional override for the file extension
           --iterations N --delay MS --retries N --retry-delay MS --continue-on-failure
           --report FILE --report-format json|markdown|junit|html --allure DIR
+          --translate-scripts      Opt-in finite script translation (Postman only)
           --cookies                Private in-memory cookie jar for this run only
           --export-environment FILE  Explicit raw final variables (Postman environment JSON)
           --output FILE --timeout SECONDS   Explicit last-response export and request timeout

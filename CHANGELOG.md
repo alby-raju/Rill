@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add explicit bounded Postman script translation into native operations: scoped string variables, inherited pre/post ordering, grouped status assertions, string extraction and conditional skip/branch/stop. Reject unsupported selected source before traffic; preserve default blocking and report redaction. Validate seven synthetic workflows against pinned stock Newman, with the reference kept outside app/build/package dependencies.
+
 - Add opt-in offline Postman `preflight --script-inventory` with original inherited source locations, affected request counts, safe lexical migration hints and explicit inspection limits. Preserve script blocking, redacted diagnostics and unchanged default preflight output.
 
 - Add read-only `doctor`, primary-command help and parser-derived Bash/zsh/fish completions. Package a standalone macOS CLI ZIP with required resources, relocation checks and provenance; keep architecture-specific checksums separate from the published verification kit.

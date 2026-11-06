@@ -62,6 +62,7 @@ public enum RunConsole {
         let passed = final.filter { $0.state == .passed }.count
         let failed = final.filter { $0.state == .failed }.count
         let notRun = report.outcomes.filter { $0.state == .notRun }.count
+        let skipped = final.filter { $0.state == .skipped }.count
         let cancelled = final.filter { $0.state == .cancelled }.count
         let attempts = executed.filter { $0.state == .passed || $0.state == .failed }
         let timings = attempts.filter { $0.status != nil }.map(\.duration).sorted()
@@ -87,7 +88,7 @@ public enum RunConsole {
             tableRow("Request visits", final.count, passed, failed),
             tableRow("Checks (all attempts)", checks, checks - failedChecks, failedChecks), "",
             "Attempts  \(attempts.count)  ·  Retries  \(attempts.filter { $0.attempt > 1 }.count)  ·  Recovered  \(recovered)",
-            "Not run   \(notRun)  ·  Cancelled  \(cancelled)  ·  Planned steps  \(report.requestedSteps)",
+            "Not run   \(notRun)  ·  Skipped  \(skipped)  ·  Cancelled  \(cancelled)  ·  Planned steps  \(report.requestedSteps)",
             "Received  \(bytes(attempts.reduce(0) { $0 + $1.bodyBytes })) (response bodies)",
         ]
         if !timings.isEmpty {

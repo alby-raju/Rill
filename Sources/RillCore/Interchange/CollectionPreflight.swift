@@ -9,9 +9,13 @@ public struct CollectionPreflight: Encodable, Sendable {
     public struct Issue: Codable, Sendable {
         public let code: String
         public let location: String
-        public init(_ code: String, _ location: String) {
+        public let line: Int?
+        public let byteColumn: Int?
+        public init(_ code: String, _ location: String, line: Int? = nil, byteColumn: Int? = nil) {
             self.code = code
             self.location = location
+            self.line = line
+            self.byteColumn = byteColumn
         }
     }
     public let schemaVersion = 1
@@ -21,23 +25,26 @@ public struct CollectionPreflight: Encodable, Sendable {
     public var globalsSupplied = false
     public var scripts = 0
     public var scriptInventory: ScriptCompatibilityInventory? = nil
+    public var scriptTranslation: ScriptTranslationSummary? = nil
     public var issueCount = 0
     public var issues: [Issue] = []
     public var passed: Bool { requests > 0 && issues.isEmpty }
 
     public static func inspect(
         collection: Data, environment: Data? = nil, overrides: [String: String] = [:],
-        folder: String? = nil, globals: Data? = nil, includeScriptInventory: Bool = false
+        folder: String? = nil, globals: Data? = nil, includeScriptInventory: Bool = false,
+        translateScripts: Bool = false
     ) throws -> Self {
         try inspect(
             PostmanFolderSelection.prepare(collection, folder: folder),
             environment: environment, overrides: overrides, globals: globals,
-            includeScriptInventory: includeScriptInventory)
+            includeScriptInventory: includeScriptInventory, translateScripts: translateScripts)
     }
 
     static func inspect(
         _ selection: PostmanFolderSelection, environment: Data?, overrides: [String: String],
-        globals: Data? = nil, includeScriptInventory: Bool = false
+        globals: Data? = nil, includeScriptInventory: Bool = false, translateScripts: Bool = false,
+        preparedScripts: PostmanScriptPlan? = nil
     ) throws -> Self {
         func object(_ data: Data) throws -> [String: Any] {
             try WorkspaceFile.checkJSONBounds(data)
@@ -63,6 +70,26 @@ public struct CollectionPreflight: Encodable, Sendable {
         func issue(_ code: String, _ path: String) {
             result.issueCount += 1
             if result.issues.count < 1000 { result.issues.append(Issue(code, path)) }
+        }
+        var scriptPlan = preparedScripts
+        if translateScripts {
+            do {
+                if scriptPlan == nil { scriptPlan = try PostmanScriptPlan.prepare(selection) }
+                if let scriptPlan, !scriptPlan.writes.isDisjoint(with: overrides.keys) {
+                    throw PostmanScriptPlanError(
+                        code: "script.overrideMutation", location: "/options/env-var", line: 1,
+                        byteColumn: 1)
+                }
+                result.scriptTranslation = ScriptTranslationSummary(
+                    sourceBlocks: scriptPlan?.programs.count ?? 0,
+                    translatedOperations: scriptPlan?.programs.reduce(0, { $0 + $1.operationCount })
+                        ?? 0)
+            } catch let error as PostmanScriptPlanError {
+                result.issueCount += 1
+                result.issues.append(
+                    Issue(
+                        error.code, error.location, line: error.line, byteColumn: error.byteColumn))
+            }
         }
         // Never hydrate imported credentials or apply this workspace.
         do { _ = try PostmanImporter.parse(selection.data) } catch {
@@ -103,6 +130,9 @@ public struct CollectionPreflight: Encodable, Sendable {
             values(env["values"], path: "/environment/values")
         }
         for (key, value) in overrides { variables[key] = value }
+        if translateScripts, variables.keys.contains(where: { !ResponseRules.validVariable($0) }) {
+            issue("script.invalidVariable", "/variable")
+        }
         let pattern = try NSRegularExpression(pattern: #"\{\{([^{}]+)\}\}"#)
         var remainingReferences = 100_000
         func references(_ text: String, seen: Set<String> = [], depth: Int = 0) -> Bool {
@@ -126,6 +156,7 @@ public struct CollectionPreflight: Encodable, Sendable {
                     }
                     return
                 }
+                if variables[key] == nil, scriptPlan?.writes.contains(key) == true { return }
                 guard !seen.contains(key), let value = variables[key],
                     references(value, seen: seen.union([key]), depth: depth + 1)
                 else {
@@ -164,7 +195,9 @@ public struct CollectionPreflight: Encodable, Sendable {
                         } == true && script?["src"] == nil
                     if !empty {
                         result.scripts += 1
-                        issue("scripts.unsupported", path + "/event/\(i)")
+                        if !translateScripts || scriptPlan == nil {
+                            issue("scripts.unsupported", path + "/event/\(i)")
+                        }
                     }
                 }
             }
@@ -179,6 +212,9 @@ public struct CollectionPreflight: Encodable, Sendable {
             }
             if let request = row["request"] {
                 result.requests += 1
+                if let object = request as? [String: Any], object["event"] != nil {
+                    issue("scripts.unsupported_request_location", path + "/request/event")
+                }
                 fields(request, path: path + "/request")
             }
             if let children = row["item"] as? [[String: Any]] {
@@ -194,7 +230,9 @@ public struct CollectionPreflight: Encodable, Sendable {
         try Task.checkCancellation()
         if result.requests == 0 { issue("collection.empty", "/item") }
         if includeScriptInventory {
-            result.scriptInventory = try ScriptCompatibilityInventory.inspect(selection)
+            var inventory = try ScriptCompatibilityInventory.inspect(selection)
+            if translateScripts, let scriptPlan { inventory.applyTranslation(scriptPlan) }
+            result.scriptInventory = inventory
         }
         return result
     }

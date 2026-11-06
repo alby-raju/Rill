@@ -18,7 +18,7 @@ Development installers are ad-hoc signed. Paid Developer ID signing and notariza
 
 ## Where Rill is heading
 
-Direct collection-file execution is available in this preview. Development source since this preview adds final-environment export, opt-in runner cookies, offline HTML reports, doctor/completions and CLI-only packaging; these additions are not in the linked installer yet. The next CLI work covers workflow compatibility and richer failure investigation. A dedicated mock workbench, large-workspace performance baselines, and Linux and Windows CLI portability are also on the [prioritized roadmap](ROADMAP.md).
+Direct collection-file execution is available in this preview. Development source since this preview adds final-environment export, opt-in runner cookies, offline HTML reports, doctor/completions, CLI-only packaging and an explicit [bounded script workflow subset](docs/SCRIPT-SUBSET.md); these additions are not in the linked installer yet. The next CLI work covers workflow compatibility and richer failure investigation. A dedicated mock workbench, large-workspace performance baselines, and Linux and Windows CLI portability are also on the [prioritized roadmap](ROADMAP.md).
 
 ## What you can do
 
