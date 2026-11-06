@@ -128,6 +128,7 @@ struct WorkbenchView: View {
         .sheet(isPresented: $store.showGRPC) { GRPCWorkbenchView().environmentObject(store) }
         .sheet(isPresented: $store.showBrokers) { BrokerWorkbenchView().environmentObject(store) }
         .sheet(isPresented: $store.showLiveStreams) { LiveStreamsView().environmentObject(store) }
+        .sheet(isPresented: $store.showMocks) { MockWorkbenchView().environmentObject(store) }
         .sheet(isPresented: $store.showAPITools) { APIToolsView().environmentObject(store) }
         .sheet(isPresented: $store.showRunner) { RunnerView().environmentObject(store) }
         .sheet(isPresented: $store.showCommandExport) {

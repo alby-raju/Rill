@@ -43,6 +43,7 @@ public enum WorkspaceFile {
         guard workspace.version == 1 else {
             throw WorkspaceError.unsupportedVersion(workspace.version)
         }
+        try MockProject.validateStorage(workspace.mockProjects ?? [])
         func unique(_ values: [UUID]) -> Bool { Set(values).count == values.count }
         func fieldsValid(_ fields: [Field]) -> Bool { unique(fields.map(\.id)) }
         guard unique((workspace.tlsProfiles ?? []).map(\.id)) else {

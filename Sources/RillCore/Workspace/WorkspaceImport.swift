@@ -16,6 +16,20 @@ public enum WorkspaceImport {
             if result.apiDefinitions == nil { result.apiDefinitions = [] }
             result.apiDefinitions?.append(source)
         }
+        for var project in incoming.mockProjects ?? [] {
+            project.id = UUID()
+            for index in project.routes.indices {
+                project.routes[index].id = UUID()
+                if let origin = project.routes[index].origin, origin.kind == .definition,
+                    let id = sourceIDs[origin.sourceID]
+                {
+                    project.routes[index].origin = MockFixtureOrigin(
+                        kind: .definition, sourceID: id, operation: origin.operation)
+                }
+            }
+            if result.mockProjects == nil { result.mockProjects = [] }
+            result.mockProjects?.append(project)
+        }
         var collections: [UUID: UUID] = [:]
         let tlsIDs = Dictionary(
             uniqueKeysWithValues: (incoming.tlsProfiles ?? []).map { ($0.id, UUID()) })

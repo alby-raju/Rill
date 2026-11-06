@@ -76,6 +76,11 @@ public struct WorkspaceImportPlan: Sendable {
                 "API definition snapshots and examples remain plain text. Source links are remapped and generation baselines reset for refresh review; contract checks use imported snapshots."
             )
         }
+        if !(incoming.mockProjects ?? []).isEmpty {
+            warnings.append(
+                "Mock projects and unapplied JSON drafts are imported as plain text. No listeners start automatically."
+            )
+        }
         if !incoming.history.isEmpty {
             warnings.append("Incoming response history is not imported.")
         }

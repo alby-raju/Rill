@@ -9,14 +9,14 @@ struct Arguments: Sendable {
     static let booleanOptions: Set<String> = [
         "quiet", "detail", "json", "apply", "continue-on-failure", "allow-insecure",
         "allow-lan", "overwrite", "show-messages", "help", "version", "insecure",
-        "include-system-roots", "cookies", "script-inventory", "translate-scripts",
+        "control-stdin", "include-system-roots", "cookies", "script-inventory", "translate-scripts",
     ]
     static let valueOptions: Set<String> = [
         "color", "workspace", "environment", "tls", "iterations", "delay", "retries",
         "retry-delay", "report", "report-format", "allure", "output", "format", "source",
         "endpoint", "query", "query-file", "variables", "header", "metadata", "timeout",
         "proto", "descriptor", "method", "data", "data-file", "count", "concurrency", "ramp",
-        "port", "routes", "repo", "message", "token-file", "destination", "client-id",
+        "port", "routes", "project", "repo", "message", "token-file", "destination", "client-id",
         "client-secret-name", "scope", "save-secret", "plugins-dir", "trust-file", "plugin",
         "service", "wait", "send", "auth-profile", "proto-include", "collection",
         "environment-file", "env-var", "ssl-client-cert", "ssl-client-key", "folder",
@@ -346,7 +346,7 @@ let usage = """
       sse --endpoint URL           Bounded SSE session
       ws --endpoint URL            --send TEXT --wait SECONDS; bounded WebSocket session
       perf REQUEST                 --count N --concurrency N --ramp MILLISECONDS
-      mock-serve --routes FILE      --port N; Ctrl+C stops the listener
+      mock-serve --project FILE     Or --routes FILE; --port N --json --control-stdin
       history-diff ID ID            Compare two saved history entries
       git-init | git-status         --repo DIRECTORY (separate from runtime data)
       git-commit --repo DIRECTORY   --message TEXT; exports portable workspace first
