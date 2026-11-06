@@ -2,14 +2,22 @@ import Foundation
 
 public enum RunReportFormat: String, CaseIterable, Sendable {
     case json = "JSON", markdown = "Markdown", junit = "JUnit XML", allure = "Allure results"
-    case html = "Offline HTML"
+    case html = "Offline HTML", ndjson = "NDJSON events"
 }
 public enum RunReportExporter {
     /// Allowlist only. Labels, URLs, checks' expected values, bodies, fingerprints and errors may contain secrets.
-    private static func sanitized(_ report: RunReport) -> RunReport {
+    static func sanitized(_ report: RunReport) -> RunReport {
         var copy = report
+        copy.sourceFormat =
+            ["postman-position-v1", "native-id-v1"].contains(report.sourceFormat ?? "")
+            ? report.sourceFormat : nil
+        copy.sources = report.sources?.filter {
+            UUID(uuidString: $0.key) != nil && RunSources.valid($0.value)
+        }
         for index in copy.outcomes.indices {
             copy.outcomes[index].retainedBody = nil
+            copy.outcomes[index].responseHeaders = nil
+            copy.outcomes[index].headersOmitted = true
             copy.outcomes[index].bodyOmitted = true
             copy.outcomes[index].fingerprint = nil
             copy.outcomes[index].checkSignature = nil
@@ -40,12 +48,11 @@ public enum RunReportExporter {
         ).replacingOccurrences(of: ">", with: "&gt;").replacingOccurrences(of: "\"", with: "&quot;")
             .replacingOccurrences(of: "'", with: "&apos;")
     }
-    public static func files(_ report: RunReport, format: RunReportFormat) throws -> [String: Data]
-    {
+    static func validate(_ report: RunReport) throws {
         guard report.duration.isFinite, (0...1e12).contains(report.duration),
             report.started.timeIntervalSince1970.isFinite,
             (0...1e12).contains(report.started.timeIntervalSince1970),
-            report.outcomes.count <= 20_000,
+            report.outcomes.count <= 20_000, (report.sources?.count ?? 0) <= 10000,
             report.outcomes.reduce(0, { $0 + $1.checks.count }) <= 100_000,
             report.outcomes.allSatisfy({
                 $0.duration.isFinite && (0...1e12).contains($0.duration)
@@ -55,6 +62,10 @@ public enum RunReportExporter {
                     } ?? true)
             })
         else { throw WorkflowError.limit }
+    }
+    public static func files(_ report: RunReport, format: RunReportFormat) throws -> [String: Data]
+    {
+        try validate(report)
         let safe = sanitized(report)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -65,10 +76,14 @@ public enum RunReportExporter {
             var object =
                 try JSONSerialization.jsonObject(with: encoder.encode(safe)) as! [String: Any]
             object["passed"] = safe.passed
+            object["schemaVersion"] = 1
+            object["kind"] = "rill.run-report"
             files = [
                 "rill-run.json": try JSONSerialization.data(
                     withJSONObject: object, options: [.prettyPrinted, .sortedKeys])
             ]
+        case .ndjson:
+            files = ["rill-run.ndjson": try ndjson(safe)]
         case .html:
             files = ["rill-run.html": html(safe)]
         case .markdown:

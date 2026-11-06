@@ -119,7 +119,7 @@ public enum WorkspaceFile {
         }
     }
 
-    static func checkJSONBounds(_ data: Data) throws {
+    public static func checkJSONBounds(_ data: Data) throws {
         guard data.count <= ResourceLimits.workspaceBytes else { throw WorkspaceError.tooLarge }
         // Bound nesting before asking the JSON decoder to allocate its tree.
         var depth = 0

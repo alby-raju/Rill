@@ -339,6 +339,7 @@ extension RillCLI {
             case "markdown": format = .markdown
             case "junit": format = .junit
             case "html": format = .html
+            case "ndjson": format = .ndjson
             default: throw CLIError.usage("Unknown report format.")
             }
             guard let data = try RunReportExporter.files(report, format: format).values.first else {

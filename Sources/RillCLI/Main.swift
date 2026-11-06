@@ -53,6 +53,7 @@ import RillCore
         case "preflight": try await preflight(args)
         case "request": try await request(args)
         case "run": try await runFile(args)
+        case "report-diff": try reportDiff(args)
         case "version": try args.text(RillVersion.number)
         case "init":
             guard !FileManager.default.fileExists(atPath: args.workspaceURL.path) else {

@@ -9,14 +9,18 @@ struct Arguments: Sendable {
     static let booleanOptions: Set<String> = [
         "quiet", "detail", "json", "apply", "continue-on-failure", "allow-insecure",
         "allow-lan", "overwrite", "show-messages", "help", "version", "insecure",
-        "control-stdin", "include-system-roots", "cookies", "script-inventory", "translate-scripts",
+        "fail-fast", "metadata-only", "strict-headers", "github-annotations", "control-stdin",
+        "include-system-roots", "cookies", "script-inventory", "translate-scripts",
     ]
     static let valueOptions: Set<String> = [
         "color", "workspace", "environment", "tls", "iterations", "delay", "retries",
         "retry-delay", "report", "report-format", "allure", "output", "format", "source",
         "endpoint", "query", "query-file", "variables", "header", "metadata", "timeout",
         "proto", "descriptor", "method", "data", "data-file", "count", "concurrency", "ramp",
-        "port", "routes", "project", "repo", "message", "token-file", "destination", "client-id",
+        "config", "seed", "seed-time", "deadline", "comparison-output", "ignore-json",
+        "ignore-header",
+        "latency-percent", "latency-floor", "port", "routes", "project", "repo", "message",
+        "token-file", "destination", "client-id",
         "client-secret-name", "scope", "save-secret", "plugins-dir", "trust-file", "plugin",
         "service", "wait", "send", "auth-profile", "proto-include", "collection",
         "environment-file", "env-var", "ssl-client-cert", "ssl-client-key", "folder",
@@ -46,7 +50,10 @@ struct Arguments: Sendable {
                     }
                     guard
                         values[name] == nil
-                            || ["header", "metadata", "proto-include", "env-var"].contains(name)
+                            || [
+                                "header", "metadata", "proto-include", "env-var", "ignore-json",
+                                "ignore-header",
+                            ].contains(name)
                     else { throw CLIError.usage("Duplicate option.") }
                     values[name, default: []].append(input[index])
                 } else {
@@ -61,6 +68,23 @@ struct Arguments: Sendable {
                 operands.append(item)
             }
             index += 1
+        }
+        try applyRunConfig()
+        if command != "run",
+            !Set(["config", "seed", "seed-time", "deadline", "comparison-output"]).isDisjoint(
+                with: values.keys)
+                || !Set(["github-annotations", "fail-fast"]).isDisjoint(with: flags)
+        {
+            throw CLIError.usage(
+                "Run configuration, seed, deadline, snapshot and annotation options require a file run."
+            )
+        }
+        if command != "report-diff",
+            !Set(["ignore-json", "ignore-header", "latency-percent", "latency-floor"]).isDisjoint(
+                with: values.keys)
+                || !Set(["metadata-only", "strict-headers"]).isDisjoint(with: flags)
+        {
+            throw CLIError.usage("Comparison rules require report-diff.")
         }
         let preflightOnly: Set<String> = [
             "environment-file", "env-var", "ssl-client-cert", "ssl-client-key", "folder", "globals",
@@ -115,7 +139,7 @@ struct Arguments: Sendable {
             throw CLIError.usage("Choose --json or --detail.")
         }
         if let format = value("report-format"),
-            !["json", "markdown", "junit", "html"].contains(format)
+            !["json", "markdown", "junit", "html", "ndjson"].contains(format)
         {
             throw CLIError.usage("Unknown report format.")
         }
@@ -314,12 +338,20 @@ let usage = """
           --iteration-data FILE    JSON/CSV rows; sets iteration count (cannot use --iterations)
           --iteration-data-format json|csv   Optional override for the file extension
           --iterations N --delay MS --retries N --retry-delay MS --continue-on-failure
-          --report FILE --report-format json|markdown|junit|html --allure DIR
+          --report FILE --report-format json|markdown|junit|html|ndjson --allure DIR
+          --config FILE            Versioned option defaults; CLI options take precedence
+          --seed UINT64 --seed-time EPOCH   Run-scoped deterministic templates (SplitMix64-v1)
+          --deadline SECONDS       Total execution deadline (0.01–86400), including pacing
+          --comparison-output FILE Explicit raw body/header snapshot; may contain credentials
+          --github-annotations     Redacted final failure annotations on stderr
           --translate-scripts      Opt-in finite script translation (Postman only)
           --cookies                Private in-memory cookie jar for this run only
           --export-environment FILE  Explicit raw final variables (Postman environment JSON)
           --output FILE --timeout SECONDS   Explicit last-response export and request timeout
           --json | --detail        Unsupported scripts/inputs block before traffic
+      report-diff BEFORE AFTER     Compare versioned reports/raw snapshots; --metadata-only
+          --ignore-json POINTER --ignore-header NAME (repeatable) --strict-headers
+          --latency-percent N --latency-floor MS --json; unknown data cannot prove equality
       request METHOD URL           Ad-hoc HTTP request; no workspace required
           -H, --header name:value   Repeatable request headers
           -d, --data TEXT           UTF-8 text body; or --data-file FILE (1 MiB)
@@ -363,7 +395,7 @@ let usage = """
       --iterations N --delay MS --retries N --retry-delay MS --continue-on-failure
       --detail shows individual attempts/checks; --json retains machine-readable output.
       --color auto|always|never (default auto; respects NO_COLOR).
-      --report FILE --report-format json|markdown|junit|html --allure DIRECTORY
+      --report FILE --report-format json|markdown|junit|html|ndjson --allure DIRECTORY
       --output FILE explicitly exports raw response data; it may contain secrets.
     Protocols: --header name:value (repeatable), --metadata name:value (gRPC), --timeout SECONDS
       --proto-include DIRECTORY supplies additional local compiler imports (repeatable).

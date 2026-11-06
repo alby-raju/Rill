@@ -9,6 +9,7 @@ public enum PostmanFileRunError: Error {
 /// A transient execution input: no workspace repository or native credential store is opened.
 public struct PostmanFileRun: Sendable {
     public let requests: [RequestDraft]
+    public let sourceLocations: [String: String]
     public let environment: Environment
     public let secrets: NamedSecretResolver
     public var translatesScripts: Bool { scriptPlan != nil }
@@ -119,6 +120,11 @@ public struct PostmanFileRun: Sendable {
             }
         }
         var requests = imported.workspace.requests
+        let locations = try RunSources.postman(selection)
+        guard locations.count == requests.count else { throw WorkflowError.invalidConfiguration }
+        for index in requests.indices { requests[index].id = RunSources.id(locations[index]) }
+        let sourceLocations = Dictionary(
+            uniqueKeysWithValues: zip(requests, locations).map { ($0.id.uuidString, $1) })
         if let scriptPlan {
             guard scriptPlan.requests.count == requests.count else {
                 throw WorkflowError.invalidConfiguration
@@ -127,7 +133,8 @@ public struct PostmanFileRun: Sendable {
             for index in requests.indices { requests[index].collectionID = collectionID }
         }
         return Self(
-            requests: requests, environment: environment, secrets: secrets,
+            requests: requests, sourceLocations: sourceLocations, environment: environment,
+            secrets: secrets,
             iterationData: iterationData,
             iterationOverrides: iterationData == nil ? [:] : overrides,
             fileTLS: fileTLS, scriptPlan: scriptPlan,
@@ -138,6 +145,17 @@ public struct PostmanFileRun: Sendable {
 
     /// File-run success explicitly requires HTTP 2xx, not unexecuted Postman assertions.
     public func run(
+        configuration: RunConfiguration, timeout: Double? = nil,
+        exportEnvironment: CollectionRunner.EnvironmentExport? = nil, cookieJar: CookieJar? = nil
+    ) async throws -> RunReport {
+        var report = try await executeRun(
+            configuration: configuration, timeout: timeout, exportEnvironment: exportEnvironment,
+            cookieJar: cookieJar)
+        report.sources = sourceLocations
+        report.sourceFormat = "postman-position-v1"
+        return report
+    }
+    private func executeRun(
         configuration: RunConfiguration, timeout: Double? = nil,
         exportEnvironment: CollectionRunner.EnvironmentExport? = nil, cookieJar: CookieJar? = nil
     ) async throws -> RunReport {

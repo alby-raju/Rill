@@ -72,3 +72,5 @@ Sidebar collection headers can be collapsed and expanded. Their state is saved l
 ### Grouping-only import containers (0.4.5 development)
 
 Flattened imports omit parent containers that contain only subfolders; child collections retain their breadcrumb names and inherited authentication. Intentional empty leaf folders and parents with their own requests remain. Existing saved collections are not automatically deleted; the change applies to new imports.
+
+Development-source [run investigation](RUN-INVESTIGATION.md) adds versioned JSON/NDJSON, structural source navigation, typed failure kinds, scoped deterministic templates, execution deadlines, reviewed config defaults, redacted CI annotations and baseline comparison. Payload/header capture is an explicit raw snapshot option; ordinary reports retain their allowlist. Missing data stays unknown.

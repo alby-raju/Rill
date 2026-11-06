@@ -31,8 +31,13 @@ is claimed. Stock dependency behavior is kept unchanged; no reference patches fo
 
 ## Dependency audit status
 
-The 5 November 2026 registry audit of this reference lockfile reported **19 advisory matches:
-1 critical, 12 high and 6 moderate**, including transitive template/parser/crypto libraries.
+The 6 November 2026 registry re-audit of this reference lockfile reported **19 affected-package
+findings: 1 critical, 12 high and 6 moderate**, including transitive template/parser/crypto
+libraries. GitHub separately lists **33 open advisories** for this same optional lockfile
+(3 critical, 14 high, 13 moderate and 3 low); package aggregates and individual advisories are
+different denominators. All 33 inspected repository alerts belong to this harness, not the
+production Swift graph. Upstream npm still lists 6.2.3 as the current Newman release. No
+reference dependency graph is patched to force conformance or to claim a clean audit.
 The reference is therefore an optional local, synthetic-input tool. Normal Swift tests/builds
 do not install or invoke it, and it is not an automatic trusted release gate or a clean-audit
 claim. Audit separately with `npm audit --json`; re-review upstream releases before expanding

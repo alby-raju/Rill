@@ -12,6 +12,8 @@ extension RillCLI {
             throw CLIError.usage("Unknown help command; use --help.")
         }
         let focused: [String: String] = [
+            "report-diff":
+                "report-diff BEFORE AFTER [--metadata-only] [--ignore-json POINTER] [--ignore-header NAME] [--strict-headers] [--latency-percent N] [--latency-floor MS] [--json|--quiet]\nCompare versioned reports or explicit raw snapshots. Missing payloads are unknown; ordinary reports require --metadata-only. Exit 4 for observed drift, 2 for incomplete/invalid comparison, 0 for complete equality under selected rules. Output never echoes payload/header values.",
             "mock-serve":
                 "mock-serve --project FILE|--routes FILE [--port N] [--json] [--control-stdin] [--quiet]\nLoopback-only HTTP. Port 0 chooses an available port. Project version 1 is shared with the desktop. --json emits one compact readiness record. --control-stdin accepts newline-terminated status/reset/stop (64 bytes maximum); EOF stops. Ctrl+C/SIGTERM stops and exits 130. No personal workspace or Keychain access.",
             "doctor":
@@ -19,7 +21,7 @@ extension RillCLI {
             "completion":
                 "completion bash|zsh|fish\nPrint static shell completion source. No workspace, network or credential access. Preserve the full CLI installation when adding its bin directory to PATH.",
             "run":
-                "run FILE [--format postman|native]\nPostman: --folder /Parent/Child --globals FILE --environment-file FILE\nNative: --collection NAME_OR_ID --environment NAME_OR_ID\nBoth: --env-var key=value --iteration-data FILE --cookies --export-environment FILE\n--iterations N --retries N --delay MS --retry-delay MS --continue-on-failure\n--report FILE --report-format json|markdown|junit|html --allure DIR --output FILE --overwrite\n--json|--detail|--quiet; see full help for bounded TLS inputs. Uploads and unsupported scripts block before traffic; --translate-scripts opts into the finite native subset. No desktop workspace or Keychain access.",
+                "run FILE [--format postman|native]\nPostman: --folder /Parent/Child --globals FILE --environment-file FILE\nNative: --collection NAME_OR_ID --environment NAME_OR_ID\nBoth: --env-var key=value --iteration-data FILE --cookies --export-environment FILE\n--iterations N --retries N --delay MS --retry-delay MS --continue-on-failure\n--report FILE --report-format json|markdown|junit|html|ndjson --allure DIR --output FILE --overwrite\n--config FILE --seed N [--seed-time EPOCH] --deadline SECONDS --github-annotations\n--comparison-output FILE explicitly saves raw response payloads/headers for report-diff.\n--json|--detail|--quiet; see full help for bounded TLS inputs. Uploads and unsupported scripts block before traffic; --translate-scripts opts into the finite native subset. No desktop workspace or Keychain access.",
             "preflight":
                 "preflight FILE [--translate-scripts] [--script-inventory] [--folder /Parent/Child] [--globals FILE] [--environment-file FILE] [--env-var key=value] [--json]\nOffline Postman validation; no requests or credential hydration. Does not execute scripts, iteration data or cookie chains.",
             "request":
@@ -35,7 +37,8 @@ extension RillCLI {
         }
     }
     static let commandNames = [
-        "help", "version", "doctor", "completion", "preflight", "request", "run", "init", "list",
+        "report-diff", "help", "version", "doctor", "completion", "preflight", "request", "run",
+        "init", "list",
         "search", "run-request", "run-collection", "run-folder", "backup", "restore", "diagnostics",
         "collection-import", "openapi-list", "openapi-import", "openapi-refresh", "contract-check",
         "perf", "history-diff", "git-status", "git-init", "git-commit", "plugins", "plugin-enable",
