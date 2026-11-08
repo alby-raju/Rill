@@ -9,7 +9,7 @@ Rill's original code is MIT licensed. Third-party libraries, vendored components
 | [Yams](https://github.com/jpsim/Yams) | 6.2.2 | YAML plus bundled libyaml; MIT |
 | [ZIPFoundation](https://github.com/weichsel/ZIPFoundation) | 0.9.20 | Bounded archive adapter; MIT, privacy manifest retained |
 | [gRPC Swift](https://github.com/grpc/grpc-swift-2) | 2.4.4 | Native gRPC; Apache-2.0 |
-| [gRPC NIO transport](https://github.com/grpc/grpc-swift-nio-transport) | 2.11.0 | Native transport; Apache-2.0 and transitive notices |
+| [gRPC NIO transport](https://github.com/grpc/grpc-swift-nio-transport) | 2.12.0 | Native transport; Apache-2.0 and transitive notices |
 | [SwiftProtobuf](https://github.com/apple/swift-protobuf) | 1.39.0 | Models/compiler; Apache-2.0 with runtime exception |
 | [Swift Kafka client](https://github.com/swift-server/swift-kafka-client) | 1.0.0 | Native librdkafka wrapper; retain its graph's native/TLS/compression notices |
 | [Swift Log](https://github.com/apple/swift-log) | 1.17.0 | Logging interface; Apache-2.0 |
@@ -48,4 +48,4 @@ Kafka 1.0.0 reviewed 1 November 2026 at revision `f457437e3c5ba4bb0bd501201e7dac
 
 ## Optional synthetic script reference
 
-`scripts/script-conformance` pins stock Newman 6.2.3 and its npm lockfile for manually invoked synthetic differential tests. Node/Newman/node_modules are not application dependencies or bundled artifacts. The reference dependency audit has known findings; its [README](../scripts/script-conformance/README.md) records the scope and audit status. Normal Swift builds/tests do not install it, and its results do not replace production dependency or release-security gates.
+`scripts/script-conformance` replays captured synthetic Newman 6.2.3 results using Python and the Rill CLI. The [corpus documentation](../scripts/script-conformance/README.md) records capture provenance and why the npm dependency graph was retired.

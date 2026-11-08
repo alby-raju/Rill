@@ -11,7 +11,7 @@ let package = Package(
         .package(url: "https://github.com/jpsim/Yams.git", exact: "6.2.2"),
         .package(url: "https://github.com/weichsel/ZIPFoundation.git", exact: "0.9.20"),
         .package(url: "https://github.com/grpc/grpc-swift-2.git", exact: "2.4.4"),
-        .package(url: "https://github.com/grpc/grpc-swift-nio-transport.git", exact: "2.11.0"),
+        .package(url: "https://github.com/grpc/grpc-swift-nio-transport.git", exact: "2.12.0"),
         .package(url: "https://github.com/apple/swift-protobuf.git", exact: "1.39.0"),
         .package(
             url: "https://github.com/swift-server/swift-kafka-client.git", exact: "1.0.0"),
