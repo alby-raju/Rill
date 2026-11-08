@@ -25,7 +25,7 @@ extension RillCLI {
             "preflight":
                 "preflight FILE [--translate-scripts] [--script-inventory] [--folder /Parent/Child] [--globals FILE] [--environment-file FILE] [--env-var key=value] [--json]\nOffline Postman validation; no requests or credential hydration. Does not execute scripts, iteration data or cookie chains.",
             "request":
-                "request METHOD URL [--header 'Name: value'] [--data TEXT|--data-file FILE|--binary-file FILE|--form NAME=VALUE|NAME@PATH] [--multipart] [--env-var key=value] [--output FILE|--download FILE] [--json]\nForm fields repeat. File fields use multipart automatically. Use --ca-cert and scoped --ssl-client options for headless TLS. --download streams a successful GET to disk. One explicit HTTP request; no saved workflows, foreign scripts or cookie session. Raw output can contain secrets.",
+                "request METHOD URL [--header 'Name: value'] [--data TEXT|--data-file FILE|--binary-file FILE|--form NAME=VALUE|NAME@PATH] [--multipart] [--env-var key=value] [--output FILE|--download FILE] [--session FILE --session-key-file FILE] [--json]\nForm fields repeat. File fields use multipart automatically. Use --ca-cert and scoped --ssl-client options for headless TLS. --download streams a successful GET to disk. One explicit HTTP request. Cookies persist only with an explicit encrypted session. Raw output can contain secrets.",
         ]
         if let text = focused[command] {
             try args.text(

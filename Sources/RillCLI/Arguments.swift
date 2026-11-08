@@ -28,7 +28,7 @@ struct Arguments: Sendable {
         "environment-file", "env-var", "ssl-client-cert", "ssl-client-key", "folder",
         "iteration-data", "iteration-data-format", "globals", "export-environment",
         "ca-cert", "ssl-client-p12", "ssl-passphrase-file", "ssl-client-origin", "ssl-client-map",
-        "binary-file", "form", "download", "attachments",
+        "binary-file", "form", "download", "attachments", "session", "session-key-file",
     ]
     init(_ input: [String]) throws {
         guard input.count <= 512, input.reduce(0, { $0 + $1.utf8.count }) <= 2 * 1024 * 1024 else {
@@ -134,6 +134,9 @@ struct Arguments: Sendable {
                 || !Set(["binary-file", "form", "download"]).isDisjoint(with: values.keys)
         {
             throw CLIError.usage("Upload and download options require request.")
+        }
+        if command != "request", value("session") != nil || value("session-key-file") != nil {
+            throw CLIError.usage("Persistent cookie sessions require request.")
         }
         if command != "run", value("attachments") != nil {
             throw CLIError.usage("--attachments requires a Postman file run.")
@@ -378,6 +381,7 @@ let usage = """
           --ca-cert FILE           Explicit trust roots; scoped client TLS flags also apply
           --env-var key=value       Temporary overrides (repeatable); --timeout SECONDS
           --output FILE            Explicit raw response export; --overwrite permits replacement
+          --session FILE --session-key-file FILE   Encrypted cookies for one HTTP origin
           --download FILE          Stream a successful GET to disk (256 MiB)
           --json                   Redacted status/timing/byte summary; non-2xx exits 3
           --workspace FILE         Explicit saved --environment/--auth-profile/--tls selection

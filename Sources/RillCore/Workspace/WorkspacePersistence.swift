@@ -225,7 +225,7 @@ public enum WorkspaceFile {
         complete = true
     }
 
-    static func atomicWrite(_ data: Data, to url: URL) throws {
+    static func atomicWrite(_ data: Data, to url: URL, replaceExisting: Bool = true) throws {
         let directory = url.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let temporary = directory.appendingPathComponent(".rill-\(UUID().uuidString).tmp")
@@ -240,7 +240,10 @@ public enum WorkspaceFile {
         try handle.write(contentsOf: data)
         try handle.synchronize()
         try handle.close()
-        guard Darwin.rename(temporary.path, url.path) == 0 else { throw WorkspaceError.unavailable }
+        let status =
+            replaceExisting
+            ? Darwin.rename(temporary.path, url.path) : Darwin.link(temporary.path, url.path)
+        guard status == 0 else { throw WorkspaceError.unavailable }
     }
 }
 

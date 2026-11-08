@@ -7,7 +7,8 @@ extension RillCLI {
         let requestValues: Set<String> = [
             "header", "data", "data-file", "binary-file", "form", "env-var", "output", "download",
             "timeout",
-            "color", "workspace", "environment", "auth-profile", "tls",
+            "color", "workspace", "environment", "auth-profile", "tls", "session",
+            "session-key-file",
         ]
         let requestFlags: Set<String> = [
             "json", "quiet", "overwrite", "allow-insecure", "multipart",
@@ -72,6 +73,11 @@ extension RillCLI {
                 throw CLIError.usage("Output exists; choose a new path or --overwrite.")
             }
         }
+        let sessionOptions = try RequestSessionOptions(
+            args,
+            protected: [args.workspaceURL]
+                + (bodyInputs + tlsInputs + [destination].compactMap { $0 })
+                .map { URL(fileURLWithPath: $0) })
         var draft = RequestDraft()
         draft.name = "Ad-hoc request"
         draft.method = method
@@ -131,6 +137,7 @@ extension RillCLI {
         let profiles = workspace.authProfiles ?? []
         let secrets = NamedSecretResolver(catalog: workspace.namedSecrets ?? [])
         let tlsProfiles = workspace.tlsProfiles ?? []
+        let session = try sessionOptions?.open()
         let summary: RequestSummary
         do {
             if let download {
@@ -138,18 +145,35 @@ extension RillCLI {
                     draft, environment: environment, to: URL(fileURLWithPath: download),
                     overwrite: args.flags.contains("overwrite"), profiles: profiles,
                     secrets: secrets,
-                    tlsProfiles: tlsProfiles, fileTLS: fileTLS)
+                    tlsProfiles: tlsProfiles, fileTLS: fileTLS, cookieJar: session?.jar)
                 summary = RequestSummary(
                     status: result.status, duration: result.duration, bodyBytes: result.bodyBytes)
             } else {
                 let exchange = try await RequestEngine.execute(
                     draft, environment: environment, profiles: profiles, secrets: secrets,
-                    tlsProfiles: tlsProfiles, fileTLS: fileTLS)
+                    tlsProfiles: tlsProfiles, fileTLS: fileTLS, cookieJar: session?.jar)
                 if let output = rawOutput { try args.write(exchange.body, to: output) }
                 summary = RequestSummary(
                     status: exchange.status, duration: exchange.duration,
                     bodyBytes: exchange.body.count)
             }
+            try session?.save()
+        } catch CookieSessionError.originMismatch {
+            throw CLIError.usage(
+                "This cookie session belongs to a different origin. No request sent.")
+        } catch CookieSessionError.explicitCookieHeader {
+            throw CLIError.usage(
+                "Choose a cookie session or an explicit Cookie header. No request sent.")
+        } catch CookieSessionError.insecureTransport {
+            throw CLIError.usage("Cookie sessions require verified TLS settings. No request sent.")
+        } catch CookieSessionError.writeFailed {
+            try? FileHandle.standardError.write(
+                contentsOf: Data(
+                    "Could not save the encrypted cookie session. The previous file was preserved.\n"
+                        .utf8))
+            throw CLIError.runtime
+        } catch is CookieSessionError {
+            throw CLIError.usage("Invalid cookie session origin. No request sent.")
         } catch RillError.responseTooLarge {
             throw CLIError.runtime
         } catch is ResponseDownloadError {
