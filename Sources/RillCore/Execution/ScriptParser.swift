@@ -4,11 +4,20 @@ struct ScriptProgram: Sendable {
     let operations: [ScriptOperation]
     let writes: Set<String>
     let branches: [String]
+    var changesOrder: Bool { operations.contains(where: \.changesOrder) }
     var operationCount: Int { operations.reduce(0) { $0 + $1.nodeCount } }
     var estimatedCost: Int { operations.reduce(0) { $0 + $1.estimatedCost } }
 }
 
 private extension ScriptOperation {
+    var changesOrder: Bool {
+        switch self {
+        case .next, .skip: return true
+        case .condition(_, _, _, let yes, let no):
+            return yes.contains(where: \.changesOrder) || no.contains(where: \.changesOrder)
+        default: return false
+        }
+    }
     var nodeCount: Int {
         if case .condition(_, _, _, let yes, let no) = self {
             return 1 + (yes + no).reduce(0) { $0 + $1.nodeCount }
@@ -17,7 +26,7 @@ private extension ScriptOperation {
     }
     var estimatedCost: Int {
         switch self {
-        case .testStatus(let values): return 1 + values.count
+        case .test(let values): return 1 + values.count
         case .condition(_, _, _, let yes, let no):
             return 1
                 + max(
@@ -32,6 +41,7 @@ struct ScriptParser {
     private var token: ScriptLexer.Token
     private let phase: ScriptCompatibilityInventory.Phase
     private var count = 0
+    private var responseAlias: String?
     private var writes: Set<String> = []
     private var branches: [String] = []
     init(_ source: String, phase: ScriptCompatibilityInventory.Phase) throws {
@@ -83,8 +93,14 @@ struct ScriptParser {
         default: nil
         }
     }
-    private mutating func expression() throws -> ScriptExpression {
+    private mutating func expression(
+        assertion: Bool = false, jsonAlias: String? = nil
+    ) throws -> ScriptExpression {
         if case .string = token.kind { return .literal(try string()) }
+        if case .identifier(let alias) = token.kind, alias == jsonAlias || alias == responseAlias {
+            try advance()
+            return try jsonSelector(allowRoot: assertion)
+        }
         let path = try chain()
         try take(.symbol(40))
         if path.count == 3, path[0] == "pm", let scope = scope(path[1]), path[2] == "get" {
@@ -101,6 +117,9 @@ struct ScriptParser {
         }
         guard path == ["pm", "response", "json"] else { throw fail() }
         try take(.symbol(41))
+        return try jsonSelector(allowRoot: assertion)
+    }
+    private mutating func jsonSelector(allowRoot: Bool) throws -> ScriptExpression {
         var selector: [String] = []
         while token.kind == .symbol(46) || token.kind == .symbol(91) {
             if token.kind == .symbol(46) {
@@ -121,7 +140,7 @@ struct ScriptParser {
                 throw fail("script.limit")
             }
         }
-        guard !selector.isEmpty else { throw fail("script.jsonScalarRequired") }
+        guard allowRoot || !selector.isEmpty else { throw fail("script.jsonScalarRequired") }
         return .json(selector)
     }
     private mutating func terminator() throws {
@@ -131,21 +150,75 @@ struct ScriptParser {
             throw fail("script.statementSeparator")
         }
     }
-    private mutating func statusAssertion() throws -> Int {
+    private mutating func assertionLiteral() throws -> ScriptLiteral {
+        switch token.kind {
+        case .string: return .string(try string())
+        case .integer(let value):
+            try advance()
+            return .integer(value)
+        case .identifier("true"), .identifier("false"):
+            return .bool(try name() == "true")
+        case .identifier("null"):
+            try advance()
+            return .null
+        default: throw fail("script.unsupportedAssertionLiteral")
+        }
+    }
+    private mutating func assertion(jsonAlias: String?) throws -> ScriptAssertion {
         let path = try chain()
-        guard path == ["pm", "response", "to", "have", "status"] else {
-            throw fail("script.unsupportedAssertion")
-        }
         try take(.symbol(40))
-        guard case .integer(let status) = token.kind, (100...599).contains(status) else {
-            throw fail("script.invalidStatus")
+        let assertion: ScriptAssertion
+        switch path {
+        case ["pm", "response", "to", "have", "status"]:
+            guard case .integer(let status) = token.kind, (100...599).contains(status) else {
+                throw fail("script.invalidStatus")
+            }
+            try advance()
+            assertion = .status(status)
+        case ["pm", "response", "to", "have", "header"]:
+            let header = try string()
+            guard HTTPEncoding.isHeaderName(header) else { throw fail("script.invalidHeader") }
+            assertion = .header(header)
+        case ["pm", "expect"]:
+            let actual = try expression(assertion: true, jsonAlias: jsonAlias)
+            try take(.symbol(41))
+            try take(.symbol(46))
+            let comparison = try chain()
+            guard comparison == ["to", "equal"] || comparison == ["to", "eql"] else {
+                throw fail("script.unsupportedAssertion")
+            }
+            try take(.symbol(40))
+            assertion = .equal(actual, try assertionLiteral(), deep: comparison.last == "eql")
+        default: throw fail("script.unsupportedAssertion")
         }
-        try advance()
         try take(.symbol(41))
         try terminator()
-        return status
+        return assertion
     }
-    private mutating func callback() throws -> [Int] {
+    private mutating func jsonAliasDeclaration() throws -> String {
+        try take(.identifier("const"))
+        let alias = try name()
+        let reserved: Set<String> = [
+            "pm", "postman", "arguments", "eval", "await", "break", "case", "catch", "class",
+            "const",
+            "continue", "debugger", "default", "delete", "do", "else", "enum", "export",
+            "extends", "false", "finally", "for", "function", "if", "implements", "import",
+            "in", "instanceof", "interface", "let", "new", "null", "package", "private",
+            "protected", "public", "return", "static", "super", "switch", "this", "throw",
+            "true", "try", "typeof", "var", "void", "while", "with", "yield",
+        ]
+        guard !reserved.contains(alias) else { throw fail("script.invalidAlias") }
+        try take(.symbol(61))
+        guard try chain() == ["pm", "response", "json"] else {
+            throw fail("script.unsupportedAlias")
+        }
+        try take(.symbol(40))
+        try take(.symbol(41))
+        try terminator()
+        return alias
+    }
+
+    private mutating func callback() throws -> [ScriptAssertion] {
         if token.kind == .identifier("function") {
             try advance()
             try take(.symbol(40))
@@ -156,14 +229,20 @@ struct ScriptParser {
             try take(.arrow)
         }
         try take(.symbol(123))
-        var statuses: [Int] = []
-        while token.kind != .symbol(125) {
-            statuses.append(try statusAssertion())
-            guard statuses.count <= 128 else { throw fail("script.limit") }
+        var assertions: [ScriptAssertion] = []
+        var jsonAlias: String?
+        if token.kind == .identifier("const") {
+            jsonAlias = try jsonAliasDeclaration()
+            assertions.append(.parseJSON)
         }
-        guard !statuses.isEmpty else { throw fail("script.emptyTest") }
+        let declarationCount = assertions.count
+        while token.kind != .symbol(125) {
+            assertions.append(try assertion(jsonAlias: jsonAlias))
+            guard assertions.count <= 128 else { throw fail("script.limit") }
+        }
+        guard assertions.count > declarationCount else { throw fail("script.emptyTest") }
         try advance()
-        return statuses
+        return assertions
     }
     private mutating func block(depth: Int) throws -> [ScriptOperation] {
         guard depth <= 16 else { throw fail("script.limit") }
@@ -221,7 +300,7 @@ struct ScriptParser {
                 guard phase == .test else { throw fail("script.assertionBeforeResponse") }
                 _ = try string()
                 try take(.symbol(44))
-                operation = .testStatus(try callback())
+                operation = .test(try callback())
             } else if path == ["pm", "execution", "setNextRequest"]
                 || path == ["postman", "setNextRequest"]
             {
@@ -251,7 +330,14 @@ struct ScriptParser {
     }
     mutating func parse() throws -> ScriptProgram {
         guard phase != .other else { throw fail("script.unsupportedPhase") }
-        let operations = try statements(depth: 0, end: .end)
+        var operations: [ScriptOperation] = []
+        if token.kind == .identifier("const") {
+            guard phase == .test else { throw fail("script.responseBeforeRequest") }
+            responseAlias = try jsonAliasDeclaration()
+            operations.append(.parseJSON)
+            count += 1
+        }
+        operations += try statements(depth: 0, end: .end)
         return ScriptProgram(operations: operations, writes: writes, branches: branches)
     }
 }

@@ -93,6 +93,73 @@ import XCTest
         XCTAssertEqual(try Data(contentsOf: source), input)
         XCTAssertEqual(try Data(contentsOf: environment), env)
     }
+    func testDryRunPlansSelectedRowsWithoutReadingTLSCredentialsOrWritingOutputs() async throws {
+        let root = try directory()
+        let source = root.appendingPathComponent("private-collection.json")
+        let environment = root.appendingPathComponent("private-environment.json")
+        let rows = root.appendingPathComponent("private-rows.json")
+        let report = root.appendingPathComponent("private-report.json")
+        let raw = root.appendingPathComponent("private-output.json")
+        let marker = Data("existing-report".utf8)
+        try marker.write(to: report)
+        let leaf: [String: Any] = [
+            "name": "private-request",
+            "request": [
+                "method": "GET", "url": "{{destination}}/private-token",
+                "header": [["key": "X-Token", "value": "{{token}}"]],
+            ],
+        ]
+        try collection([
+            request("outside selection", "invalid://excluded"),
+            ["name": "private-folder", "item": [leaf]],
+        ]).write(to: source)
+        try JSONSerialization.data(withJSONObject: [
+            "_postman_variable_scope": "environment",
+            "values": [["key": "token", "value": "private-secret-value", "type": "secret"]],
+        ]).write(to: environment)
+        try Data(
+            #"[{"destination":"http://127.0.0.1:1"},{"destination":"https://private.invalid"}]"#
+                .utf8
+        )
+        .write(to: rows)
+        let args = [
+            "run", source.path, "--dry-run", "--json", "--folder", "/private-folder",
+            "--environment-file", environment.path, "--iteration-data", rows.path,
+            "--report", report.path, "--output", raw.path,
+        ]
+        let result = try await cli(
+            args + [
+                "--ssl-client-p12", root.appendingPathComponent("missing-private-key.p12").path,
+                "--ssl-client-origin", "https://private.invalid",
+                "--ssl-passphrase-file",
+                root.appendingPathComponent("missing-private-passphrase").path,
+            ])
+        XCTAssertEqual(result.status, 0, String(decoding: result.diagnostics, as: UTF8.self))
+        let plan = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: result.output) as? [String: Any])
+        XCTAssertEqual(plan["sendsRequests"] as? Bool, false)
+        XCTAssertEqual(plan["baseSteps"] as? Int, 2)
+        XCTAssertEqual(plan["environmentSource"] as? String, "explicitFile")
+        XCTAssertEqual(plan["tlsInputsDeferred"] as? Bool, true)
+        let steps = try XCTUnwrap(plan["steps"] as? [[String: Any]])
+        XCTAssertEqual(steps.first?["source"] as? String, "/item/1/item/0")
+        XCTAssertEqual(steps.first?["runtimeValidationDeferred"] as? Bool, true)
+        XCTAssertFalse(
+            String(decoding: result.output + result.diagnostics, as: UTF8.self).contains("private-")
+        )
+        XCTAssertEqual(try Data(contentsOf: report), marker)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: raw.path))
+        try Data(
+            #"[{"destination":"https://private.invalid"},{"destination":"invalid://private-late-row"}]"#
+                .utf8
+        )
+        .write(to: rows)
+        let invalid = try await cli(args)
+        XCTAssertEqual(invalid.status, 2)
+        XCTAssertFalse(
+            String(decoding: invalid.diagnostics, as: UTF8.self).contains("private-late-row"))
+    }
+
     func testUnsupportedScriptsAndLateInvalidURLBlockBeforeRunArtifacts() async throws {
         let root = try directory()
         let source = root.appendingPathComponent("collection.json")

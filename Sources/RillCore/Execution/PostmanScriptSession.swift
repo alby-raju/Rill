@@ -43,6 +43,7 @@ actor PostmanScriptSession {
     private var stop = false
     private var skip = false
     private var checks: [CheckResult] = []
+    private var responseJSON: Result<JSONValue, WorkflowError>?
     init(
         plan: PostmanScriptPlan, requests: [RequestDraft], initial: ScriptVariables,
         data: IterationData?, overrides: [String: String], secrets: NamedSecretResolver
@@ -80,15 +81,65 @@ actor PostmanScriptSession {
                 .value
         case .json(let path):
             guard let response else { throw WorkflowError.invalidConfiguration }
-            let pointer =
-                "/"
-                + path.map {
-                    $0.replacingOccurrences(of: "~", with: "~0").replacingOccurrences(
-                        of: "/", with: "~1")
-                }.joined(separator: "/")
-            guard case .string(let text) = try ResponseJSON.value(response.body, path: pointer)
+            guard case .string(let text) = try jsonValue(path, response: response)
             else { throw WorkflowError.missingValue }
             return String(decoding: text, as: UTF8.self)
+        }
+    }
+    private func jsonValue(_ path: [String], response: Exchange) throws -> JSONValue {
+        if responseJSON == nil {
+            do {
+                guard response.bodyWasTruncated != true else { throw WorkflowError.invalidJSON }
+                responseJSON = .success(
+                    try ResponseJSON.parse(response.body, preserveNumberSpelling: true))
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                responseJSON = .failure(.invalidJSON)
+            }
+            try budget()
+        }
+        guard let responseJSON else { throw WorkflowError.invalidJSON }
+        return try ResponseJSON.value(responseJSON.get(), tokens: path)
+    }
+    private func matches(_ assertion: ScriptAssertion, response: Exchange) throws -> Bool {
+        switch assertion {
+        case .status(let status):
+            return response.status == status
+        case .header(let header):
+            return response.headers.contains {
+                $0.name.caseInsensitiveCompare(header) == .orderedSame
+            }
+        case .parseJSON:
+            do {
+                _ = try jsonValue([], response: response)
+                return true
+            } catch WorkflowError.invalidJSON {
+                return false
+            }
+        case .equal(let expression, let expected, let deep):
+            let actual: JSONValue
+            if case .json(let path) = expression {
+                do {
+                    actual = try jsonValue(path, response: response)
+                } catch WorkflowError.missingValue {
+                    return false
+                } catch WorkflowError.invalidJSON {
+                    return false
+                }
+            } else {
+                guard let text = try value(expression, response: response) else { return false }
+                actual = .string(Data(text.utf8))
+            }
+            switch (actual, expected) {
+            case (.string(let data), .string(let text)): return data.elementsEqual(text.utf8)
+            case (.number(let spelling), .integer(let number)):
+                guard let value = Double(spelling), value == Double(number) else { return false }
+                return !deep || value != 0 || value.sign == .plus
+            case (.bool(let actual), .bool(let expected)): return actual == expected
+            case (.null, .null): return true
+            default: return false
+            }
         }
     }
     private func execute(_ program: [ScriptOperation], response: Exchange?) throws {
@@ -102,18 +153,21 @@ actor PostmanScriptSession {
                 }
                 try variables.write(text, scope: scope, key: name)
             case .unset(let scope, let name): try variables.write(nil, scope: scope, key: name)
-            case .testStatus(let expected):
+            case .parseJSON:
+                guard let response else { throw WorkflowError.invalidConfiguration }
+                _ = try jsonValue([], response: response)
+            case .test(let assertions):
                 guard let response else { throw WorkflowError.invalidConfiguration }
                 var passed = true
-                for status in expected {
+                for assertion in assertions {
                     operations += 1
                     try budget()
-                    if response.status != status {
+                    if try !matches(assertion, response: response) {
                         passed = false
                         break
                     }
                 }
-                checks.append(CheckResult(title: "Translated status test", passed: passed))
+                checks.append(CheckResult(title: "Translated Postman test", passed: passed))
             case .next(let target):
                 if let target {
                     guard let index = plan.targetIndices[Data(target.utf8)] else {
@@ -160,6 +214,8 @@ actor PostmanScriptSession {
         stop = false
         skip = false
         checks = []
+        responseJSON = nil
+        defer { responseJSON = nil }
         phaseStarted = ProcessInfo.processInfo.systemUptime
         for source in plan.requests[index].pre {
             try execute(plan.programs[source].operations, response: nil)

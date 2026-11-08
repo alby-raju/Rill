@@ -136,6 +136,17 @@ Selected native assertions, extraction, GraphQL/contracts and enabled finite `js
 
 Before traffic, the complete native file schema and selected hook/profile/contract/TLS configuration are validated. Multipart/binary bodies and file references block without opening referenced files. Saved Keychain client-identity references require an explicit file identity instead of a lookup. System trust and embedded custom anchors are supported; an insecure selected profile requires `--allow-insecure` on this invocation unless explicit file trust replaces it. Unlike static Postman preparation, native request expansion occurs per step so response-derived variables, extraction and hook mutations can drive later requests. Later expansion/configuration errors can therefore occur after earlier requests have run; reports retain partial outcomes. The same execution budgets, retries, cancellation, redaction, protected output paths and exit codes apply. Offline `preflight` remains Postman-only.
 
+### Preview a file run offline
+
+```sh
+rill run ./collection.json --config ./run.json --translate-scripts --dry-run --json
+rill run ./workspace.json --format native --collection Smoke --environment CI --dry-run --detail
+```
+
+Development source supports `--dry-run` for Postman and native files. It uses the run's selected folder or collection, config, environment, globals, overrides and iteration data. The terminal summary or version 1 JSON plan shows the selection and environment source, iteration count, retry limit and base step count. JSON and terminal `--detail` list each selected request once in input order using its HTTP method and structural location in the source. They omit request and environment names, addresses, paths, headers, bodies, variable values and script source. Source locations are JSON pointers such as `/item/1/item/0` and `/requests/0`.
+
+A successful plan describes offline preparation. It does not run scripts or hooks, resolve named-secret values, open key/certificate/passphrase files, send requests or write run outputs. TLS declarations and the identity map shape are checked; TLS file contents are deferred. The plan marks requests whose validation depends on secrets, script mutations or native workflow state, and indicates when scripts or hooks can change the request order. The base count excludes retries, skips and branches. Concrete preparation failures still exit 2. Use the explicit command-line flag when reusing a run config; `dry-run` is unavailable as a persisted config default.
+
 ### CA trust and mutual TLS from files
 
 Both file formats support explicit TLS inputs on macOS 15+, without importing or looking up a client identity in the personal Keychain:

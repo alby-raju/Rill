@@ -5,8 +5,11 @@ extension RillCLI {
     static func runFile(_ input: Arguments) async throws {
         let tlsOptions = try FileTLSOptions(input)
         var resolved = input
-        resolved.referencedTLSInputs = tlsOptions.referencedInputs
+        if !input.flags.contains("dry-run") {
+            resolved.referencedTLSInputs = tlsOptions.referencedInputs
+        }
         let args = resolved
+        let dryRun = args.flags.contains("dry-run")
         guard args.operands.count == 1,
             Set(args.values.keys).isSubset(of: FileRunOptions.values.union(["config"])),
             args.flags.isSubset(of: FileRunOptions.flags),
@@ -76,43 +79,7 @@ extension RillCLI {
         guard timeout >= 1 else {
             throw CLIError.usage("--timeout must be between 1 and 300 seconds.")
         }
-        guard
-            !args.flags.contains("overwrite") || args.value("report") != nil
-                || args.value("output") != nil || args.value("allure") != nil
-                || args.value("export-environment") != nil || args.value("comparison-output") != nil
-        else {
-            throw CLIError.usage("--overwrite requires a report/output destination.")
-        }
-        let destinations = [
-            args.value("report"), args.value("output"), args.value("export-environment"),
-            args.value("comparison-output"),
-        ].compactMap { $0 }
-        let normalized = destinations.map { URL(fileURLWithPath: $0).resolvingSymlinksInPath() }
-        let inputs = args.fileRunInputs
-        guard Set(normalized).count == normalized.count, Set(normalized).isDisjoint(with: inputs),
-            !normalized.contains(args.workspaceURL.resolvingSymlinksInPath())
-        else {
-            throw CLIError.usage(
-                "Outputs must be distinct and cannot replace run inputs (including data and TLS files) or the desktop workspace."
-            )
-        }
-        for destination in destinations
-        where FileManager.default.fileExists(atPath: destination)
-            && !args.flags.contains("overwrite")
-        {
-            throw CLIError.usage("Output exists; choose a new path or --overwrite.")
-        }
-        if let directory = args.value("allure") {
-            var isDirectory: ObjCBool = false
-            guard !inputs.contains(URL(fileURLWithPath: directory).resolvingSymlinksInPath()),
-                URL(fileURLWithPath: directory).resolvingSymlinksInPath()
-                    != args.workspaceURL.resolvingSymlinksInPath(),
-                !FileManager.default.fileExists(atPath: directory, isDirectory: &isDirectory)
-                    || isDirectory.boolValue
-            else {
-                throw CLIError.usage("Allure output must be a directory distinct from input files.")
-            }
-        }
+        if !dryRun { try validateFileRunOutputs(args) }
         let iterationData: IterationData?
         do {
             iterationData = try args.value("iteration-data").map { path in
@@ -137,7 +104,8 @@ extension RillCLI {
             )
         }
         if let iterationData { config.iterations = iterationData.rows.count }
-        let fileTLS = try tlsOptions.load(args)
+        let planningTLS = dryRun ? try tlsOptions.planningTLS(args) : nil
+        let fileTLS = dryRun ? nil : try tlsOptions.load(args)
         let plan: FileRunPlan
         do {
             let data = try BoundedFileInput.read(
@@ -148,9 +116,9 @@ extension RillCLI {
                         workspace: data, collection: args.value("collection"),
                         environment: args.value("environment"),
                         overrides: args.variableOverrides(),
-                        processEnvironment: ProcessInfo.processInfo.environment,
+                        processEnvironment: dryRun ? [:] : ProcessInfo.processInfo.environment,
                         allowInsecure: args.flags.contains("allow-insecure"),
-                        iterationData: iterationData, fileTLS: fileTLS))
+                        iterationData: iterationData, fileTLS: fileTLS, planningTLS: planningTLS))
             } else {
                 plan = .postman(
                     try PostmanFileRun.prepare(
@@ -163,7 +131,8 @@ extension RillCLI {
                         globals: try args.value("globals").map {
                             try BoundedFileInput.read(
                                 URL(fileURLWithPath: $0), limit: ResourceLimits.workspaceBytes)
-                        }, translateScripts: args.flags.contains("translate-scripts")))
+                        }, translateScripts: args.flags.contains("translate-scripts"),
+                        planningOnly: dryRun))
             }
         } catch let error as PostmanScriptPlanError {
             throw CLIError.usage(
@@ -223,6 +192,18 @@ extension RillCLI {
         }
         guard requests.count * config.iterations <= 10_000 else {
             throw CLIError.usage("Requested run exceeds the execution limit; no requests sent.")
+        }
+        if dryRun {
+            let output = plan.preview(
+                args, format: format, configuration: config,
+                tlsInputsDeferred: planningTLS?.identityDeclared == true
+                    || args.value("ca-cert") != nil)
+            if args.flags.contains("json") {
+                try args.json(output)
+            } else {
+                try args.text(output.terminal(detail: args.flags.contains("detail")))
+            }
+            return
         }
         if !args.flags.contains("json") {
             if fileTLS?.profile.mode == .insecure {
@@ -300,6 +281,46 @@ extension RillCLI {
         try requireSuccessfulRun(report)
     }
 
+    private static func validateFileRunOutputs(_ args: Arguments) throws {
+        guard
+            !args.flags.contains("overwrite") || args.value("report") != nil
+                || args.value("output") != nil || args.value("allure") != nil
+                || args.value("export-environment") != nil || args.value("comparison-output") != nil
+        else {
+            throw CLIError.usage("--overwrite requires a report/output destination.")
+        }
+        let destinations = [
+            args.value("report"), args.value("output"), args.value("export-environment"),
+            args.value("comparison-output"),
+        ].compactMap { $0 }
+        let normalized = destinations.map { URL(fileURLWithPath: $0).resolvingSymlinksInPath() }
+        let inputs = args.fileRunInputs
+        guard Set(normalized).count == normalized.count, Set(normalized).isDisjoint(with: inputs),
+            !normalized.contains(args.workspaceURL.resolvingSymlinksInPath())
+        else {
+            throw CLIError.usage(
+                "Outputs must be distinct and cannot replace run inputs (including data and TLS files) or the desktop workspace."
+            )
+        }
+        for destination in destinations
+        where FileManager.default.fileExists(atPath: destination)
+            && !args.flags.contains("overwrite")
+        {
+            throw CLIError.usage("Output exists; choose a new path or --overwrite.")
+        }
+        if let directory = args.value("allure") {
+            var isDirectory: ObjCBool = false
+            guard !inputs.contains(URL(fileURLWithPath: directory).resolvingSymlinksInPath()),
+                URL(fileURLWithPath: directory).resolvingSymlinksInPath()
+                    != args.workspaceURL.resolvingSymlinksInPath(),
+                !FileManager.default.fileExists(atPath: directory, isDirectory: &isDirectory)
+                    || isDirectory.boolValue
+            else {
+                throw CLIError.usage("Allure output must be a directory distinct from input files.")
+            }
+        }
+    }
+
     static func folderSelectionUsage(_ error: PostmanFolderSelectionError) -> CLIError {
         switch error {
         case .invalidPath:
@@ -360,6 +381,42 @@ private enum FileRunPlan {
         case .native: "native checks; unchecked responses require HTTP 2xx"
         }
     }
+    func preview(
+        _ args: Arguments, format: String, configuration: RunConfiguration, tlsInputsDeferred: Bool
+    ) -> OfflineRunPlan {
+        let sources: [String: String]
+        let environment: String
+        let deferred: Set<Int>
+        let dynamicOrder: Bool
+        switch self {
+        case .postman(let plan):
+            sources = plan.sourceLocations
+            environment = args.value("environment-file") == nil ? "none" : "explicitFile"
+            deferred = plan.deferredRequestPositions
+            dynamicOrder = plan.scriptsMayChangeOrder
+        case .native(let plan):
+            sources = plan.sourceLocations
+            environment =
+                args.value("environment") != nil
+                ? "explicitSelection" : plan.hasSelectedEnvironment ? "workspaceSelection" : "none"
+            deferred = plan.deferredRequestPositions
+            dynamicOrder = plan.requests.contains { $0.postHook != nil }
+        }
+        let steps = requests.enumerated().map { position, request in
+            OfflineRunPlan.Step(
+                position: position + 1, source: sources[request.id.uuidString] ?? "",
+                method: request.method.rawValue,
+                runtimeValidationDeferred: deferred.contains(position))
+        }
+        return OfflineRunPlan(
+            inputFormat: format,
+            selection: args.value("folder") != nil
+                ? "folder" : args.value("collection") != nil ? "collection" : "entireFile",
+            environmentSource: environment, iterations: configuration.iterations,
+            baseSteps: steps.count * configuration.iterations, retries: configuration.retries,
+            dynamicOrder: dynamicOrder, tlsInputsDeferred: tlsInputsDeferred, steps: steps)
+    }
+
     func run(
         configuration: RunConfiguration, timeout: Double?,
         exportEnvironment: CollectionRunner.EnvironmentExport?, cookieJar: CookieJar?

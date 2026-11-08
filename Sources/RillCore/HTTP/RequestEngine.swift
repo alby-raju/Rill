@@ -59,6 +59,41 @@ public enum RequestEngine {
         _ input: RequestDraft, environment: Environment?, profiles: [AuthenticationProfile] = [],
         secrets: NamedSecretResolver? = nil
     ) throws -> URLRequest {
+        try prepare(input, environment: environment, profiles: profiles) { name in
+            guard let secrets else { throw AuthenticationError.missingSecret }
+            return try secrets.resolve(name)
+        }
+    }
+
+    // Validate concrete inputs without asking any credential provider for a value.
+    // A placeholder can change URL/header validity, so such a step remains deferred.
+    static func prepareForPlanning(
+        _ input: RequestDraft, environment: Environment?, profiles: [AuthenticationProfile] = []
+    ) throws -> Bool {
+        var deferred = false
+        do {
+            _ = try prepare(input, environment: environment, profiles: profiles) { name in
+                try NamedSecretResolver.validateName(name)
+                deferred = true
+                return "rill-redacted.invalid"
+            }
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch let error as RillError {
+            if case .missingVariable = error { throw error }
+            guard deferred else { throw error }
+        } catch AuthenticationError.invalidName {
+            throw AuthenticationError.invalidName
+        } catch  where deferred {
+            return true
+        }
+        return deferred
+    }
+
+    private static func prepare(
+        _ input: RequestDraft, environment: Environment?, profiles: [AuthenticationProfile],
+        resolveSecret: @escaping (String) throws -> String
+    ) throws -> URLRequest {
         let draft = try AuthenticationProfiles.applying(to: input, profiles: profiles)
         let variables =
             environment?.variables.filter { $0.enabled && !$0.name.isEmpty }.reduce(
@@ -68,10 +103,7 @@ public enum RequestEngine {
         func expand(_ value: String) throws -> String {
             let result = try VariableExpansion.resolve(
                 value, values: variables,
-                secretLookup: { name in
-                    guard let secrets else { throw AuthenticationError.missingSecret }
-                    return try secrets.resolve(name)
-                })
+                secretLookup: resolveSecret)
             expandedBytes += result.utf8.count
             guard expandedBytes <= ResourceLimits.workspaceBytes else {
                 throw EditingError.expansionLimit

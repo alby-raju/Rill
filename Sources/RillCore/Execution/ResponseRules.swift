@@ -44,10 +44,17 @@ enum ResponseJSON {
     static func value(_ data: Data, path: String) throws -> JSONValue {
         guard path.utf8.count <= 4096 else { throw WorkflowError.invalidSelector }
         let tokens = try pathTokens(path)
-        var value: JSONValue
-        do { value = try JSONValueParser(data).parse() } catch is CancellationError {
-            throw CancellationError()
-        } catch { throw WorkflowError.invalidJSON }
+        return try value(parse(data), tokens: tokens)
+    }
+    static func parse(_ data: Data, preserveNumberSpelling: Bool = false) throws -> JSONValue {
+        do {
+            return try JSONValueParser(data, preserveNumberSpelling: preserveNumberSpelling).parse()
+        } catch is CancellationError { throw CancellationError() } catch {
+            throw WorkflowError.invalidJSON
+        }
+    }
+    static func value(_ root: JSONValue, tokens: [String]) throws -> JSONValue {
+        var value = root
         for token in tokens {
             switch value {
             case .object(let object):

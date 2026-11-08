@@ -15,6 +15,11 @@ public final class FileTLSConfiguration: @unchecked Sendable {
     private typealias ClientIdentity = (SecIdentity, [SecCertificate])
     private let identities: [HTTPSOrigin: ClientIdentity]
 
+    public static func validateClientOrigins(_ values: [String]) throws {
+        let origins = try values.map(HTTPSOrigin.init)
+        guard Set(origins).count == origins.count else { throw FileTLSError.duplicateOrigin }
+    }
+
     public init(trust: FileTLSConfiguration, clientIdentities: [FileTLSConfiguration]) throws {
         guard !trust.hasClientIdentity,
             (1...Self.maximumClientIdentities).contains(clientIdentities.count)
