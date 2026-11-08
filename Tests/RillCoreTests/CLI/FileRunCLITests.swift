@@ -186,6 +186,156 @@ import XCTest
         XCTAssertTrue(invalid.output.isEmpty)
         XCTAssertFalse(FileManager.default.fileExists(atPath: report.path))
     }
+
+    func testSelectedPostmanMultipartBindsExplicitFilesAndIgnoresExportedPaths() async throws {
+        let base = try XCTUnwrap(ProcessInfo.processInfo.environment["RILL_TEST_BASE_URL"])
+        let root = try directory()
+        let source = root.appendingPathComponent("collection.json")
+        let manifest = root.appendingPathComponent("attachments.json")
+        let config = root.appendingPathComponent("config.json")
+        let raw = root.appendingPathComponent("raw.json")
+        let first = root.appendingPathComponent("first fixture.bin")
+        let second = root.appendingPathComponent("second fixture.bin")
+        let firstBytes = Data([0xff, 0, 42])
+        let secondBytes = Data([0x80, 0, 43])
+        try firstBytes.write(to: first)
+        try secondBytes.write(to: second)
+        let upload: [String: Any] = [
+            "name": "private-upload-request",
+            "request": [
+                "method": "POST", "url": base + "/echo",
+                "body": [
+                    "mode": "formdata",
+                    "formdata": [
+                        [
+                            "key": "file", "type": "file", "disabled": true,
+                            "src": "/private/disabled",
+                        ],
+                        ["key": "label", "type": "text", "value": "fixture label"],
+                        [
+                            "key": "file", "type": "file",
+                            "src": [
+                                "{{private-exported-path}}", "/private/exported-second",
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+            "event": [
+                [
+                    "listen": "prerequest",
+                    "script": [
+                        "exec": [
+                            "pm.request.headers.add({key: 'X-Upload-Check', value: 'fixture'});"
+                        ]
+                    ],
+                ]
+            ],
+        ]
+        let input = try collection([
+            upload, ["name": "Selected", "item": [upload]],
+        ])
+        try input.write(to: source)
+        let slots = ["/item/1/item/0/attachments/0", "/item/1/item/0/attachments/1"]
+        let map = try JSONSerialization.data(withJSONObject: [
+            "schemaVersion": 1,
+            "attachments": zip(slots, [first, second]).map {
+                ["slot": $0, "file": $1.lastPathComponent]
+            },
+        ])
+        try map.write(to: manifest)
+        try JSONSerialization.data(withJSONObject: [
+            "kind": "rill.run-config", "schemaVersion": 1,
+            "options": ["attachments": manifest.lastPathComponent],
+        ]).write(to: config)
+        let common = ["run", source.path, "--folder", "/Selected", "--translate-scripts", "--json"]
+        let missing = try await cli(common + ["--dry-run"])
+        XCTAssertEqual(missing.status, 2)
+        let missingPlan = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: missing.output) as? [String: Any])
+        let missingSlots = try XCTUnwrap(missingPlan["attachments"] as? [[String: Any]])
+        XCTAssertEqual(missingSlots.compactMap { $0["slot"] as? String }, slots)
+        XCTAssertEqual(missingSlots.compactMap { $0["bound"] as? Bool }, [false, false])
+        XCTAssertEqual(missingPlan["passed"] as? Bool, false)
+
+        let configured = common + ["--config", config.path]
+        let planned = try await cli(configured + ["--dry-run", "--output", raw.path])
+        XCTAssertEqual(planned.status, 0, String(decoding: planned.diagnostics, as: UTF8.self))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: raw.path))
+        let plan = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: planned.output) as? [String: Any])
+        let plannedSlots = try XCTUnwrap(plan["attachments"] as? [[String: Any]])
+        XCTAssertEqual(plannedSlots.compactMap { $0["bound"] as? Bool }, [true, true])
+        let run = try await cli(configured + ["--output", raw.path])
+        XCTAssertEqual(run.status, 0, String(decoding: run.diagnostics, as: UTF8.self))
+        let echo = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: Data(contentsOf: raw)) as? [String: Any])
+        let headers = try XCTUnwrap(echo["headers"] as? [String: String])
+        XCTAssertEqual(headers.first { $0.key.lowercased() == "x-upload-check" }?.value, "fixture")
+        let body = try XCTUnwrap(Data(base64Encoded: try XCTUnwrap(echo["body"] as? String)))
+        let firstPart = try XCTUnwrap(body.range(of: firstBytes))
+        let secondPart = try XCTUnwrap(body.range(of: secondBytes))
+        XCTAssertLessThan(firstPart.upperBound, secondPart.lowerBound)
+        XCTAssertFalse(String(decoding: body, as: UTF8.self).contains("exported"))
+        XCTAssertFalse(
+            String(decoding: planned.output + run.output + run.diagnostics, as: UTF8.self).contains(
+                "private-"))
+        let alias = root.appendingPathComponent("attachment-hardlink.bin")
+        try FileManager.default.linkItem(at: first, to: alias)
+        for destination in [first, manifest, alias] {
+            let collision = try await cli(
+                configured + ["--report", destination.path, "--overwrite"])
+            XCTAssertEqual(collision.status, 2)
+        }
+        XCTAssertEqual(try Data(contentsOf: first), firstBytes)
+        XCTAssertEqual(try Data(contentsOf: second), secondBytes)
+        XCTAssertEqual(try Data(contentsOf: manifest), map)
+        XCTAssertEqual(try Data(contentsOf: source), input)
+    }
+
+    func testPostmanBinaryAttachmentRequiresExplicitReadableBindingForExecution() async throws {
+        let base = try XCTUnwrap(ProcessInfo.processInfo.environment["RILL_TEST_BASE_URL"])
+        let root = try directory()
+        let source = root.appendingPathComponent("collection.json")
+        let manifest = root.appendingPathComponent("attachments.json")
+        let output = root.appendingPathComponent("response.json")
+        let payload = root.appendingPathComponent("private-missing-file")
+        try collection([
+            [
+                "name": "Binary",
+                "request": [
+                    "method": "PUT", "url": base + "/echo",
+                    "body": ["mode": "file", "file": ["src": "/private/exported-body"]],
+                ],
+            ]
+        ]).write(to: source)
+        func bind(_ slot: String) throws {
+            try JSONSerialization.data(withJSONObject: [
+                "schemaVersion": 1,
+                "attachments": [["slot": slot, "file": payload.lastPathComponent]],
+            ]).write(to: manifest)
+        }
+        let args = [
+            "run", source.path, "--attachments", manifest.path, "--output", output.path, "--json",
+        ]
+        try bind("/item/0/attachments/99")
+        let unknown = try await cli(args + ["--dry-run"])
+        XCTAssertEqual(unknown.status, 2)
+        try bind("/item/0/attachments/0")
+        let planned = try await cli(args + ["--dry-run"])
+        XCTAssertEqual(planned.status, 0, String(decoding: planned.diagnostics, as: UTF8.self))
+        let missing = try await cli(args)
+        XCTAssertEqual(missing.status, 2)
+        XCTAssertFalse(String(decoding: missing.diagnostics, as: UTF8.self).contains("private-"))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: output.path))
+        let bytes = Data([0xff, 0x10, 0])
+        try bytes.write(to: payload)
+        let sent = try await cli(args)
+        XCTAssertEqual(sent.status, 0, String(decoding: sent.diagnostics, as: UTF8.self))
+        let echo = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: Data(contentsOf: output)) as? [String: Any])
+        XCTAssertEqual(echo["body"] as? String, bytes.base64EncodedString())
+    }
     func testSelectedFolderRunAndPreflightAgreeWithoutTouchingExcludedInputs() async throws {
         guard let base = ProcessInfo.processInfo.environment["RILL_TEST_BASE_URL"] else {
             throw XCTSkip("Fixture required")

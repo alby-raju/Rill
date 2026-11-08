@@ -77,29 +77,32 @@ public final class PreparedHTTPRequest: @unchecked Sendable {
 
 enum UploadBody {
     static let maximumBytes = 256 * 1024 * 1024
+    static func validate(
+        _ draft: RequestDraft, environment: Environment?, secrets: NamedSecretResolver?
+    ) throws {
+        var count = 0
+        func add(_ size: Int) throws {
+            try Task.checkCancellation()
+            guard size <= maximumBytes - count else { throw UploadError.tooLarge }
+            count += size
+        }
+        _ = try encode(
+            draft, environment: environment, secrets: secrets,
+            boundary: "RillBoundary00000000000000000000000000000000",
+            write: { try add($0.count) },
+            file: { reference in
+                guard let size = Int(exactly: reference.byteCount) else {
+                    throw UploadError.tooLarge
+                }
+                try add(size)
+            })
+    }
+
     static func create(
         _ draft: RequestDraft, environment: Environment?, secrets: NamedSecretResolver? = nil,
         limit: Int = maximumBytes
     ) throws -> (url: URL, count: Int, contentType: String) {
         guard (1...maximumBytes).contains(limit) else { throw UploadError.tooLarge }
-        let variables =
-            environment?.variables.filter { $0.enabled && !$0.name.isEmpty }.reduce(
-                into: [String: String]()
-            ) { $0[$1.name] = $1.value } ?? [:]
-        var expandedBytes = 0
-        func expand(_ value: String) throws -> String {
-            let output = try VariableExpansion.resolve(
-                value, values: variables,
-                secretLookup: { name in
-                    guard let secrets else { throw AuthenticationError.missingSecret }
-                    return try secrets.resolve(name)
-                })
-            expandedBytes += output.utf8.count
-            guard expandedBytes <= ResourceLimits.workspaceBytes else {
-                throw EditingError.expansionLimit
-            }
-            return output
-        }
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
             "rill-upload-" + UUID().uuidString)
         let descriptor = Darwin.open(
@@ -142,6 +145,38 @@ enum UploadBody {
                 info.st_mtimespec.tv_nsec == after.st_mtimespec.tv_nsec
             else { throw UploadError.changed }
         }
+        let boundary = "RillBoundary" + UUID().uuidString.replacingOccurrences(of: "-", with: "")
+        let contentType = try encode(
+            draft, environment: environment, secrets: secrets,
+            boundary: boundary, write: write, file: file)
+        try output.synchronize()
+        try output.close()
+        complete = true
+        return (directory, count, contentType)
+    }
+
+    private static func encode(
+        _ draft: RequestDraft, environment: Environment?, secrets: NamedSecretResolver?,
+        boundary: String, write: (Data) throws -> Void, file: (UploadFileReference) throws -> Void
+    ) throws -> String {
+        let variables =
+            environment?.variables.filter { $0.enabled && !$0.name.isEmpty }.reduce(
+                into: [String: String]()
+            ) { $0[$1.name] = $1.value } ?? [:]
+        var expandedBytes = 0
+        func expand(_ value: String) throws -> String {
+            let output = try VariableExpansion.resolve(
+                value, values: variables,
+                secretLookup: { name in
+                    guard let secrets else { throw AuthenticationError.missingSecret }
+                    return try secrets.resolve(name)
+                })
+            expandedBytes += output.utf8.count
+            guard expandedBytes <= ResourceLimits.workspaceBytes else {
+                throw EditingError.expansionLimit
+            }
+            return output
+        }
         func quoted(_ value: String) throws -> String {
             guard !value.unicodeScalars.contains(where: { $0.value < 32 || $0.value == 127 }) else {
                 throw UploadError.invalidPart
@@ -155,19 +190,17 @@ enum UploadBody {
             try file(reference)
             contentType = try expand(draft.contentType)
         } else {
-            let boundary =
-                "RillBoundary" + UUID().uuidString.replacingOccurrences(of: "-", with: "")
             contentType = "multipart/form-data; boundary=" + boundary
             for part in draft.multipartParts ?? [] where part.enabled && !part.name.isEmpty {
                 let name = try quoted(expand(part.name))
                 var header = "--\(boundary)\r\nContent-Disposition: form-data; name=\"\(name)\""
                 if part.kind == .file {
                     guard let reference = part.file else { throw UploadError.invalidPart }
-                    let filename = try quoted(
-                        expand(
-                            part.filename.isEmpty
-                                ? URL(fileURLWithPath: reference.path).lastPathComponent
-                                : part.filename))
+                    let name =
+                        part.filename.isEmpty
+                        ? URL(fileURLWithPath: reference.path).lastPathComponent
+                        : try expand(part.filename)
+                    let filename = try quoted(name)
                     header += "; filename=\"\(filename)\""
                 }
                 let type = part.kind == .json ? "application/json" : try expand(part.contentType)
@@ -175,8 +208,8 @@ enum UploadBody {
                 else { throw UploadError.invalidPart }
                 header += "\r\nContent-Type: \(type)\r\n\r\n"
                 try write(Data(header.utf8))
-                if part.kind == .file {
-                    try file(part.file!)
+                if let reference = part.file, part.kind == .file {
+                    try file(reference)
                 } else {
                     try write(Data(expand(part.value).utf8))
                 }
@@ -186,9 +219,7 @@ enum UploadBody {
         }
         guard !contentType.unicodeScalars.contains(where: { $0.value < 32 || $0.value == 127 })
         else { throw UploadError.invalidPart }
-        try output.synchronize()
-        try output.close()
-        complete = true
-        return (directory, count, contentType)
+        return contentType
     }
+
 }

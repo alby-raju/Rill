@@ -1,4 +1,5 @@
 import Foundation
+import RillCore
 
 struct OfflineRunPlan: Encodable {
     struct Step: Encodable {
@@ -10,7 +11,7 @@ struct OfflineRunPlan: Encodable {
 
     let schemaVersion = 1
     let kind = "rill.offline-run-plan"
-    let passed = true
+    let passed: Bool
     let sendsRequests = false
     let inputFormat: String
     let selection: String
@@ -20,6 +21,7 @@ struct OfflineRunPlan: Encodable {
     let retries: Int
     let dynamicOrder: Bool
     let tlsInputsDeferred: Bool
+    let attachments: [PostmanAttachmentSlot]?
     let steps: [Step]
 
     func terminal(detail: Bool) -> String {
@@ -38,6 +40,12 @@ struct OfflineRunPlan: Encodable {
         let deferred = steps.filter(\.runtimeValidationDeferred).count
         if deferred > 0 {
             lines.append("\(deferred) requests have validation deferred until execution.")
+        }
+        if let attachments {
+            lines.append("Attachment files are checked during execution.")
+            for attachment in attachments {
+                lines.append("  \(attachment.slot)  \(attachment.bound ? "bound" : "missing")")
+            }
         }
         if detail {
             for step in steps {

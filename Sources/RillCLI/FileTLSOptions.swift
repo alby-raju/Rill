@@ -200,8 +200,25 @@ struct FileTLSOptions {
 extension Arguments {
     var fileRunInputs: [URL] {
         let paths =
-            ["config", "environment-file", "iteration-data", "globals"] + FileTLSOptions.inputNames
+            ["config", "environment-file", "iteration-data", "globals", "attachments"]
+            + FileTLSOptions.inputNames
         return (operands + paths.compactMap { value($0) })
-            .map { URL(fileURLWithPath: $0).resolvingSymlinksInPath() } + referencedTLSInputs
+            .map { URL(fileURLWithPath: $0).resolvingSymlinksInPath() } + referencedRunInputs
+    }
+
+    func protectsFileRunInput(_ destination: URL) -> Bool {
+        let target = destination.resolvingSymlinksInPath()
+        let inputs = fileRunInputs
+        if inputs.contains(target) { return true }
+        // Different spellings can name the same file on a case-insensitive volume.
+        let identity =
+            try? target.resourceValues(forKeys: [.fileResourceIdentifierKey])
+            .fileResourceIdentifier as? NSObject
+        guard let identity else { return false }
+        return inputs.contains { input in
+            let candidate = try? input.resourceValues(forKeys: [.fileResourceIdentifierKey])
+                .fileResourceIdentifier
+            return candidate.map { identity.isEqual($0) } ?? false
+        }
     }
 }

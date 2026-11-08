@@ -2,7 +2,6 @@ import Foundation
 
 public enum PostmanFileRunError: Error {
     case blocked(CollectionPreflight)
-    case unsupportedBody
     case invalidOverrides
 }
 
@@ -10,6 +9,7 @@ public enum PostmanFileRunError: Error {
 public struct PostmanFileRun: Sendable {
     public let requests: [RequestDraft]
     public let deferredRequestPositions: Set<Int>
+    public let attachmentSlots: [PostmanAttachmentSlot]
     private let planningOnly: Bool
     public let sourceLocations: [String: String]
     public let environment: Environment
@@ -29,7 +29,8 @@ public struct PostmanFileRun: Sendable {
         collection: Data, environment inputEnvironment: Data? = nil,
         overrides: [String: String] = [:], folder: String? = nil,
         iterationData: IterationData? = nil, fileTLS: FileTLSConfiguration? = nil,
-        globals: Data? = nil, translateScripts: Bool = false, planningOnly: Bool = false
+        globals: Data? = nil, translateScripts: Bool = false, planningOnly: Bool = false,
+        attachmentFiles: [String: URL] = [:]
     ) throws -> Self {
         try Task.checkCancellation()
         guard overrides.count <= 10_000,
@@ -50,20 +51,18 @@ public struct PostmanFileRun: Sendable {
         preflightOverrides.merge(overrides) { _, override in override }
         let preflight = try CollectionPreflight.inspect(
             selection, environment: inputEnvironment, overrides: preflightOverrides,
-            globals: globals, translateScripts: translateScripts, preparedScripts: scriptPlan)
+            globals: globals, translateScripts: translateScripts, preparedScripts: scriptPlan,
+            discardUploadPaths: true)
         guard preflight.passed else { throw PostmanFileRunError.blocked(preflight) }
-        let imported = try PostmanImporter.parse(selection.data)
+        let imported = try PostmanImporter.parse(selection.data, discardUploadPaths: true)
         guard imported.workspace.requests.count * (iterationData?.rows.count ?? 1) <= 10_000 else {
             throw WorkflowError.invalidConfiguration
         }
-        // Referenced upload files must not be silently opened or converted into empty bodies.
-        guard
-            imported.workspace.requests.allSatisfy({
-                $0.bodyMode != .binary && $0.bodyMode != .multipart
-            })
-        else {
-            throw PostmanFileRunError.unsupportedBody
-        }
+        var requests = imported.workspace.requests
+        let locations = try RunSources.postman(selection)
+        guard locations.count == requests.count else { throw WorkflowError.invalidConfiguration }
+        let attachmentSlots = try PostmanAttachments.bind(
+            &requests, locations: locations, files: attachmentFiles, planningOnly: planningOnly)
         var fields: [String: Field] = [:]
         var layers: [ScriptVariableScope: [String: String]] = [:]
         var currentScope = ScriptVariableScope.collection
@@ -127,8 +126,18 @@ public struct PostmanFileRun: Sendable {
             }
             let validationEnvironment =
                 scriptPlan == nil ? rowEnvironment : WorkflowEngine.environment(validationValues)
-            for (position, request) in imported.workspace.requests.enumerated() {
+            for (position, input) in requests.enumerated() {
+                var request = input
                 try Task.checkCancellation()
+                if request.bodyMode == .binary || request.bodyMode == .multipart {
+                    if planningOnly {
+                        deferredRequestPositions.insert(position)
+                    } else {
+                        try UploadBody.validate(
+                            request, environment: validationEnvironment, secrets: secrets)
+                    }
+                    request.bodyMode = RequestBodyMode.none
+                }
                 if planningOnly {
                     if try RequestEngine.prepareForPlanning(
                         request, environment: validationEnvironment)
@@ -141,9 +150,6 @@ public struct PostmanFileRun: Sendable {
                 }
             }
         }
-        var requests = imported.workspace.requests
-        let locations = try RunSources.postman(selection)
-        guard locations.count == requests.count else { throw WorkflowError.invalidConfiguration }
         for index in requests.indices { requests[index].id = RunSources.id(locations[index]) }
         let sourceLocations = Dictionary(
             uniqueKeysWithValues: zip(requests, locations).map { ($0.id.uuidString, $1) })
@@ -156,6 +162,7 @@ public struct PostmanFileRun: Sendable {
         }
         return Self(
             requests: requests, deferredRequestPositions: deferredRequestPositions,
+            attachmentSlots: attachmentSlots,
             planningOnly: planningOnly, sourceLocations: sourceLocations, environment: environment,
             secrets: secrets,
             iterationData: iterationData,

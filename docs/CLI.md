@@ -63,7 +63,7 @@ rill run ./collection.json --environment-file ./environment.json \
 
 The file runner executes the supported Postman v2/v2.1 JSON subset through RillCore, in depth-first source order, without creating a desktop workspace or importing credentials into Keychain. Enabled globals provide fallback values; collection variables override them, followed by enabled environment-file values, iteration-data rows and repeatable `--env-var` options (last occurrence wins; empty values are valid). Secret-typed input values stay in a transient in-memory credential provider. Ambient process-secret fallback and personal Keychain credentials are not read by this file-run path.
 
-Before any request, the entire selected collection/folder and supplied environment are checked for static blockers and every supported request is prepared to validate expanded URLs, headers, credentials and resource limits. By default, nonempty foreign scripts, missing/cyclic variables, unsupported transport/import representations and multipart/binary/upload bodies block the run. Referenced upload files are never opened. Supported native dynamic templates may be generated during preparation and again at execution; no deterministic-seed promise is made.
+Before any request, the entire selected collection/folder and supplied environment are checked for static blockers and every supported request is prepared to validate expanded URLs, headers, credentials and resource limits. By default, nonempty foreign scripts, missing or cyclic variables, unsupported transport/import representations and unbound file attachments block the run. Rill ignores file paths stored in the export. Supported native dynamic templates may be generated during preparation and again at execution; no deterministic-seed promise is made.
 
 **Success policy: HTTP 2xx checks, not Postman assertions.** Every executed request receives an explicit 2xx status check. Scripts in the selected subtree or its ancestors reject the run rather than executing without their tests. A passed run does not establish Newman or full Postman compatibility. Status-check failures exit **4**, transport/runtime failures **3**, invalid/blocked inputs **2**, and cancellation **130**; successful runs exit **0**.
 
@@ -121,6 +121,35 @@ rill run ./collection.json --folder '/Payments/Refunds' \
 
 Collection variables, supplied environment values and overrides keep their existing precedence. Collection/ancestor authentication and settings remain attached, so inherited scripts, unsupported folder variables or unapplied transport settings still block. All selected requests are prepared before traffic. Excluded requests/folders are neither inspected nor executed; a passed folder run says nothing about the rest of the collection. Both preflight checks and run JSON summaries include `folderSelected`, terminal output labels the selected scope, and diagnostic item indices point to the original input JSON. Omitting `--folder` continues to check/run the entire collection. Source JSON is never rewritten.
 
+### Bind Postman file attachments
+
+Development source supports raw binary bodies and multipart forms in Postman file runs. Text-only multipart forms need no attachment manifest. For file parts, use the dry-run plan to discover the required slots:
+
+```sh
+rill run ./collection.json --folder /Upload --dry-run --json
+```
+
+The plan lists each slot and whether a file was declared for it. A plan with missing bindings exits 2 while still listing the slots. Create a version 1 JSON manifest using the exact slots printed by the plan:
+
+```json
+{
+  "schemaVersion": 1,
+  "attachments": [
+    {"slot": "/item/1/item/0/attachments/0", "file": "./photo.jpg"},
+    {"slot": "/item/1/item/0/attachments/1", "file": "./notes.pdf"}
+  ]
+}
+```
+
+```sh
+rill run ./collection.json --folder /Upload --attachments ./attachments.json --dry-run --json
+rill run ./collection.json --folder /Upload --attachments ./attachments.json --report ./upload-results.json
+```
+
+The request prefix uses original collection positions, including when a folder is selected. The final number counts enabled file parts from zero in their wire order. A multipart field with multiple exported files gets one slot for each file. A binary body uses slot zero. Regenerate the plan after reordering requests or file parts. Duplicate, missing or unused slots block execution. Relative file paths resolve from the manifest's directory. The manifest supports up to 256 bindings and 64 KiB of JSON.
+
+Exported paths are ignored, including paths that contain unresolved variables. Only the manifest can select local files. Dry-run checks the mapping without inspecting attachment files. A real run checks regular-file metadata and the 256 MiB body limit before sending any requests, then reads and rechecks each file when its request is prepared. The manifest, attachments and aliases are protected from report and output overwrite. Native file runs still reject streaming bodies.
+
 ### Run a native Rill file
 
 ```sh
@@ -143,7 +172,7 @@ rill run ./collection.json --config ./run.json --translate-scripts --dry-run --j
 rill run ./workspace.json --format native --collection Smoke --environment CI --dry-run --detail
 ```
 
-Development source supports `--dry-run` for Postman and native files. It uses the run's selected folder or collection, config, environment, globals, overrides and iteration data. The terminal summary or version 1 JSON plan shows the selection and environment source, iteration count, retry limit and base step count. JSON and terminal `--detail` list each selected request once in input order using its HTTP method and structural location in the source. They omit request and environment names, addresses, paths, headers, bodies, variable values and script source. Source locations are JSON pointers such as `/item/1/item/0` and `/requests/0`.
+Development source supports `--dry-run` for Postman and native files. It uses the run's selected folder or collection, config, environment, globals, overrides and iteration data. The terminal summary or version 1 JSON plan shows the selection and environment source, iteration count, retry limit and base step count. JSON and terminal `--detail` list each selected request once in input order using its HTTP method and structural location in the source. They omit request and environment names, addresses, local paths, headers, bodies, variable values and script source. Source locations are JSON pointers such as `/item/1/item/0` and `/requests/0`.
 
 A successful plan describes offline preparation. It does not run scripts or hooks, resolve named-secret values, open key/certificate/passphrase files, send requests or write run outputs. TLS declarations and the identity map shape are checked; TLS file contents are deferred. The plan marks requests whose validation depends on secrets, script mutations or native workflow state, and indicates when scripts or hooks can change the request order. The base count excludes retries, skips and branches. Concrete preparation failures still exit 2. Use the explicit command-line flag when reusing a run config; `dry-run` is unavailable as a persisted config default.
 

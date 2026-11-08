@@ -219,7 +219,7 @@ final class PostmanFileRunTests: XCTestCase {
                     && $0.location == "/item/0/item/1/request"
             })
     }
-    func testScriptsAndMultipartInputsAreBlockedBeforeExecution() throws {
+    func testScriptsAndUnboundFilePartsAreBlockedBeforeExecution() throws {
         var scripted = item("script", "http://127.0.0.1:1")
         scripted["event"] = [["script": ["exec": ["pm.test('fixture', () => {})"]]]]
         XCTAssertThrowsError(try PostmanFileRun.prepare(collection: collection([scripted]))) {
@@ -235,7 +235,9 @@ final class PostmanFileRunTests: XCTestCase {
                 "method": "POST", "url": "http://127.0.0.1:1",
                 "body": [
                     "mode": "formdata",
-                    "formdata": [["key": "text", "value": "value", "type": "text"]],
+                    "formdata": [
+                        ["key": "upload", "type": "file", "src": "/private/exported/path"]
+                    ],
                 ],
             ],
         ]
