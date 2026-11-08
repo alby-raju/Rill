@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Compare independently authored synthetic workflows against pinned Newman, loopback only."""
+"""Compare independently authored synthetic workflows against recorded Newman results, loopback only."""
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import subprocess
 import tempfile
@@ -12,7 +13,6 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-VERSION = "6.2.3"
 
 
 def event(source: str, phase: str = "test") -> dict:
@@ -217,12 +217,8 @@ def values(path: Path) -> dict:
 
 
 def run(cli: Path) -> None:
-    newman = HERE / "node_modules/.bin/newman"
-    actual_version = subprocess.check_output(
-        [str(newman), "--version"], text=True, timeout=15
-    ).strip()
-    if actual_version != VERSION:
-        raise RuntimeError("Run npm ci with the committed Newman lockfile first.")
+    baseline = json.loads((HERE / "reference.json").read_text())
+    cases = baseline["cases"]
     server = ThreadingHTTPServer(("127.0.0.1", 0), Fixture)
     worker = threading.Thread(target=server.serve_forever, daemon=True)
     worker.start()
@@ -230,7 +226,17 @@ def run(cli: Path) -> None:
     try:
         with tempfile.TemporaryDirectory(prefix="rill-newman conformance ") as directory:
             root = Path(directory)
-            for name, source, environment, passed, exported in corpus(base):
+            scenarios = corpus(base)
+            if set(cases) != {scenario[0] for scenario in scenarios}:
+                raise AssertionError("Synthetic corpus and recorded reference cases differ.")
+            for name, source, environment, passed, exported in scenarios:
+                reference = cases[name]
+                normalized = json.dumps([source, environment, passed, exported], sort_keys=True)
+                digest = hashlib.sha256(
+                    normalized.replace(base, "http://127.0.0.1:0").encode()
+                ).hexdigest()
+                if digest != reference["inputSHA256"]:
+                    raise AssertionError(f"{name}: input changed since the reference capture.")
                 collection_file, env = root / "collection.json", root / "env.json"
                 collection_file.write_text(json.dumps(source))
                 env.write_text(
@@ -245,26 +251,7 @@ def run(cli: Path) -> None:
                         }
                     )
                 )
-                newman_report, newman_env = root / "newman.json", root / "newman-env.json"
-                Fixture.records.clear()
-                reference = subprocess.run(
-                    [
-                        str(newman),
-                        "run",
-                        str(collection_file),
-                        "--environment",
-                        str(env),
-                        "--reporters",
-                        "json",
-                        "--reporter-json-export",
-                        str(newman_report),
-                        "--export-environment",
-                        str(newman_env),
-                    ],
-                    capture_output=True,
-                    timeout=60,
-                )
-                expected_wire = list(Fixture.records)
+                expected_wire = reference["wire"]
                 rill_report, rill_env = root / "rill.json", root / "rill-env.json"
                 Fixture.records.clear()
                 candidate = subprocess.run(
@@ -287,28 +274,27 @@ def run(cli: Path) -> None:
                     timeout=60,
                 )
                 actual_wire = list(Fixture.records)
-                if reference.returncode != (0 if passed else 1) or candidate.returncode != (
+                if reference["exit"] != (0 if passed else 1) or candidate.returncode != (
                     0 if passed else 4
                 ):
                     raise AssertionError(
-                        f"{name}: exits Newman={reference.returncode}, Rill={candidate.returncode}; Rill diagnostics={candidate.stderr.decode()}"
+                        f"{name}: exits Newman={reference['exit']}, Rill={candidate.returncode}; Rill diagnostics={candidate.stderr.decode()}"
                     )
                 if actual_wire != expected_wire:
                     raise AssertionError(
                         f"{name}: synthetic wire mismatch\nNewman={expected_wire}\nRill={actual_wire}"
                     )
-                n = json.loads(newman_report.read_text())["run"]["stats"]["assertions"]
                 r = json.loads(rill_report.read_text())
                 checks = sum(item.get("checkCount", len(item["checks"])) for item in r["outcomes"])
                 failed = sum(
                     item.get("failedCheckCount", sum(not c["passed"] for c in item["checks"]))
                     for item in r["outcomes"]
                 )
-                if (checks, failed) != (n["total"], n["failed"]):
+                if (checks, failed) != (reference["checks"], reference["failed"]):
                     raise AssertionError(
-                        f"{name}: assertion counts differ {(checks, failed)} != {(n['total'], n['failed'])}"
+                        f"{name}: assertion counts differ {(checks, failed)} != {(reference['checks'], reference['failed'])}"
                     )
-                reference_values, candidate_values = values(newman_env), values(rill_env)
+                reference_values, candidate_values = reference["environment"], values(rill_env)
                 for key in exported:
                     if reference_values.get(key) != candidate_values.get(key):
                         raise AssertionError(
@@ -346,9 +332,7 @@ def run(cli: Path) -> None:
                     raise AssertionError(
                         "Unsupported source did not fail closed with redacted diagnostics."
                     )
-            print(
-                f"PASS fail-closed source cases; Newman {VERSION}; Node {subprocess.check_output(['node', '--version'], text=True).strip()}"
-            )
+            print(f"PASS fail-closed source cases and recorded Newman {baseline['newman']} corpus")
     finally:
         server.shutdown()
         server.server_close()
