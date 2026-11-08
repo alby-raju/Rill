@@ -330,8 +330,9 @@ let usage = """
           --collection NAME_OR_ID --environment NAME_OR_ID   Native selection
           --allow-insecure         Native insecure profiles require explicit opt-in
           --ca-cert FILE           DER/PEM roots for this run; --include-system-roots adds system trust
-          --ssl-client-cert FILE --ssl-client-key FILE   Unencrypted PEM identity
-          --ssl-client-p12 FILE --ssl-passphrase-file FILE   Memory-only PKCS#12 identity
+          --ssl-client-cert FILE --ssl-client-key FILE   PEM identity (encrypted PKCS#8 or clear)
+          --ssl-client-p12 FILE   Memory-only PKCS#12 identity
+          --ssl-passphrase-file FILE   Required for encrypted PEM, optional for PKCS#12
           --ssl-client-origin https://HOST:PORT   Required exact origin for a single client identity
           --ssl-client-map FILE    Versioned JSON map for up to 16 exact HTTPS origins
           --insecure               Explicitly disable server certificate/hostname verification

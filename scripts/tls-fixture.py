@@ -106,6 +106,19 @@ openssl(
     "-out",
     "ec-client.pem",
 )
+for name, cipher in [("client", "aes-256-cbc"), ("ec-client", "aes-128-cbc")]:
+    openssl(
+        "pkcs8",
+        "-topk8",
+        "-in",
+        name + ".key",
+        "-out",
+        name + "-encrypted.pem",
+        "-v2",
+        cipher,
+        "-passout",
+        "pass: rill-fixture ",
+    )
 openssl(
     "pkcs12",
     "-export",

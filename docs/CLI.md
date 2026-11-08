@@ -151,7 +151,15 @@ rill run ./workspace.json --format native --ssl-client-p12 ./client.p12 \
 
 `--ca-cert FILE` accepts DER or a pure PEM certificate bundle. These anchors replace system roots; add `--include-system-roots` to include both. `--insecure` explicitly disables server certificate/hostname verification and cannot be combined with `--ca-cert`. The terminal marks it, and JSON includes `tlsPolicy`. Without an explicit trust override, Postman runs use system trust and native requests retain their selected trust profiles. Supplying only a client identity does not change native trust or waive `--allow-insecure` for an embedded insecure profile. Client certificate chains never become server trust anchors automatically.
 
-Choose one unencrypted PEM certificate/key pair or one PKCS#12 identity. RSA and EC PEM identities are fixture-tested. In a PEM bundle, the leaf is first and intermediates follow. Encrypted PEM keys are unsupported; use PKCS#12 and `--ssl-passphrase-file` for an encrypted container. The password defaults to empty when no file is supplied. A password file is UTF-8 single-line text, preserving spaces and removing at most one trailing LF or CRLF. Passwords are not accepted as command-line values. CA/certificate/key files are each limited to 1 MiB, certificate bundles to 16 certificates, PKCS#12 to 4 MiB and one identity, and password files to 4 KiB. Invalid, mismatched, expired/not-yet-valid identities and wrong passwords fail setup before traffic, with redacted diagnostics. Platform crypto import is synchronous; input bounds are not a separate worker sandbox.
+Choose a PEM certificate/key pair or one PKCS#12 identity. RSA and EC PEM identities are fixture-tested. In a PEM certificate bundle, put the leaf first and intermediates after it. Encrypted PEM uses the PKCS#8 `ENCRYPTED PRIVATE KEY` format with PBES2, PBKDF2 and AES-128/192/256-CBC. PBKDF2 accepts HMAC-SHA-1/224/256/384/512, an 8–64 byte salt and 1–1,000,000 iterations. Encrypted EC keys use the named P-256, P-384 or P-521 curves. Legacy PEM encryption, scrypt and other encryption schemes are unsupported.
+
+Use `--ssl-passphrase-file FILE` for encrypted PEM or password-protected PKCS#12. A password file is UTF-8 single-line text. Rill preserves spaces and removes at most one trailing LF or CRLF. Omit the file for an unencrypted PEM key. PKCS#12 defaults to an empty password when the file is omitted. CA/certificate/key files are each limited to 1 MiB, certificate bundles to 16 certificates, PKCS#12 to 4 MiB and one identity, and password files to 4 KiB. Invalid or mismatched keys, invalid certificate dates and wrong passwords fail setup before traffic with redacted diagnostics.
+
+```sh
+rill run ./collection.json --ssl-client-cert ./client.pem \
+  --ssl-client-key ./encrypted-key.pem --ssl-passphrase-file ./passphrase.txt \
+  --ssl-client-origin https://api.example.test --ca-cert ./ca.pem
+```
 
 Use `--ssl-client-origin` with the single-identity flags. For a run that contacts several mTLS services, use `--ssl-client-map ./identities.json` with this version 1 format:
 
@@ -165,7 +173,7 @@ Use `--ssl-client-origin` with the single-identity flags. For a run that contact
 }
 ```
 
-The map accepts 1–16 identities and is limited to 64 KiB. Relative identity paths are resolved from the map's directory. `passphraseFile` is optional for PKCS#12. Choose either the map or the single-identity flags. Trust options apply to the entire run. The map and all referenced files are protected from output overwrite.
+The map accepts 1–16 identities and is limited to 64 KiB. Relative identity paths are resolved from the map's directory. `passphraseFile` is required for an encrypted PEM key and optional for PKCS#12. Choose either the map or the single-identity flags. Trust options apply to the entire run. The map and all referenced files are protected from output overwrite.
 
 Each origin is an exact HTTPS host and port, with no credentials, query, fragment or path beyond `/`. Host case and default port 443 are normalized, and duplicate origins fail setup before any requests are sent. Rill selects the identity after resolving the request URL and offers it only to matching TLS challenges, including in `--insecure` mode. Unmapped requests use no file identity. Same-origin redirects remain allowed. Rill leaves cross-origin redirects unfollowed even when both origins are mapped. A native request that requires an identity fails configuration before sending if its resolved origin has no matching file identity. Earlier workflow steps may already have run.
 
@@ -265,7 +273,7 @@ Use `--translate-scripts` for the explicit [bounded native script subset](SCRIPT
 
 Use `--script-inventory` with `--json` or `--detail` for an opt-in [script compatibility inventory](COMPATIBILITY.md): original collection/folder/request event locations, selected-descendant counts, declared-disabled flags and redacted lexical API hints with source coordinates. The inventory alone never enables JavaScript or translation; combine it with `--translate-scripts` to validate the finite subset. Opaque syntax, inspection budgets and omitted source records are explicit; known hints do not establish executable support. Existing script blockers and exit codes remain unchanged. The optional JSON field is `checks.scriptInventory`; it is absent by default.
 
-Optional PEM certificate/key inspection uses the fixed system `/usr/bin/openssl` with bounded input/output and deadlines. It checks PEM parsing, public-key pairing and certificate notAfter expiry only. It does not verify notBefore validity, certificate chains, hostname, revocation, server trust or actual mTLS negotiation. Only unencrypted PEM private keys are supported in this increment; encrypted keys, PKCS#12 and CA options remain future work. No private key or password is printed or imported into Keychain.
+Optional PEM certificate/key inspection uses the fixed system `/usr/bin/openssl` with bounded input/output and deadlines. It checks PEM parsing, public-key pairing and certificate notAfter expiry only. It does not verify notBefore validity, certificate chains, hostname, revocation, server trust or actual mTLS negotiation. Offline inspection supports unencrypted PEM keys. File runs also support encrypted PKCS#8 PEM keys, PKCS#12 and custom CAs. No private key or password is printed or imported into Keychain.
 
 Exit 0 means these static checks passed, **not** that the suite executed or matched Newman semantics. Blocked/invalid input exits 2; cancellation exits 130. JSON output has `passed`, `sendsRequests: false`, and a versioned `checks` object containing counts and `{code, location}` diagnostics. Malformed/unreadable input can instead produce a redacted stderr configuration error with exit 2. No request, workspace import, credential hydration or file export occurs.
 
