@@ -87,7 +87,10 @@ jobs:
             x86_64) RILL_FORMAT_ARCH=amd64; RILL_FORMAT_SHA=d33eee0da0f92835b3562e9767a05cee7e4eaeef47daa03bfd09da17b4b590a6 ;;
             *) echo 'Unsupported formatter architecture' >&2; exit 1 ;;
           esac
-          curl --fail --location --silent --show-error "https://github.com/mvdan/sh/releases/download/v3.14.1/shfmt_v3.14.1_darwin_$RILL_FORMAT_ARCH" --output "$RUNNER_TEMP/shfmt"
+          curl --fail --location --silent --show-error \
+            --retry 4 --retry-all-errors --retry-max-time 120 --connect-timeout 10 --max-time 30 \
+            "https://github.com/mvdan/sh/releases/download/v3.14.1/shfmt_v3.14.1_darwin_$RILL_FORMAT_ARCH" \
+            --output "$RUNNER_TEMP/shfmt"
           echo "$RILL_FORMAT_SHA  $RUNNER_TEMP/shfmt" | shasum -a 256 -c -
           chmod +x "$RUNNER_TEMP/shfmt"
           RILL_RUFF="$RUNNER_TEMP/format-tools/bin/ruff" RILL_SHFMT="$RUNNER_TEMP/shfmt" bash scripts/format.sh --check
