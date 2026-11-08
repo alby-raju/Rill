@@ -97,6 +97,29 @@ struct FileTLSOptions {
         mappedIdentities.flatMap(\.inputs).map { $0.resolvingSymlinksInPath() }
     }
 
+    func planningTLS(_ args: Arguments) throws -> (identityDeclared: Bool, overridesTrust: Bool) {
+        let ca = args.value("ca-cert") != nil
+        let insecure = args.flags.contains("insecure")
+        let certificate = args.value("ssl-client-cert") != nil
+        let key = args.value("ssl-client-key") != nil
+        let pkcs12 = args.value("ssl-client-p12") != nil
+        let origin = args.value("ssl-client-origin")
+        guard !(ca && insecure), ca || !args.flags.contains("include-system-roots"),
+            certificate == key, !(pkcs12 && key), (pkcs12 || key) == (origin != nil),
+            args.value("ssl-passphrase-file") == nil || pkcs12 || key
+        else {
+            throw CLIError.usage("Invalid TLS option combination. No requests sent.")
+        }
+        let origins = mappedIdentities.compactMap(\.origin) + [origin].compactMap { $0 }
+        do {
+            try FileTLSConfiguration.validateClientOrigins(origins)
+        } catch {
+            throw CLIError.usage(
+                "TLS identity origins must be unique exact HTTPS origins. No requests sent.")
+        }
+        return (!origins.isEmpty, ca || insecure)
+    }
+
     func load(_ args: Arguments) throws -> FileTLSConfiguration? {
         guard
             !Self.values.isDisjoint(with: args.values.keys)

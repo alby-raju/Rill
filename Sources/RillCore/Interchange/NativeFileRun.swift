@@ -12,6 +12,9 @@ public enum NativeFileRunError: Error {
 /// Read-only native file execution. No WorkspaceSession, personal credentials or TLS identities.
 public struct NativeFileRun: Sendable {
     public let requests: [RequestDraft]
+    public let hasSelectedEnvironment: Bool
+    public let deferredRequestPositions: Set<Int>
+    private let planningOnly: Bool
     public let sourceLocations: [String: String]
     public let environment: Environment
     public let secrets: NamedSecretResolver
@@ -26,7 +29,8 @@ public struct NativeFileRun: Sendable {
         workspace data: Data, collection: String? = nil, environment selection: String? = nil,
         overrides: [String: String] = [:], processEnvironment: [String: String] = [:],
         allowInsecure: Bool = false, iterationData: IterationData? = nil,
-        fileTLS: FileTLSConfiguration? = nil
+        fileTLS: FileTLSConfiguration? = nil,
+        planningTLS: (identityDeclared: Bool, overridesTrust: Bool)? = nil
     ) throws -> Self {
         try Task.checkCancellation()
         let workspace = try WorkspaceFile.decode(data)
@@ -72,6 +76,9 @@ public struct NativeFileRun: Sendable {
                 _ = try iterationData.variables(at: index, base: variables, overrides: overrides)
             }
         }
+        let identityAvailable =
+            planningTLS?.identityDeclared ?? (fileTLS?.hasClientIdentity == true)
+        let overridesTrust = planningTLS?.overridesTrust ?? (fileTLS?.overridesTrust == true)
         let profiles = workspace.authProfiles ?? []
         let tlsProfiles = workspace.tlsProfiles ?? []
         let definitions = workspace.apiDefinitions ?? []
@@ -90,20 +97,49 @@ public struct NativeFileRun: Sendable {
             _ = try AuthenticationProfiles.applying(to: request, profiles: profiles)
             if let tls = try TLSProfiles.selected(
                 request.tlsProfileID, from: tlsProfiles,
-                fileIdentityAvailable: fileTLS?.hasClientIdentity == true)
+                fileIdentityAvailable: identityAvailable)
             {
                 guard
                     (!tls.requiresClientIdentity && tls.identityReference == nil)
-                        || fileTLS?.hasClientIdentity == true
+                        || identityAvailable
                 else {
                     throw NativeFileRunError.unsupportedIdentity
                 }
-                guard tls.mode != .insecure || allowInsecure || fileTLS?.overridesTrust == true
+                guard tls.mode != .insecure || allowInsecure || overridesTrust
                 else {
                     throw NativeFileRunError.insecureNotAllowed
                 }
             }
             _ = try APIContractContext(request.apiLink, definitions: definitions)
+        }
+        var deferredRequestPositions = Set<Int>()
+        if planningTLS != nil {
+            var changesVariables = false
+            for (position, request) in requests.enumerated() {
+                try ResponseRules.validate(request.assertions ?? [], request.extractions ?? [])
+                if changesVariables || request.preHook != nil {
+                    deferredRequestPositions.insert(position)
+                }
+                changesVariables =
+                    changesVariables || request.preHook != nil || request.postHook != nil
+                    || !(request.extractions ?? []).isEmpty
+            }
+            for index in 0..<(iterationData?.rows.count ?? 1) {
+                let values =
+                    try iterationData?.variables(at: index, base: variables, overrides: overrides)
+                    ?? variables
+                let environment = WorkflowEngine.environment(values)
+                for (position, request) in requests.enumerated()
+                where !deferredRequestPositions.contains(position) {
+                    try Task.checkCancellation()
+                    if try RequestEngine.prepareForPlanning(
+                        request, environment: environment, profiles: profiles)
+                    {
+                        deferredRequestPositions.insert(position)
+                    }
+                }
+            }
+            if changesVariables { deferredRequestPositions.formUnion(requests.indices) }
         }
         // Bind only explicitly supplied process values to this file's descriptors. Never consult
         // the native provider or change its normal catalog-before-process precedence.
@@ -120,7 +156,9 @@ public struct NativeFileRun: Sendable {
             catalog: catalog, credentials: TransientCredentials(values: values),
             processEnvironment: processEnvironment.filter { $0.key.hasPrefix("RILL_SECRET_") })
         return Self(
-            requests: requests,
+            requests: requests, hasSelectedEnvironment: environmentID != nil,
+            deferredRequestPositions: deferredRequestPositions,
+            planningOnly: planningTLS != nil,
             sourceLocations: Dictionary(
                 uniqueKeysWithValues: workspace.requests.enumerated().map {
                     ($0.element.id.uuidString, "/requests/\($0.offset)")
@@ -139,6 +177,7 @@ public struct NativeFileRun: Sendable {
         configuration: RunConfiguration, timeout: Double? = nil,
         exportEnvironment: CollectionRunner.EnvironmentExport? = nil, cookieJar: CookieJar? = nil
     ) async throws -> RunReport {
+        guard !planningOnly else { throw WorkflowError.invalidConfiguration }
         var report = try await executeRun(
             configuration: configuration, timeout: timeout, exportEnvironment: exportEnvironment,
             cookieJar: cookieJar)

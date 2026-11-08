@@ -11,7 +11,7 @@ struct Arguments: Sendable {
         "quiet", "detail", "json", "apply", "continue-on-failure", "allow-insecure",
         "allow-lan", "overwrite", "show-messages", "help", "version", "insecure",
         "fail-fast", "metadata-only", "strict-headers", "github-annotations", "control-stdin",
-        "include-system-roots", "cookies", "script-inventory", "translate-scripts",
+        "include-system-roots", "cookies", "script-inventory", "translate-scripts", "dry-run",
     ]
     static let valueOptions: Set<String> = [
         "color", "workspace", "environment", "tls", "iterations", "delay", "retries",
@@ -126,6 +126,9 @@ struct Arguments: Sendable {
         if command != "preflight", flags.contains("script-inventory") {
             throw CLIError.usage(
                 "--script-inventory is supported only by offline Postman preflight.")
+        }
+        if command != "run", flags.contains("dry-run") {
+            throw CLIError.usage("--dry-run is supported only by file runs.")
         }
         if command != "run", flags.contains("cookies") {
             throw CLIError.usage("--cookies is supported only by file runs.")
@@ -329,6 +332,7 @@ let usage = """
           --format native          Read a native Rill workspace file without opening Keychain
           --collection NAME_OR_ID --environment NAME_OR_ID   Native selection
           --allow-insecure         Native insecure profiles require explicit opt-in
+          --dry-run                Print a redacted plan without sending or writing outputs
           --ca-cert FILE           DER/PEM roots for this run; --include-system-roots adds system trust
           --ssl-client-cert FILE --ssl-client-key FILE   PEM identity (encrypted PKCS#8 or clear)
           --ssl-client-p12 FILE   Memory-only PKCS#12 identity

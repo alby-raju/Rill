@@ -9,9 +9,14 @@ public enum PostmanFileRunError: Error {
 /// A transient execution input: no workspace repository or native credential store is opened.
 public struct PostmanFileRun: Sendable {
     public let requests: [RequestDraft]
+    public let deferredRequestPositions: Set<Int>
+    private let planningOnly: Bool
     public let sourceLocations: [String: String]
     public let environment: Environment
     public let secrets: NamedSecretResolver
+    public var scriptsMayChangeOrder: Bool {
+        scriptPlan?.programs.contains(where: \.changesOrder) == true
+    }
     public var translatesScripts: Bool { scriptPlan != nil }
     private let iterationData: IterationData?
     private let iterationOverrides: [String: String]
@@ -24,7 +29,7 @@ public struct PostmanFileRun: Sendable {
         collection: Data, environment inputEnvironment: Data? = nil,
         overrides: [String: String] = [:], folder: String? = nil,
         iterationData: IterationData? = nil, fileTLS: FileTLSConfiguration? = nil,
-        globals: Data? = nil, translateScripts: Bool = false
+        globals: Data? = nil, translateScripts: Bool = false, planningOnly: Bool = false
     ) throws -> Self {
         try Task.checkCancellation()
         guard overrides.count <= 10_000,
@@ -75,7 +80,7 @@ public struct PostmanFileRun: Sendable {
         func applyImport(_ imported: ForeignWorkspaceImport) {
             apply(imported.workspace.environments)
             catalog += imported.workspace.namedSecrets ?? []
-            secretValues.merge(imported.secretValues) { _, new in new }
+            if !planningOnly { secretValues.merge(imported.secretValues) { _, new in new } }
         }
         if let globals {
             currentScope = .globals
@@ -100,6 +105,10 @@ public struct PostmanFileRun: Sendable {
             catalog: catalog, credentials: TransientCredentials(values: secretValues),
             processEnvironment: [:])
         let baseVariables = WorkflowEngine.variables(in: environment)
+        var deferredRequestPositions = Set<Int>()
+        if planningOnly, scriptPlan?.writes.isEmpty == false {
+            deferredRequestPositions.formUnion(imported.workspace.requests.indices)
+        }
         for index in 0..<(iterationData?.rows.count ?? 1) {
             let values =
                 try iterationData?.variables(at: index, base: baseVariables, overrides: overrides)
@@ -110,13 +119,20 @@ public struct PostmanFileRun: Sendable {
             for name in scriptPlan?.writes ?? [] where validationValues[name] == nil {
                 validationValues[name] = "https://rill-dynamic.invalid"
             }
-            for request in imported.workspace.requests {
+            let validationEnvironment =
+                scriptPlan == nil ? rowEnvironment : WorkflowEngine.environment(validationValues)
+            for (position, request) in imported.workspace.requests.enumerated() {
                 try Task.checkCancellation()
-                _ = try RequestEngine.prepare(
-                    request,
-                    environment: scriptPlan == nil
-                        ? rowEnvironment : WorkflowEngine.environment(validationValues),
-                    secrets: secrets)
+                if planningOnly {
+                    if try RequestEngine.prepareForPlanning(
+                        request, environment: validationEnvironment)
+                    {
+                        deferredRequestPositions.insert(position)
+                    }
+                } else {
+                    _ = try RequestEngine.prepare(
+                        request, environment: validationEnvironment, secrets: secrets)
+                }
             }
         }
         var requests = imported.workspace.requests
@@ -133,7 +149,8 @@ public struct PostmanFileRun: Sendable {
             for index in requests.indices { requests[index].collectionID = collectionID }
         }
         return Self(
-            requests: requests, sourceLocations: sourceLocations, environment: environment,
+            requests: requests, deferredRequestPositions: deferredRequestPositions,
+            planningOnly: planningOnly, sourceLocations: sourceLocations, environment: environment,
             secrets: secrets,
             iterationData: iterationData,
             iterationOverrides: iterationData == nil ? [:] : overrides,
@@ -148,6 +165,7 @@ public struct PostmanFileRun: Sendable {
         configuration: RunConfiguration, timeout: Double? = nil,
         exportEnvironment: CollectionRunner.EnvironmentExport? = nil, cookieJar: CookieJar? = nil
     ) async throws -> RunReport {
+        guard !planningOnly else { throw WorkflowError.invalidConfiguration }
         var report = try await executeRun(
             configuration: configuration, timeout: timeout, exportEnvironment: exportEnvironment,
             cookieJar: cookieJar)

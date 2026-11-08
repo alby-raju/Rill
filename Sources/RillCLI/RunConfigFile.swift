@@ -12,6 +12,7 @@ enum FileRunOptions {
         "json", "quiet", "detail", "continue-on-failure", "fail-fast", "overwrite",
         "allow-insecure",
         "insecure", "include-system-roots", "cookies", "translate-scripts", "github-annotations",
+        "dry-run",
     ]
     static let paths: Set<String> = Set([
         "environment-file", "iteration-data", "globals", "report", "allure", "output",
@@ -57,7 +58,8 @@ extension Arguments {
             let config = try JSONDecoder().decode(RunConfigFile.self, from: data)
             guard config.kind == "rill.run-config", config.schemaVersion == 1,
                 Set((config.options ?? [:]).keys).isSubset(of: FileRunOptions.values),
-                Set((config.flags ?? [:]).keys).isSubset(of: FileRunOptions.flags)
+                Set((config.flags ?? [:]).keys).isSubset(
+                    of: FileRunOptions.flags.subtracting(["dry-run"]))
             else { throw WorkflowError.invalidConfiguration }
             let explicitFlags = flags
             var defaults = Set((config.flags ?? [:]).filter(\.value).map(\.key))

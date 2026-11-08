@@ -42,8 +42,11 @@ pm.environment.set('header', pm.response.headers.get('X-Token'));
 pm.test('status check', function () {
     pm.response.to.have.status(200);
 });
-pm.test('another status check', () => {
-    pm.response.to.have.status(201);
+pm.test('response fields', () => {
+    const body = pm.response.json();
+    pm.response.to.have.header('Content-Type');
+    pm.expect(body.ok).to.eql(true);
+    pm.expect(body.count).to.equal(42);
 });
 pm.execution.setNextRequest('Next request');
 pm.execution.setNextRequest(null);
@@ -68,16 +71,25 @@ pm.execution.skipRequest();
   `!` is accepted for the truthiness form. Both arms require braces. Nested conditions
   are bounded; arbitrary boolean/numeric expressions, `&&`/`||` and automatic coercions reject.
 - A `pm.test` callback is anonymous `function () { ... }` or `() => { ... }`, containing
-  one or more literal `pm.response.to.have.status(100...599)` assertions only. Each callback
-  produces one check; a failed status assertion ends that callback while later tests and
-  ordinary following operations still run. Other callback side effects/assertion APIs reject.
+  one or more status, header-presence or scalar-equality assertions. Supported forms are
+  `pm.response.to.have.status(100...599)`, `pm.response.to.have.header('Name')` and
+  `pm.expect(expression).to.equal(literal)` or `.to.eql(literal)`. Equality accepts strings,
+  nonnegative integer literals of up to nine digits, booleans and `null`. Types must match.
+  Missing JSON values differ from `null`. Header names are case-insensitive. JSON objects and
+  arrays can be traversed to reach a scalar. Arrays support literal indices. Object and array
+  literals are unsupported as expected values.
+- A post-response block or test callback can start with one `const name = pm.response.json();`
+  declaration. Its JSON alias is scoped to that block or callback and can be used with the same
+  literal selectors as an inline JSON expression. Other declarations and initializers reject.
+- Each callback produces one check. A failed assertion ends that callback. Later tests and
+  ordinary following operations still run. Reports omit user test labels and assertion values.
 - Next-request selection accepts a literal original ID, a unique literal name, or `null`.
   Legacy `postman.setNextRequest` is also accepted. Targets must exist inside the selected
   run scope; branches can cross its folders. IDs take precedence over names. Names and
   comparisons use exact UTF-8 bytes, including canonically distinct Unicode sequences.
 - `null` stops after the current request; a later next-request call can replace that choice.
   Skip immediately ends remaining pre-request scripts and sends no request or post scripts.
-  Loops, declarations/aliases, arbitrary functions, async calls, external modules, eval,
+  Loops, general declarations, arbitrary functions, async calls, external modules, eval,
   dynamic property access, Vault, arbitrary request mutation and all other syntax reject.
 
 ## Scope, ordering and failure behavior
@@ -123,8 +135,8 @@ and cancellation handling are reused rather than introducing another collection 
 ## Bounds and validation evidence
 
 The parser allows at most 1 MiB/block, 4 MiB source across the plan, 1,000 blocks, 10,000 source lines/block,
-100,000 lexer tokens/block, 1,024 parsed statements/block, 16 conditional levels and 128 status
-assertions/callback. Compilation bounds total estimated operation cost to 100,000 and each
+100,000 lexer tokens/block, 1,024 parsed statements/block, 16 conditional levels and 128 assertion or declaration operations per callback.
+Compilation bounds total estimated operation cost to 100,000 and each
 request's inherited pre/post cost to 1,024. It retains at most 100,000 inherited source references
 and traverses at most 100,000 nodes/32 folder levels plus request leaves. Runtime repeats the
 1,024-operation bound and applies a 250 ms deadline per script phase, excluding network wait.
@@ -141,7 +153,8 @@ inheritance/extraction, skip/branch/stop, mutation after failed checks, both con
 scoped mutation and expected non-2xx responses. Wire order/headers, assertion totals/failures,
 selected exported mutations and normalized exit results matched. Additional negative fixtures
 confirmed unsupported/remote later source blocks the first request and never fetches a script.
-See the [optional reference harness](../scripts/script-conformance/README.md). These results
+The newer typed assertions and JSON aliases have Rill fixture coverage. See the
+[recorded reference harness](../scripts/script-conformance/README.md) for the earlier cases. These results
 define a small corpus, not a compatibility percentage or acceptance of arbitrary collections.
 
 The broader [roadmap](../ROADMAP.md) still requires independent suites, fuller assertions and

@@ -6,8 +6,15 @@ indirect enum ScriptExpression: Sendable {
 }
 indirect enum ScriptOperation: Sendable {
     case set(ScriptVariableScope, String, ScriptExpression), unset(ScriptVariableScope, String)
-    case testStatus([Int]), next(String?), skip
+    case test([ScriptAssertion]), parseJSON, next(String?), skip
     case condition(ScriptExpression, String?, Bool, [ScriptOperation], [ScriptOperation])
+}
+enum ScriptLiteral: Sendable {
+    case string(String), integer(Int), bool(Bool), null
+}
+enum ScriptAssertion: Sendable {
+    case status(Int), header(String), parseJSON
+    case equal(ScriptExpression, ScriptLiteral, deep: Bool)
 }
 struct ScriptSyntaxFailure: Error, Sendable {
     let code: String
@@ -195,7 +202,9 @@ struct ScriptLexer {
             advance()
             kind = byte == 61 ? .equal : .unequal
         } else {
-            guard [40, 41, 123, 125, 91, 93, 46, 44, 59, 33].contains(byte) else { throw fail() }
+            guard [40, 41, 123, 125, 91, 93, 46, 44, 59, 33, 61].contains(byte) else {
+                throw fail()
+            }
             advance()
             kind = .symbol(byte)
         }

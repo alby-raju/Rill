@@ -174,7 +174,10 @@ class Handler(BaseHTTPRequestHandler):
             except (BrokenPipeError, ConnectionResetError):
                 pass
             return
-        body = b'{"message":"hello from fixture"}'
+        if self.path == "/script-scalars":
+            body = b'{"n":42,"text":"42","ok":true,"empty":null,"zero":-0}'
+        else:
+            body = b'{"message":"hello from fixture"}'
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.send_header("X-Fixture", "Rill")

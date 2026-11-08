@@ -67,6 +67,53 @@ private actor ScriptExportCapture {
         return try XCTUnwrap(object["headers"] as? [String: String])
     }
 
+    func testTypedAssertionsKeepCallbackGroupingAndRedactValues() async throws {
+        let data = try collection([
+            request(
+                "Scalars", url: base() + "/script-scalars",
+                events: [
+                    event(
+                        """
+                        const document = pm.response.json();
+                        pm.test('private-label', () => {
+                            const payload = pm.response.json();
+                            pm.response.to.have.header('x-fixture');
+                            pm.expect(pm.response.headers.get('X-Fixture')).to.equal('Rill');
+                            pm.expect(payload.n).to.eql(42);
+                            pm.expect(document.ok).to.equal(true);
+                            pm.expect(pm.response.json().empty).to.eql(null);
+                            pm.expect(pm.response.json().zero).to.equal(0);
+                        });
+                        pm.test('typed failure', () => {
+                            pm.expect(pm.response.json().text).to.eql(42);
+                            pm.expect(pm.response.json().empty).to.equal(null);
+                        });
+                        pm.test('signed zero', () => {
+                            pm.expect(pm.response.json().zero).to.eql(0);
+                        });
+                        pm.test('missing differs from null', () => {
+                            pm.expect(pm.response.json().missing).to.equal(null);
+                        });
+                        pm.test('next callback still runs', () => {
+                            pm.response.to.have.status(200);
+                        });
+                        """)
+                ])
+        ])
+        let plan = try PostmanFileRun.prepare(collection: data, translateScripts: true)
+        let report = try await plan.run(configuration: RunConfiguration())
+        XCTAssertEqual(
+            report.outcomes.first?.checks.map(\.passed), [true, false, false, false, true])
+        XCTAssertFalse(report.passed)
+        let bytes = try XCTUnwrap(RunReportExporter.files(report, format: .json).values.first)
+        XCTAssertFalse(String(decoding: bytes, as: UTF8.self).contains("private-label"))
+        XCTAssertThrowsError(
+            try ScriptParser(
+                "pm.test('x', () => { pm.expect(pm.response.json().n).to.eql({ a: 1 }); });",
+                phase: .test
+            ).parsed())
+    }
+
     func testInheritedPreAndPostOrderScopesExtractionAndFailedTestMutations() async throws {
         let base = try base()
         let data = try collection(

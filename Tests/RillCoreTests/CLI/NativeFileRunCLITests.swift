@@ -78,6 +78,42 @@ import XCTest
             String(decoding: ordinary, as: UTF8.self).contains("fixture-native-private-secret"))
         XCTAssertEqual(try Data(contentsOf: source), input)
     }
+    func testNativeDryRunReportsWorkspaceSelectionWithoutResolvingProcessSecrets() async throws {
+        let root = try directory()
+        let source = root.appendingPathComponent("private-native.json")
+        var workspace = Workspace()
+        let environment = Environment(name: "private-env")
+        workspace.environments = [environment]
+        workspace.selectedEnvironmentID = environment.id
+        var concrete = request("http://127.0.0.1:1/private-path")
+        concrete.name = "private-request"
+        var dependent = request("http://127.0.0.1:1/private-path")
+        dependent.headers = [Field(name: "X-Token", value: "{{secret:private-token}}")]
+        workspace.requests = [concrete, dependent]
+        try WorkspaceFile.encode(workspace).write(to: source)
+        let result = try await cli([
+            "run", source.path, "--format", "native", "--dry-run", "--json",
+        ])
+        XCTAssertEqual(result.status, 0, String(decoding: result.diagnostics, as: UTF8.self))
+        let plan = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: result.output) as? [String: Any])
+        XCTAssertEqual(plan["environmentSource"] as? String, "workspaceSelection")
+        let steps = try XCTUnwrap(plan["steps"] as? [[String: Any]])
+        XCTAssertEqual(
+            steps.compactMap { $0["source"] as? String }, ["/requests/0", "/requests/1"])
+        XCTAssertEqual(
+            steps.compactMap { $0["runtimeValidationDeferred"] as? Bool }, [false, true])
+        XCTAssertFalse(
+            String(decoding: result.output + result.diagnostics, as: UTF8.self).contains("private-")
+        )
+        workspace.requests = [request("invalid://private-invalid")]
+        try WorkspaceFile.encode(workspace).write(to: source)
+        let invalid = try await cli([
+            "run", source.path, "--format", "native", "--dry-run", "--json",
+        ])
+        XCTAssertEqual(invalid.status, 2)
+    }
+
     func testNativeFailureExitCodesAndMissingSecrets() async throws {
         guard let base = ProcessInfo.processInfo.environment["RILL_TEST_BASE_URL"] else {
             throw XCTSkip("Fixture required")
