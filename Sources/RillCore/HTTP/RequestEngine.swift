@@ -50,6 +50,14 @@ enum HTTPClientConfiguration {
     }
 }
 
+enum RequestHeaderAction: String, Sendable { case add, upsert, remove }
+
+struct RequestHeaderEdit: Sendable {
+    let action: RequestHeaderAction
+    let name: String
+    let value: String
+}
+
 public enum RequestEngine {
     public static func resolve(_ text: String, variables: [String: String]) throws -> String {
         try VariableExpansion.resolve(text, values: variables)
@@ -92,6 +100,7 @@ public enum RequestEngine {
 
     private static func prepare(
         _ input: RequestDraft, environment: Environment?, profiles: [AuthenticationProfile],
+        headerEdits: [RequestHeaderEdit] = [],
         resolveSecret: @escaping (String) throws -> String
     ) throws -> URLRequest {
         let draft = try AuthenticationProfiles.applying(to: input, profiles: profiles)
@@ -155,13 +164,34 @@ public enum RequestEngine {
             guard headerNames.insert(name.lowercased()).inserted else {
                 throw RillError.duplicateHeader
             }
-            let tokens = CharacterSet(
-                charactersIn:
-                    "!#$%&'*+-.^_`|~0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-            guard !name.isEmpty, name.unicodeScalars.allSatisfy({ tokens.contains($0) }),
-                !hasInvalidHeaderValue(value)
-            else { throw RillError.invalidHeader(name) }
+            guard HTTPEncoding.isHeaderName(name), !hasInvalidHeaderValue(value) else {
+                throw RillError.invalidHeader(name)
+            }
             request.setValue(value, forHTTPHeaderField: name)
+        }
+        for edit in headerEdits {
+            let key = edit.name.lowercased()
+            let ownsAuthorization = draft.auth == .bearer || draft.auth == .basic
+            let ownsContentType =
+                draft.graphql != nil || draft.bodyMode == .form
+                || draft.bodyMode == .multipart
+            guard !(ownsAuthorization && key == "authorization"),
+                !(draft.auth == .apiKey && !keyInQuery && key == keyName.lowercased()),
+                !(ownsContentType && key == "content-type"),
+                !hasInvalidHeaderValue(edit.value)
+            else { throw WorkflowError.invalidConfiguration }
+            switch edit.action {
+            case .add:
+                guard headerNames.insert(key).inserted else { throw RillError.duplicateHeader }
+                request.setValue(edit.value, forHTTPHeaderField: edit.name)
+            case .upsert:
+                headerNames.insert(key)
+                request.setValue(edit.value, forHTTPHeaderField: edit.name)
+            case .remove:
+                if headerNames.remove(key) != nil {
+                    request.setValue(nil, forHTTPHeaderField: edit.name)
+                }
+            }
         }
         let body: Data?
         if let graphql = draft.graphql {
@@ -231,18 +261,30 @@ public enum RequestEngine {
         _ input: RequestDraft, environment: Environment?, profiles: [AuthenticationProfile] = [],
         secrets: NamedSecretResolver? = nil
     ) throws -> PreparedHTTPRequest {
+        try freeze(
+            input, environment: environment, profiles: profiles, secrets: secrets, headerEdits: [])
+    }
+
+    private static func freeze(
+        _ input: RequestDraft, environment: Environment?, profiles: [AuthenticationProfile],
+        secrets: NamedSecretResolver?, headerEdits: [RequestHeaderEdit]
+    ) throws -> PreparedHTTPRequest {
         let draft = try AuthenticationProfiles.applying(to: input, profiles: profiles)
-        guard draft.graphql == nil && (draft.bodyMode == .multipart || draft.bodyMode == .binary)
-        else {
-            return PreparedHTTPRequest(
-                request: try prepare(draft, environment: environment, secrets: secrets))
+        func prepareHeaders(_ request: RequestDraft) throws -> URLRequest {
+            try prepare(request, environment: environment, profiles: [], headerEdits: headerEdits) {
+                name in
+                guard let secrets else { throw AuthenticationError.missingSecret }
+                return try secrets.resolve(name)
+            }
         }
+        guard draft.graphql == nil && (draft.bodyMode == .multipart || draft.bodyMode == .binary)
+        else { return PreparedHTTPRequest(request: try prepareHeaders(draft)) }
         guard draft.method != .GET && draft.method != .HEAD else {
             throw RillError.unsupportedBodyMethod
         }
         var headersOnly = draft
         headersOnly.bodyMode = RequestBodyMode.none
-        var request = try prepare(headersOnly, environment: environment, secrets: secrets)
+        var request = try prepareHeaders(headersOnly)
         let upload = try UploadBody.create(draft, environment: environment, secrets: secrets)
         request.httpBodyStream = InputStream(url: upload.url)
         request.setValue(String(upload.count), forHTTPHeaderField: "Content-Length")
@@ -262,6 +304,41 @@ public enum RequestEngine {
         definitions: [APIDefinitionSource] = [], followRedirects: Bool = true,
         fileTLS: FileTLSConfiguration? = nil, cookieJar: CookieJar? = nil
     ) async throws -> Exchange {
+        try await execute(
+            draft, environment: environment, budget: budget, profiles: profiles, secrets: secrets,
+            tlsProfiles: tlsProfiles, identities: identities, definitions: definitions,
+            followRedirects: followRedirects, fileTLS: fileTLS, cookieJar: cookieJar,
+            headerEdits: [])
+    }
+
+    public static func download(
+        _ draft: RequestDraft, environment: Environment?, to destination: URL,
+        overwrite: Bool = false, profiles: [AuthenticationProfile] = [],
+        secrets: NamedSecretResolver? = nil, tlsProfiles: [TLSProfile] = [],
+        fileTLS: FileTLSConfiguration? = nil
+    ) async throws -> DownloadResult {
+        guard draft.method == .GET else { throw RillError.unsupportedBodyMethod }
+        try Task.checkCancellation()
+        let sink = try ResponseFileSink(destination: destination, overwrite: overwrite)
+        let exchange = try await execute(
+            draft, environment: environment,
+            budget: ResponseBudget(downloadBytes: 256 * 1024 * 1024),
+            profiles: profiles, secrets: secrets, tlsProfiles: tlsProfiles, fileTLS: fileTLS,
+            headerEdits: [], download: sink)
+        if (200...299).contains(exchange.status) { try sink.commit() }
+        return DownloadResult(
+            status: exchange.status, duration: exchange.duration,
+            bodyBytes: exchange.originalBodyBytes ?? 0)
+    }
+
+    static func execute(
+        _ draft: RequestDraft, environment: Environment?, budget: ResponseBudget = .standard,
+        profiles: [AuthenticationProfile] = [], secrets: NamedSecretResolver? = nil,
+        tlsProfiles: [TLSProfile] = [], identities: any TLSIdentityProvider = SystemTLSIdentities(),
+        definitions: [APIDefinitionSource] = [], followRedirects: Bool = true,
+        fileTLS: FileTLSConfiguration? = nil, cookieJar: CookieJar? = nil,
+        headerEdits: [RequestHeaderEdit], download: ResponseFileSink? = nil
+    ) async throws -> Exchange {
         try Task.checkCancellation()
         let selectedProfile = try TLSProfiles.selected(
             draft.tlsProfileID, from: tlsProfiles,
@@ -272,7 +349,8 @@ public enum RequestEngine {
             fileTLS == nil
             ? try selectedProfile?.identityReference.map { try identities.identity(for: $0) } : nil
         let frozen = try freeze(
-            draft, environment: environment, profiles: profiles, secrets: secrets)
+            draft, environment: environment, profiles: profiles, secrets: secrets,
+            headerEdits: headerEdits)
         defer { frozen.removeTemporaryBody() }
         let request = frozen.request
         let fileCredential = fileTLS?.credential(for: request.url)
@@ -313,6 +391,29 @@ public enum RequestEngine {
         guard let http = response as? HTTPURLResponse else { throw RillError.invalidURL }
         let headersElapsed = ProcessInfo.processInfo.systemUptime - start
         let maximum = budget.downloadBytes
+        if let download {
+            var count = 0
+            if (200...299).contains(http.statusCode) {
+                guard response.expectedContentLength <= Int64(maximum) else {
+                    throw RillError.responseTooLarge
+                }
+                do { count = try await download.stream(bytes, limit: maximum) } catch {
+                    try transportFailure(error)
+                }
+                let encoding = http.value(forHTTPHeaderField: "Content-Encoding")?.lowercased()
+                if (encoding == nil || encoding == "identity"),
+                    response.expectedContentLength >= 0,
+                    Int64(count) != response.expectedContentLength
+                {
+                    throw URLError(.networkConnectionLost)
+                }
+            }
+            return Exchange(
+                requestID: draft.id, requestName: draft.name, method: draft.method,
+                url: http.url?.absoluteString ?? "", status: http.statusCode,
+                duration: ProcessInfo.processInfo.systemUptime - start,
+                headers: [], body: Data(), checks: [], originalBodyBytes: count)
+        }
         if response.expectedContentLength > Int64(maximum) { throw RillError.responseTooLarge }
         var data = Data()
         do {

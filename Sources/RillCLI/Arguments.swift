@@ -12,6 +12,7 @@ struct Arguments: Sendable {
         "allow-lan", "overwrite", "show-messages", "help", "version", "insecure",
         "fail-fast", "metadata-only", "strict-headers", "github-annotations", "control-stdin",
         "include-system-roots", "cookies", "script-inventory", "translate-scripts", "dry-run",
+        "multipart",
     ]
     static let valueOptions: Set<String> = [
         "color", "workspace", "environment", "tls", "iterations", "delay", "retries",
@@ -27,6 +28,7 @@ struct Arguments: Sendable {
         "environment-file", "env-var", "ssl-client-cert", "ssl-client-key", "folder",
         "iteration-data", "iteration-data-format", "globals", "export-environment",
         "ca-cert", "ssl-client-p12", "ssl-passphrase-file", "ssl-client-origin", "ssl-client-map",
+        "binary-file", "form", "download",
     ]
     init(_ input: [String]) throws {
         guard input.count <= 512, input.reduce(0, { $0 + $1.utf8.count }) <= 2 * 1024 * 1024 else {
@@ -53,7 +55,7 @@ struct Arguments: Sendable {
                         values[name] == nil
                             || [
                                 "header", "metadata", "proto-include", "env-var", "ignore-json",
-                                "ignore-header",
+                                "ignore-header", "form",
                             ].contains(name)
                     else { throw CLIError.usage("Duplicate option.") }
                     values[name, default: []].append(input[index])
@@ -96,23 +98,23 @@ struct Arguments: Sendable {
                 "env-var", "environment-file", "folder", "ssl-client-cert", "ssl-client-key",
                 "globals",
             ]
-            : command == "request" ? ["env-var"] : []
+            : command == "request" ? ["env-var", "ssl-client-cert", "ssl-client-key"] : []
         let fileOnly = preflightOnly.subtracting(allowedInputs)
         if command != "preflight", !fileOnly.isDisjoint(with: values.keys) {
             throw CLIError.usage(
-                "PEM certificate/key options require run or preflight; folder/environment/variable inputs are supported by run and preflight, and request also accepts --env-var."
+                "PEM certificate/key options require run, request or preflight; folder/environment/variable inputs are supported by run and preflight, and request also accepts --env-var."
             )
         }
         if value("collection") != nil && command != "run" {
             throw CLIError.usage("--collection is supported only by native file runs.")
         }
-        if command != "run",
+        if !["run", "request"].contains(command),
             !FileTLSOptions.values.subtracting(["ssl-client-cert", "ssl-client-key"]).isDisjoint(
                 with: values.keys)
                 || !FileTLSOptions.flags.isDisjoint(with: flags)
         {
             throw CLIError.usage(
-                "TLS file execution options require run; preflight supports only PEM pair inspection."
+                "TLS file execution options require run or request; preflight supports only PEM pair inspection."
             )
         }
         if command != "run", value("iteration-data") != nil || value("iteration-data-format") != nil
@@ -126,6 +128,12 @@ struct Arguments: Sendable {
         if command != "preflight", flags.contains("script-inventory") {
             throw CLIError.usage(
                 "--script-inventory is supported only by offline Postman preflight.")
+        }
+        if command != "request",
+            flags.contains("multipart")
+                || !Set(["binary-file", "form", "download"]).isDisjoint(with: values.keys)
+        {
+            throw CLIError.usage("Upload and download options require request.")
         }
         if command != "run", flags.contains("dry-run") {
             throw CLIError.usage("--dry-run is supported only by file runs.")
@@ -362,8 +370,12 @@ let usage = """
       request METHOD URL           Ad-hoc HTTP request; no workspace required
           -H, --header name:value   Repeatable request headers
           -d, --data TEXT           UTF-8 text body; or --data-file FILE (1 MiB)
+          --binary-file FILE       Stream an explicit binary body
+          --form NAME=VALUE|NAME@PATH   Repeatable form fields; --multipart forces multipart
+          --ca-cert FILE           Explicit trust roots; scoped client TLS flags also apply
           --env-var key=value       Temporary overrides (repeatable); --timeout SECONDS
           --output FILE            Explicit raw response export; --overwrite permits replacement
+          --download FILE          Stream a successful GET to disk (256 MiB)
           --json                   Redacted status/timing/byte summary; non-2xx exits 3
           --workspace FILE         Explicit saved --environment/--auth-profile/--tls selection
       init                         Create a new empty workspace (never overwrites)

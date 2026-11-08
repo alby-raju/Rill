@@ -52,6 +52,9 @@ pm.execution.setNextRequest('Next request');
 pm.execution.setNextRequest(null);
 
 // Pre-request only:
+pm.request.headers.upsert({key: 'Authorization', value: 'Bearer ' + pm.environment.get('token')});
+pm.request.headers.add({key: 'X-Client', value: 'rill'});
+pm.request.headers.remove('X-Old');
 pm.execution.skipRequest();
 ```
 
@@ -83,6 +86,13 @@ pm.execution.skipRequest();
   literal selectors as an inline JSON expression. Other declarations and initializers reject.
 - Each callback produces one check. A failed assertion ends that callback. Later tests and
   ordinary following operations still run. Reports omit user test labels and assertion values.
+- Pre-request scripts can add, upsert or remove a header by literal name. Add and
+  upsert accept an object with only `key` and `value`. Values are string literals, scoped
+  getters or up to 16 of those expressions joined by `+`. The evaluated value goes to the
+  request without a second template expansion. Header names are case-insensitive. Edits apply
+  in script order to the current request attempt. Adding a duplicate fails the attempt.
+  Auth-helper headers, structured body content types and transport-managed headers are protected.
+  Names are limited to 256 UTF-8 bytes, each value to 64 KiB and edits to 256 KiB per attempt.
 - Next-request selection accepts a literal original ID, a unique literal name, or `null`.
   Legacy `postman.setNextRequest` is also accepted. Targets must exist inside the selected
   run scope; branches can cross its folders. IDs take precedence over names. Names and
@@ -90,7 +100,7 @@ pm.execution.skipRequest();
 - `null` stops after the current request; a later next-request call can replace that choice.
   Skip immediately ends remaining pre-request scripts and sends no request or post scripts.
   Loops, general declarations, arbitrary functions, async calls, external modules, eval,
-  dynamic property access, Vault, arbitrary request mutation and all other syntax reject.
+  dynamic property access, Vault, other request mutations and unsupported syntax reject.
 
 ## Scope, ordering and failure behavior
 

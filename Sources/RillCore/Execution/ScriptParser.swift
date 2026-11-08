@@ -4,12 +4,21 @@ struct ScriptProgram: Sendable {
     let operations: [ScriptOperation]
     let writes: Set<String>
     let branches: [String]
+    var editsHeaders: Bool { operations.contains(where: \.editsHeaders) }
     var changesOrder: Bool { operations.contains(where: \.changesOrder) }
     var operationCount: Int { operations.reduce(0) { $0 + $1.nodeCount } }
     var estimatedCost: Int { operations.reduce(0) { $0 + $1.estimatedCost } }
 }
 
 private extension ScriptOperation {
+    var editsHeaders: Bool {
+        switch self {
+        case .editHeader: return true
+        case .condition(_, _, _, let yes, let no):
+            return yes.contains(where: \.editsHeaders) || no.contains(where: \.editsHeaders)
+        default: return false
+        }
+    }
     var changesOrder: Bool {
         switch self {
         case .next, .skip: return true
@@ -27,6 +36,7 @@ private extension ScriptOperation {
     var estimatedCost: Int {
         switch self {
         case .test(let values): return 1 + values.count
+        case .editHeader(_, _, let values): return 1 + values.count
         case .condition(_, _, _, let yes, let no):
             return 1
                 + max(
@@ -244,6 +254,47 @@ struct ScriptParser {
         try advance()
         return assertions
     }
+    private mutating func scriptHeaderName() throws -> String {
+        let header = try string()
+        let reserved: Set<String> = [
+            "connection", "content-length", "cookie", "expect", "host", "proxy-authorization",
+            "proxy-connection", "te", "trailer", "transfer-encoding", "upgrade",
+        ]
+        guard header.utf8.count <= 256, HTTPEncoding.isHeaderName(header),
+            !reserved.contains(header.lowercased())
+        else { throw fail("script.invalidHeaderMutation") }
+        return header
+    }
+
+    private mutating func headerEdit(_ action: RequestHeaderAction) throws -> ScriptOperation {
+        guard phase == .prerequest else { throw fail("script.headerMutationAfterRequest") }
+        if action == .remove { return .editHeader(action, try scriptHeaderName(), []) }
+        try take(.symbol(123))
+        var header: String?
+        var values: [ScriptExpression] = []
+        for index in 0..<2 {
+            if index > 0 { try take(.symbol(44)) }
+            let property: String
+            if case .string = token.kind { property = try string() } else { property = try name() }
+            try take(.symbol(58))
+            switch property {
+            case "key" where header == nil:
+                header = try scriptHeaderName()
+            case "value" where values.isEmpty:
+                values.append(try expression())
+                while token.kind == .symbol(43) {
+                    guard values.count < 16 else { throw fail("script.limit") }
+                    try advance()
+                    values.append(try expression())
+                }
+            default: throw fail("script.unsupportedHeaderMutation")
+            }
+        }
+        try take(.symbol(125))
+        guard let header, !values.isEmpty else { throw fail("script.unsupportedHeaderMutation") }
+        return .editHeader(action, header, values)
+    }
+
     private mutating func block(depth: Int) throws -> [ScriptOperation] {
         guard depth <= 16 else { throw fail("script.limit") }
         try take(.symbol(123))
@@ -296,6 +347,10 @@ struct ScriptParser {
                 } else {
                     operation = .unset(scope, key)
                 }
+            } else if path.count == 4, path.prefix(3).elementsEqual(["pm", "request", "headers"]),
+                let action = RequestHeaderAction(rawValue: path[3])
+            {
+                operation = try headerEdit(action)
             } else if path == ["pm", "test"] {
                 guard phase == .test else { throw fail("script.assertionBeforeResponse") }
                 _ = try string()

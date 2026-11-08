@@ -64,7 +64,7 @@ computed properties and arbitrary JavaScript behavior are not inferred.
 | `pm.test`, `pm.expect`, `pm.response.to.have.status/header/body` | `assertion.*` | Selected status, header-presence and scalar-equality forms are translated | Native response assertions and finite hook assertions cover additional cases |
 | `pm.response.json/text`, `pm.response.headers.get` | `response.*` | Literal JSON selectors and header getters are translated in selected forms | Native JSON/header extraction and response assertions |
 | `pm.execution.setNextRequest/skipRequest`, `postman.setNextRequest` | `workflow.*` | Literal branch targets, stop and pre-request skip are translated | Native same-collection `next` and explicit stop |
-| `pm.request.headers.add/upsert/remove` | `request.header.*` | Unsupported | Native header operations; removal/ordering semantics need review |
+| `pm.request.headers.add/upsert/remove` | `request.header.*` | Bounded pre-request edits with literal names and string values | Native header operations cover other request mutation workflows |
 | `pm.sendRequest`, `pm.vault` methods | `runtime.http`, `runtime.vault` | Unsupported | No implicit async HTTP/Vault implementation |
 | `require`, `eval`, `Function`, `console.log` | `runtime.module`, `runtime.dynamicCode`, `runtime.log` | Unsupported | No foreign module/runtime access; native log output remains opaque |
 | Loop and async keywords | `syntax.loop`, `syntax.async` | Unsupported | No arbitrary loops or asynchronous foreign source |

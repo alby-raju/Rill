@@ -336,7 +336,7 @@ import XCTest
         }
         XCTAssertEqual(try Data(contentsOf: source), input)
         let wrongCommand = try await cli([
-            "request", "GET", "http://127.0.0.1:1", "--ca-cert", ca.path,
+            "doctor", "--ca-cert", ca.path,
         ])
         XCTAssertEqual(wrongCommand.status, 2)
     }

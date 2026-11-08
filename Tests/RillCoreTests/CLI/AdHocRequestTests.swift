@@ -131,6 +131,107 @@ import XCTest
         XCTAssertEqual(invalid.status, 2)
     }
 
+    func testBinaryAndMultipartUploadsAndFormEncodingPreserveBytes() async throws {
+        let base = try XCTUnwrap(ProcessInfo.processInfo.environment["RILL_TEST_BASE_URL"])
+        let root = try directory()
+        let file = root.appendingPathComponent("private payload.bin")
+        let payload = Data([0, 0xff, 10, 13, 0x80])
+        try payload.write(to: file)
+        func send(_ options: [String]) async throws -> (String, Data) {
+            let output = root.appendingPathComponent(UUID().uuidString)
+            let result = try await cli(
+                ["request", "POST", base + "/echo", "--output", output.path, "--json"] + options)
+            XCTAssertEqual(result.status, 0, String(decoding: result.diagnostics, as: UTF8.self))
+            XCTAssertFalse(
+                String(decoding: result.output + result.diagnostics, as: UTF8.self).contains(
+                    "private"))
+            let echo = try XCTUnwrap(
+                JSONSerialization.jsonObject(with: Data(contentsOf: output)) as? [String: Any])
+            let headers = try XCTUnwrap(echo["headers"] as? [String: String])
+            let contentType = try XCTUnwrap(
+                headers.first { $0.key.lowercased() == "content-type" }?.value)
+            let body = try XCTUnwrap(Data(base64Encoded: try XCTUnwrap(echo["body"] as? String)))
+            return (contentType, body)
+        }
+        let binary = try await send(["--binary-file", file.path])
+        XCTAssertEqual(binary.0, "application/octet-stream")
+        XCTAssertEqual(binary.1, payload)
+        let form = try await send(["--form", "item=private one", "--form", "item=+"])
+        XCTAssertEqual(form.0, "application/x-www-form-urlencoded")
+        XCTAssertEqual(String(decoding: form.1, as: UTF8.self), "item=private+one&item=%2B")
+        let multipart = try await send([
+            "--form", "item=first", "--form", "attachment@" + file.path, "--form", "item=last",
+        ])
+        XCTAssertTrue(multipart.0.hasPrefix("multipart/form-data; boundary="))
+        let first = try XCTUnwrap(multipart.1.range(of: Data("first".utf8)))
+        let binaryPart = try XCTUnwrap(multipart.1.range(of: payload))
+        let last = try XCTUnwrap(multipart.1.range(of: Data("last".utf8)))
+        XCTAssertLessThan(first.upperBound, binaryPart.lowerBound)
+        XCTAssertLessThan(binaryPart.upperBound, last.lowerBound)
+        let collision = try await cli([
+            "request", "POST", base + "/echo", "--form", "attachment@" + file.path,
+            "--output", file.path, "--overwrite",
+        ])
+        XCTAssertEqual(collision.status, 2)
+        XCTAssertEqual(try Data(contentsOf: file), payload)
+    }
+
+    func testAdHocUsesExplicitMutualTLSWithoutWorkspace() async throws {
+        let variables = ProcessInfo.processInfo.environment
+        let origin = try XCTUnwrap(variables["RILL_TEST_MTLS_URL"])
+        let tls = URL(fileURLWithPath: try XCTUnwrap(variables["RILL_TEST_TLS_DIR"]))
+        let phrase = try directory().appendingPathComponent("private passphrase.txt")
+        try Data("rill-fixture\n".utf8).write(to: phrase)
+        let args = [
+            "request", "GET", origin + "/client-rsa", "--ca-cert",
+            tls.appendingPathComponent("ca.pem").path, "--ssl-client-p12",
+            tls.appendingPathComponent("client.p12").path, "--ssl-passphrase-file", phrase.path,
+            "--json",
+        ]
+        let result = try await cli(args + ["--ssl-client-origin", origin])
+        XCTAssertEqual(result.status, 0, String(decoding: result.diagnostics, as: UTF8.self))
+        let wrong = try await cli(args + ["--ssl-client-origin", "https://localhost:1"])
+        XCTAssertEqual(wrong.status, 3)
+        let collision = try await cli(
+            args + [
+                "--ssl-client-origin", origin, "--output", phrase.path, "--overwrite",
+            ])
+        XCTAssertEqual(collision.status, 2)
+        XCTAssertEqual(try Data(contentsOf: phrase), Data("rill-fixture\n".utf8))
+    }
+
+    func testDownloadStreamsBeyondPreviewLimitAndKeepsOldFileOnFailure() async throws {
+        let base = try XCTUnwrap(ProcessInfo.processInfo.environment["RILL_TEST_BASE_URL"])
+        let root = try directory()
+        let output = root.appendingPathComponent("download.bin")
+        let marker = Data("keep existing file".utf8)
+        try marker.write(to: output)
+        let common = ["--download", output.path, "--json"]
+        let exists = try await cli(["request", "GET", base + "/large"] + common)
+        XCTAssertEqual(exists.status, 2)
+        for endpoint in ["download-truncated", "download-over-limit", "download-denied"] {
+            let failed = try await cli(
+                ["request", "GET", base + "/" + endpoint] + common + ["--overwrite"])
+            XCTAssertEqual(failed.status, 3, endpoint)
+            XCTAssertEqual(try Data(contentsOf: output), marker, endpoint)
+            XCTAssertEqual(
+                try FileManager.default.contentsOfDirectory(atPath: root.path), ["download.bin"])
+        }
+        let success = try await cli(["request", "GET", base + "/large"] + common + ["--overwrite"])
+        XCTAssertEqual(success.status, 0, String(decoding: success.diagnostics, as: UTF8.self))
+        let summary = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: success.output) as? [String: Any])
+        let body = try Data(contentsOf: output)
+        XCTAssertEqual(summary["bodyBytes"] as? Int, 17 * 1024 * 1024)
+        XCTAssertEqual(body, Data(repeating: 120, count: 17 * 1024 * 1024))
+        let fresh = root.appendingPathComponent("fresh.bin")
+        let created = try await cli([
+            "request", "GET", base + "/chunked/3", "--download", fresh.path,
+        ])
+        XCTAssertEqual(created.status, 0)
+        XCTAssertEqual(try Data(contentsOf: fresh), Data("xxx".utf8))
+    }
+
     func testRecognizableForeignPreflightFormatsHaveRedactedGuidance() async throws {
         let root = try directory()
         let file = root.appendingPathComponent("input.json")
