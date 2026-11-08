@@ -163,6 +163,7 @@ fi
 export RILL_TEST_TLS_DIR="$RILL_TLS_DIRECTORY"
 export RILL_TEST_TLS_URL=https://localhost:18750
 export RILL_TEST_MTLS_URL=https://localhost:18751
+export RILL_TEST_SECOND_MTLS_URL=https://localhost:18752
 python3 - "$RILL_TLS_PID" <<'PY_TLS_READY'
 import http.client
 import os

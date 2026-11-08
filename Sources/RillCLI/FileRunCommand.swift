@@ -2,7 +2,11 @@ import Foundation
 import RillCore
 
 extension RillCLI {
-    static func runFile(_ args: Arguments) async throws {
+    static func runFile(_ input: Arguments) async throws {
+        let tlsOptions = try FileTLSOptions(input)
+        var resolved = input
+        resolved.referencedTLSInputs = tlsOptions.referencedInputs
+        let args = resolved
         guard args.operands.count == 1,
             Set(args.values.keys).isSubset(of: FileRunOptions.values.union(["config"])),
             args.flags.isSubset(of: FileRunOptions.flags),
@@ -133,7 +137,7 @@ extension RillCLI {
             )
         }
         if let iterationData { config.iterations = iterationData.rows.count }
-        let fileTLS = try FileTLSOptions.load(args)
+        let fileTLS = try tlsOptions.load(args)
         let plan: FileRunPlan
         do {
             let data = try BoundedFileInput.read(

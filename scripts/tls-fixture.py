@@ -214,6 +214,12 @@ class Server(ThreadingHTTPServer):
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
+        if self.path == "/redirect-second":
+            self.send_response(302)
+            self.send_header("Location", "https://localhost:18752/client-ec")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
         if self.path in ["/redirect-same", "/redirect-cross"]:
             self.send_response(302)
             self.send_header(
@@ -223,8 +229,18 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", "0")
             self.end_headers()
             return
+        expected_client = {
+            "/client-rsa": "RillFixtureClient",
+            "/client-ec": "RillFixtureECClient",
+        }.get(self.path)
+        status = 200
+        if expected_client:
+            peer = self.connection.getpeercert()
+            subject = dict(pair for group in (peer or {}).get("subject", ()) for pair in group)
+            if subject.get("commonName") != expected_client:
+                status = 403
         body = b'{"message":"TLS fixture"}'
-        self.send_response(200)
+        self.send_response(status)
         self.send_header("X-Fixture", "RillTLS")
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
@@ -236,7 +252,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 servers = []
-for port, require_client in [(18750, False), (18751, True)]:
+for port, require_client in [(18750, False), (18751, True), (18752, True)]:
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     context.minimum_version = ssl.TLSVersion.TLSv1_2
     context.load_cert_chain(root / "server.pem", root / "server.key")

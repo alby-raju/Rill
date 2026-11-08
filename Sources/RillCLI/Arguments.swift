@@ -6,6 +6,7 @@ enum CLIError: Error { case usage(String), assertion, runtime }
 struct Arguments: Sendable {
     var command = "help", operands: [String] = [], values: [String: [String]] = [:],
         flags: Set<String> = []
+    var referencedTLSInputs: [URL] = []
     static let booleanOptions: Set<String> = [
         "quiet", "detail", "json", "apply", "continue-on-failure", "allow-insecure",
         "allow-lan", "overwrite", "show-messages", "help", "version", "insecure",
@@ -25,7 +26,7 @@ struct Arguments: Sendable {
         "service", "wait", "send", "auth-profile", "proto-include", "collection",
         "environment-file", "env-var", "ssl-client-cert", "ssl-client-key", "folder",
         "iteration-data", "iteration-data-format", "globals", "export-environment",
-        "ca-cert", "ssl-client-p12", "ssl-passphrase-file", "ssl-client-origin",
+        "ca-cert", "ssl-client-p12", "ssl-passphrase-file", "ssl-client-origin", "ssl-client-map",
     ]
     init(_ input: [String]) throws {
         guard input.count <= 512, input.reduce(0, { $0 + $1.utf8.count }) <= 2 * 1024 * 1024 else {
@@ -331,7 +332,8 @@ let usage = """
           --ca-cert FILE           DER/PEM roots for this run; --include-system-roots adds system trust
           --ssl-client-cert FILE --ssl-client-key FILE   Unencrypted PEM identity
           --ssl-client-p12 FILE --ssl-passphrase-file FILE   Memory-only PKCS#12 identity
-          --ssl-client-origin https://HOST:PORT   Required exact origin for either client identity
+          --ssl-client-origin https://HOST:PORT   Required exact origin for a single client identity
+          --ssl-client-map FILE    Versioned JSON map for up to 16 exact HTTPS origins
           --insecure               Explicitly disable server certificate/hostname verification
           --globals FILE           Postman globals JSON; lowest variable precedence
           --environment-file FILE --env-var key=value (repeatable)

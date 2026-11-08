@@ -153,7 +153,21 @@ rill run ./workspace.json --format native --ssl-client-p12 ./client.p12 \
 
 Choose one unencrypted PEM certificate/key pair or one PKCS#12 identity. RSA and EC PEM identities are fixture-tested. In a PEM bundle, the leaf is first and intermediates follow. Encrypted PEM keys are unsupported; use PKCS#12 and `--ssl-passphrase-file` for an encrypted container. The password defaults to empty when no file is supplied. A password file is UTF-8 single-line text, preserving spaces and removing at most one trailing LF or CRLF. Passwords are not accepted as command-line values. CA/certificate/key files are each limited to 1 MiB, certificate bundles to 16 certificates, PKCS#12 to 4 MiB and one identity, and password files to 4 KiB. Invalid, mismatched, expired/not-yet-valid identities and wrong passwords fail setup before traffic, with redacted diagnostics. Platform crypto import is synchronous; input bounds are not a separate worker sandbox.
 
-`--ssl-client-origin` is mandatory with an identity and accepts one exact HTTPS origin, including an optional port, with no credentials, query, fragment or path beyond `/`. Default port 443 is normalized. The identity is offered only to that destination and matching TLS challenges; `--insecure` does not relax this scope. Same-origin redirects remain allowed, cross-origin redirects remain unfollowed, and a run supports one identity/origin. Native saved identity requirements can be fulfilled by the supplied files without consulting their saved Keychain references. If a native request requires an identity outside the configured origin, it fails configuration before that request is sent; earlier workflow steps may already have run.
+Use `--ssl-client-origin` with the single-identity flags. For a run that contacts several mTLS services, use `--ssl-client-map ./identities.json` with this version 1 format:
+
+```json
+{
+  "schemaVersion": 1,
+  "identities": [
+    {"origin": "https://api.example.test", "certificate": "api.pem", "key": "api.key"},
+    {"origin": "https://jobs.example.test:8443", "pkcs12": "jobs.p12", "passphraseFile": "jobs.txt"}
+  ]
+}
+```
+
+The map accepts 1–16 identities and is limited to 64 KiB. Relative identity paths are resolved from the map's directory. `passphraseFile` is optional for PKCS#12. Choose either the map or the single-identity flags. Trust options apply to the entire run. The map and all referenced files are protected from output overwrite.
+
+Each origin is an exact HTTPS host and port, with no credentials, query, fragment or path beyond `/`. Host case and default port 443 are normalized, and duplicate origins fail setup before any requests are sent. Rill selects the identity after resolving the request URL and offers it only to matching TLS challenges, including in `--insecure` mode. Unmapped requests use no file identity. Same-origin redirects remain allowed. Rill leaves cross-origin redirects unfollowed even when both origins are mapped. A native request that requires an identity fails configuration before sending if its resolved origin has no matching file identity. Earlier workflow steps may already have run.
 
 Identity material stays in process memory and URL credentials are not persisted. JSON's optional `clientIdentityConfigured` describes configuration, not proof that a server requested or received it; `tlsPolicy` describes explicit trust overrides (or system trust for configured Postman runs), not every native request profile. Normal output omits key/password contents and certificate subjects. Explicit raw response export can still contain sensitive server content. TLS inputs are read-only and protected from report/raw-output overwrite. Setup errors exit 2, TLS transport failures exit 3, and cancellation exits 130. File execution options apply to `run`; offline `preflight` retains its existing PEM pair inspection and does not negotiate TLS or inspect PKCS#12.
 
