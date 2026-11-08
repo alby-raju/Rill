@@ -1,0 +1,148 @@
+{
+  "cases": {
+    "conditional-skip": {
+      "checks": 1,
+      "environment": {
+        "choice": "initial"
+      },
+      "exit": 0,
+      "failed": 0,
+      "inputSHA256": "6fea8167838a59df612161571ee45caedbaf711880455b0c5127c7b6208ad9f1",
+      "wire": [
+        {
+          "headers": {
+            "x-case-choice": "initial",
+            "x-case-fallback": "collection-fallback"
+          },
+          "path": "/echo-choice"
+        }
+      ]
+    },
+    "conditional-yes": {
+      "checks": 2,
+      "environment": {
+        "choice": "yes"
+      },
+      "exit": 0,
+      "failed": 0,
+      "inputSHA256": "8ead52f3b17f2835094d86c351fc4a3ae920b1f420639780f331ccc3899d4891",
+      "wire": [
+        {
+          "headers": {},
+          "path": "/conditional"
+        },
+        {
+          "headers": {
+            "x-case-choice": "yes",
+            "x-case-fallback": "collection-fallback"
+          },
+          "path": "/echo-choice"
+        }
+      ]
+    },
+    "expected-non2xx": {
+      "checks": 1,
+      "environment": {},
+      "exit": 0,
+      "failed": 0,
+      "inputSHA256": "4ba9761ba72d4cf2745bdee7b854fb587c3ef7806d1b22ffa5035397e1086037",
+      "wire": [
+        {
+          "headers": {},
+          "path": "/expected404"
+        }
+      ]
+    },
+    "failed-check-mutation": {
+      "checks": 2,
+      "environment": {
+        "after": "retained"
+      },
+      "exit": 1,
+      "failed": 1,
+      "inputSHA256": "b92639942a176bae39972ecb3c61b5adbe69e2fca53f251e3d5e14f7a090f94e",
+      "wire": [
+        {
+          "headers": {},
+          "path": "/failed-check"
+        },
+        {
+          "headers": {
+            "x-case-after": "retained"
+          },
+          "path": "/after-failed-check"
+        }
+      ]
+    },
+    "inheritance-extraction": {
+      "checks": 2,
+      "environment": {
+        "header": "synthetic-header",
+        "order": "folder",
+        "post": "folder",
+        "token": "synthetic-token"
+      },
+      "exit": 0,
+      "failed": 0,
+      "inputSHA256": "d4ef10809bf4a6b435a0cf361fd3de04971636bfec8a86c7aabdb3a87f824114",
+      "wire": [
+        {
+          "headers": {
+            "x-case-order": "request"
+          },
+          "path": "/login"
+        },
+        {
+          "headers": {
+            "x-case-header": "synthetic-header",
+            "x-case-order": "folder",
+            "x-case-post": "request",
+            "x-case-token": "synthetic-token"
+          },
+          "path": "/echo"
+        }
+      ]
+    },
+    "scoped-mutation": {
+      "checks": 1,
+      "environment": {
+        "copy": "global",
+        "removed": null
+      },
+      "exit": 0,
+      "failed": 0,
+      "inputSHA256": "68cc68976221b7844f8368e6ae71a2046510d00682271f19b969f17d76d5423a",
+      "wire": [
+        {
+          "headers": {
+            "x-case-c": "collection",
+            "x-case-copy": "global",
+            "x-case-g": "global",
+            "x-case-local": "local"
+          },
+          "path": "/scopes"
+        }
+      ]
+    },
+    "skip-branch-stop": {
+      "checks": 2,
+      "environment": {},
+      "exit": 0,
+      "failed": 0,
+      "inputSHA256": "414ddff2cbb75a3f6cf9633dced84ab70df75e51434e8d58f7fa0ab9fb5028d7",
+      "wire": [
+        {
+          "headers": {},
+          "path": "/branch"
+        },
+        {
+          "headers": {},
+          "path": "/target"
+        }
+      ]
+    }
+  },
+  "lockSHA256": "b426f9588b803821e194bbf9b44fc33fa18d600434050321fbf5aad62beac568",
+  "newman": "6.2.3",
+  "node": "v26.12.1"
+}

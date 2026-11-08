@@ -48,4 +48,4 @@ Kafka 1.0.0 reviewed 1 November 2026 at revision `f457437e3c5ba4bb0bd501201e7dac
 
 ## Optional synthetic script reference
 
-`scripts/script-conformance` pins stock Newman 6.2.3 and its npm lockfile for manually invoked synthetic differential tests. Node/Newman/node_modules are not application dependencies or bundled artifacts. The reference dependency audit has known findings; its [README](../scripts/script-conformance/README.md) records the scope and audit status. Normal Swift builds/tests do not install it, and its results do not replace production dependency or release-security gates.
+`scripts/script-conformance` replays captured synthetic Newman 6.2.3 results using Python and the Rill CLI. The [corpus documentation](../scripts/script-conformance/README.md) records capture provenance and why the npm dependency graph was retired.
