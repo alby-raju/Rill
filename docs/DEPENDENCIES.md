@@ -9,7 +9,7 @@ Rill's original code is MIT licensed. Third-party libraries, vendored components
 | [Yams](https://github.com/jpsim/Yams) | 6.2.2 | YAML plus bundled libyaml; MIT |
 | [ZIPFoundation](https://github.com/weichsel/ZIPFoundation) | 0.9.20 | Bounded archive adapter; MIT, privacy manifest retained |
 | [gRPC Swift](https://github.com/grpc/grpc-swift-2) | 2.4.4 | Native gRPC; Apache-2.0 |
-| [gRPC NIO transport](https://github.com/grpc/grpc-swift-nio-transport) | 2.11.0 | Native transport; Apache-2.0 and transitive notices |
+| [gRPC NIO transport](https://github.com/grpc/grpc-swift-nio-transport) | 2.12.0 | Native transport; Apache-2.0 and transitive notices |
 | [SwiftProtobuf](https://github.com/apple/swift-protobuf) | 1.39.0 | Models/compiler; Apache-2.0 with runtime exception |
 | [Swift Kafka client](https://github.com/swift-server/swift-kafka-client) | 1.0.0 | Native librdkafka wrapper; retain its graph's native/TLS/compression notices |
 | [Swift Log](https://github.com/apple/swift-log) | 1.16.2 | Logging interface; Apache-2.0 |

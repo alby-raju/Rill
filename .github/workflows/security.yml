@@ -39,7 +39,16 @@ jobs:
           persist-credentials: false
       - name: Validate workflow definitions
         run: |
-          curl --fail --location --silent --show-error https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz --output "$RUNNER_TEMP/actionlint.tar.gz"
+          RILL_DOWNLOAD=(--fail --location --silent --show-error --retry 2 --retry-all-errors
+            --retry-max-time 45 --connect-timeout 10 --max-time 20)
+          if ! curl "${RILL_DOWNLOAD[@]}" -H 'Accept: application/octet-stream' \
+            https://api.github.com/repos/rhysd/actionlint/releases/assets/384924896 \
+            --output "$RUNNER_TEMP/actionlint.tar.gz" ||
+            ! echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $RUNNER_TEMP/actionlint.tar.gz" | sha256sum -c -; then
+            curl "${RILL_DOWNLOAD[@]}" \
+              https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz \
+              --output "$RUNNER_TEMP/actionlint.tar.gz"
+          fi
           echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $RUNNER_TEMP/actionlint.tar.gz" | sha256sum -c -
           tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP" actionlint
           "$RUNNER_TEMP/actionlint" -shellcheck=
