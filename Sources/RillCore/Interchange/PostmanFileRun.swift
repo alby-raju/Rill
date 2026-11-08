@@ -109,6 +109,12 @@ public struct PostmanFileRun: Sendable {
         if planningOnly, scriptPlan?.writes.isEmpty == false {
             deferredRequestPositions.formUnion(imported.workspace.requests.indices)
         }
+        if planningOnly, let scriptPlan {
+            for (position, step) in scriptPlan.requests.enumerated()
+            where step.pre.contains(where: { scriptPlan.programs[$0].editsHeaders }) {
+                deferredRequestPositions.insert(position)
+            }
+        }
         for index in 0..<(iterationData?.rows.count ?? 1) {
             let values =
                 try iterationData?.variables(at: index, base: baseVariables, overrides: overrides)

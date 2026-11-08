@@ -6,6 +6,7 @@ indirect enum ScriptExpression: Sendable {
 }
 indirect enum ScriptOperation: Sendable {
     case set(ScriptVariableScope, String, ScriptExpression), unset(ScriptVariableScope, String)
+    case editHeader(RequestHeaderAction, String, [ScriptExpression])
     case test([ScriptAssertion]), parseJSON, next(String?), skip
     case condition(ScriptExpression, String?, Bool, [ScriptOperation], [ScriptOperation])
 }
@@ -202,7 +203,7 @@ struct ScriptLexer {
             advance()
             kind = byte == 61 ? .equal : .unequal
         } else {
-            guard [40, 41, 123, 125, 91, 93, 46, 44, 59, 33, 61].contains(byte) else {
+            guard [40, 41, 123, 125, 91, 93, 46, 44, 59, 33, 61, 58, 43].contains(byte) else {
                 throw fail()
             }
             advance()

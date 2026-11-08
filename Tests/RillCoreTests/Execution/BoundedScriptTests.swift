@@ -159,6 +159,72 @@ private actor ScriptExportCapture {
         }
     }
 
+    func testPreRequestHeaderEditsAreOrderedLiteralAndScopedToOneRequest() async throws {
+        let base = try base()
+        let data = try collection([
+            request(
+                "Mutated", url: base + "/echo",
+                events: [
+                    event(
+                        """
+                        pm.environment.set('token', 'private-token');
+                        pm.request.headers.upsert({value: 'Bearer ' + pm.environment.get('token'), key: 'authorization'});
+                        pm.request.headers.remove('x-remove');
+                        pm.request.headers.add({key: 'X-Literal', value: '{{unresolved}}'});
+                        """, phase: "prerequest")
+                ],
+                headers: [["key": "X-Remove", "value": "old"]]),
+            request("Untouched", url: base + "/echo"),
+        ])
+        let planned = try PostmanFileRun.prepare(
+            collection: data, translateScripts: true, planningOnly: true)
+        XCTAssertEqual(planned.deferredRequestPositions, [0, 1])
+        let executable = try PostmanFileRun.prepare(collection: data, translateScripts: true)
+        let report = try await executable.run(configuration: RunConfiguration())
+        XCTAssertTrue(report.passed)
+        let headers = try report.outcomes.map { outcome in
+            let body = try XCTUnwrap(outcome.retainedBody)
+            let object = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+            return try XCTUnwrap(object["headers"] as? [String: String])
+        }
+        XCTAssertEqual(
+            headers[0].first { $0.key.lowercased() == "authorization" }?.value,
+            "Bearer private-token")
+        XCTAssertNil(headers[0].first { $0.key.lowercased() == "x-remove" })
+        XCTAssertEqual(
+            headers[0].first { $0.key.lowercased() == "x-literal" }?.value, "{{unresolved}}")
+        XCTAssertNil(headers[1].first { $0.key.lowercased() == "authorization" })
+        XCTAssertNil(headers[1].first { $0.key.lowercased() == "x-literal" })
+        let json = try XCTUnwrap(RunReportExporter.files(report, format: .json).values.first)
+        XCTAssertFalse(String(decoding: json, as: UTF8.self).contains("private-token"))
+    }
+
+    func testHeaderEditsRejectUnsafeNamesAndUnrepresentableDuplicates() async throws {
+        for script in [
+            "pm.request.headers.remove('Host');",
+            "pm.request.headers.upsert({key: 'Content-Length', value: '4'});",
+            "pm.request.headers.add({key: 'X-Ok', value: 42});",
+        ] {
+            XCTAssertThrowsError(try ScriptParser(script, phase: .prerequest).parsed())
+        }
+        XCTAssertThrowsError(
+            try ScriptParser("pm.request.headers.remove('X-Ok');", phase: .test).parsed())
+        let data = try collection([
+            request(
+                "Duplicate", url: base() + "/echo",
+                events: [
+                    event(
+                        "pm.request.headers.add({key: 'x-existing', value: 'new'});",
+                        phase: "prerequest")
+                ],
+                headers: [["key": "X-Existing", "value": "old"]])
+        ])
+        let plan = try PostmanFileRun.prepare(collection: data, translateScripts: true)
+        let report = try await plan.run(configuration: RunConfiguration())
+        XCTAssertEqual(report.outcomes.first?.failure, "invalidRequest")
+        XCTAssertNil(report.outcomes.first?.status)
+    }
+
     func testSkipAndCrossFolderBranchHaveExplicitRunOutcomes() async throws {
         let base = try base()
         let data = try collection([

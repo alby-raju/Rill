@@ -240,9 +240,25 @@ rill request GET '{{base}}/health' --workspace ./workspace.json \
 
 `request METHOD URL` uses the shared HTTP engine without creating a request or reading the desktop workspace. It accepts GET, POST, PUT, PATCH, DELETE, HEAD and OPTIONS (case-insensitive). Saved environments/authentication/TLS profiles require an explicit `--workspace`; only metadata is loaded, with named credentials resolved by the existing credential provider when needed. Nothing is saved back.
 
-Use repeatable `-H`/`--header name:value`, `-d`/`--data TEXT` or `--data-file FILE` (UTF-8, at most 1 MiB). Body options are mutually exclusive; GET/HEAD bodies and repeated header names remain rejected. Temporary `--env-var key=value` overrides saved environment values; the last occurrence wins and empty values are valid. `--timeout` is 1–300 seconds. Insecure profiles still require `--allow-insecure`; certificate/environment file flags are not supported here.
+Use repeatable `-H`/`--header name:value`, `-d`/`--data TEXT` or `--data-file FILE` (UTF-8, at most 1 MiB). Development source also supports explicit binary and form uploads:
 
-Normal output is a redacted HTTP status/timing/response-byte summary. `--json` emits `schemaVersion: 1`, `status`, `duration` (seconds) and `bodyBytes`; it never includes URLs, headers or payloads. `--quiet` suppresses it. Raw response bytes require `--output FILE`, with `--overwrite` for existing files; workspace and body input paths are protected. Response downloads retain the shared 16 MiB limit. HTTP non-2xx and transport failures exit 3; invalid configuration exits 2; cancellation exits 130. This command does not run saved hooks/assertions or produce collection reports. No cookie jar or foreign script runtime is introduced.
+```sh
+rill request PUT https://example.test/blob --binary-file ./image.bin
+rill request POST https://example.test/upload --form 'title=Example' --form 'file@./image.bin'
+rill request POST https://example.test/search --form 'q=Rill API' --form 'tag=swift' --form 'tag=cli'
+```
+
+A form with only text fields is URL-encoded. Adding a `NAME@PATH` field or `--multipart` selects multipart. Repeated names and field order are preserved. Paths are literal and files must be regular files. The complete binary or multipart upload is limited to 256 MiB. Body modes are mutually exclusive. GET/HEAD bodies and repeated request headers are rejected.
+
+Temporary `--env-var key=value` overrides saved environment values. The last occurrence wins, including empty values. `--timeout` accepts 1–300 seconds. A saved insecure profile requires `--allow-insecure`. For headless mTLS, use [explicit file TLS options](#ca-trust-and-mutual-tls-from-files), including a single exact `--ssl-client-origin`. Choose either explicit file TLS or a saved `--tls` profile. Certificate maps are for collection file runs.
+
+```sh
+rill request GET https://example.test/archive --download ./archive.zip --json
+```
+
+`--download FILE` streams a successful GET into a private temporary file in the destination directory, then installs it atomically. The directory must exist. The limit is 256 MiB. Failed HTTP responses, incomplete transfers, size-limit failures and cancellation leave any existing destination intact. Use `--overwrite` to replace an existing file after a successful transfer.
+
+Ordinary output is a redacted status, timing and byte summary. `--json` emits `schemaVersion: 1`, `status`, `duration` in seconds and `bodyBytes`. `--quiet` suppresses the summary. Use `--output FILE` for explicit raw response export, including on non-2xx responses, with the usual 16 MiB limit. Choose either `--output` or `--download`. Both protect workspace, body and TLS inputs from overwrite. Non-2xx and transport failures exit 3, invalid configuration exits 2, and cancellation exits 130. The command runs a single request with no saved hooks, assertions or cookie session.
 
 ## Terminal run experience
 

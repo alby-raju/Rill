@@ -164,6 +164,18 @@ class Handler(BaseHTTPRequestHandler):
             return
         if self.path == "/slow":
             time.sleep(5)
+        if self.path in ("/download-truncated", "/download-over-limit", "/download-denied"):
+            self.send_response(403 if self.path == "/download-denied" else 200)
+            size = {
+                "/download-truncated": 128 * 1024,
+                "/download-over-limit": 256 * 1024 * 1024 + 1,
+                "/download-denied": 0,
+            }[self.path]
+            self.send_header("Content-Length", str(size))
+            self.end_headers()
+            if self.path == "/download-truncated":
+                self.wfile.write(b"x" * (70 * 1024))
+            return
         if self.path == "/large":
             self.send_response(200)
             self.send_header("Content-Length", str(17 * 1024 * 1024))

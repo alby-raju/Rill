@@ -43,6 +43,8 @@ actor PostmanScriptSession {
     private var stop = false
     private var skip = false
     private var checks: [CheckResult] = []
+    private var headerEdits: [RequestHeaderEdit] = []
+    private var headerEditBytes = 0
     private var responseJSON: Result<JSONValue, WorkflowError>?
     init(
         plan: PostmanScriptPlan, requests: [RequestDraft], initial: ScriptVariables,
@@ -153,6 +155,19 @@ actor PostmanScriptSession {
                 }
                 try variables.write(text, scope: scope, key: name)
             case .unset(let scope, let name): try variables.write(nil, scope: scope, key: name)
+            case .editHeader(let action, let name, let expressions):
+                var text = ""
+                for expression in expressions {
+                    operations += 1
+                    try budget()
+                    guard let part = try value(expression, response: nil),
+                        part.utf8.count <= 64 * 1024 - text.utf8.count
+                    else { throw WorkflowError.invalidConfiguration }
+                    text += part
+                }
+                headerEditBytes += name.utf8.count + text.utf8.count
+                guard headerEditBytes <= 256 * 1024 else { throw WorkflowError.limit }
+                headerEdits.append(RequestHeaderEdit(action: action, name: name, value: text))
             case .parseJSON:
                 guard let response else { throw WorkflowError.invalidConfiguration }
                 _ = try jsonValue([], response: response)
@@ -214,8 +229,13 @@ actor PostmanScriptSession {
         stop = false
         skip = false
         checks = []
+        headerEdits = []
+        headerEditBytes = 0
         responseJSON = nil
-        defer { responseJSON = nil }
+        defer {
+            responseJSON = nil
+            headerEdits = []
+        }
         phaseStarted = ProcessInfo.processInfo.systemUptime
         for source in plan.requests[index].pre {
             try execute(plan.programs[source].operations, response: nil)
@@ -231,7 +251,7 @@ actor PostmanScriptSession {
         }
         var exchange = try await RequestEngine.execute(
             request, environment: WorkflowEngine.environment(variables.effective), secrets: secrets,
-            fileTLS: fileTLS, cookieJar: cookieJar)
+            fileTLS: fileTLS, cookieJar: cookieJar, headerEdits: headerEdits)
         try Task.checkCancellation()
         phaseStarted = ProcessInfo.processInfo.systemUptime
         for source in plan.requests[index].post {
