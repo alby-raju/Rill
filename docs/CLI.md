@@ -82,7 +82,7 @@ rill run ./collection.json --cookies
 rill run ./workspace.json --format native --cookies
 ```
 
-`--cookies` opts a file run into a private in-memory cookie jar. Responses capture `Set-Cookie`; later matching requests and redirects send cookies using native domain, path, Secure and expiry rules. The jar starts empty for every invocation, is shared across requests/retries/iterations in that run, and is discarded at the end. Cookies are transport session state: failed assertions do not roll back server cookie changes. Runs without the flag retain cookie-free behavior. The jar is separate from Workbench, system/browser storage, environment exports and ordinary reports. No cookie files are read or written. Explicit raw response exports may reveal echoed cookies. Individual `request` commands and offline preflight reject this option. The desktop Collection and Environment matrix tabs offer the same opt-in as **Use run-local cookies**, with a separate empty jar per environment. Load tests retain isolated cookie-free requests.
+`--cookies` opts a file run into a private in-memory cookie jar. Responses capture `Set-Cookie`; later matching requests and redirects send cookies using native domain, path, Secure and expiry rules. The jar starts empty for every invocation, is shared across requests/retries/iterations in that run, and is discarded at the end. Cookies are transport session state: failed assertions do not roll back server cookie changes. Runs without the flag retain cookie-free behavior. The jar is separate from Workbench, system/browser storage, environment exports and ordinary reports. No cookie files are read or written. Explicit raw response exports may reveal echoed cookies. Individual `request` commands use the separate [encrypted cookie session](#persist-cookies-across-requests) option. Offline preflight rejects `--cookies`. The desktop Collection and Environment matrix tabs offer the same opt-in as **Use run-local cookies**, with a separate empty jar per environment. Load tests retain isolated cookie-free requests.
 
 ### Final environment export
 
@@ -287,7 +287,23 @@ rill request GET https://example.test/archive --download ./archive.zip --json
 
 `--download FILE` streams a successful GET into a private temporary file in the destination directory, then installs it atomically. The directory must exist. The limit is 256 MiB. Failed HTTP responses, incomplete transfers, size-limit failures and cancellation leave any existing destination intact. Use `--overwrite` to replace an existing file after a successful transfer.
 
-Ordinary output is a redacted status, timing and byte summary. `--json` emits `schemaVersion: 1`, `status`, `duration` in seconds and `bodyBytes`. `--quiet` suppresses the summary. Use `--output FILE` for explicit raw response export, including on non-2xx responses, with the usual 16 MiB limit. Choose either `--output` or `--download`. Both protect workspace, body and TLS inputs from overwrite. Non-2xx and transport failures exit 3, invalid configuration exits 2, and cancellation exits 130. The command runs a single request with no saved hooks, assertions or cookie session.
+Ordinary output is a redacted status, timing and byte summary. `--json` emits `schemaVersion: 1`, `status`, `duration` in seconds and `bodyBytes`. `--quiet` suppresses the summary. Use `--output FILE` for explicit raw response export, including on non-2xx responses, with the usual 16 MiB limit. Choose either `--output` or `--download`. Both protect workspace, body and TLS inputs from overwrite. Non-2xx and transport failures exit 3, invalid configuration exits 2, and cancellation exits 130. The command runs a single request with no saved hooks or assertions. Cookies are disabled unless an encrypted session is selected.
+
+### Persist cookies across requests
+
+```sh
+(umask 077; openssl rand -hex 32 > ./session-key.txt)
+rill request POST https://api.example.test/login --data-file ./login.json \
+  --session ./cookies.rill --session-key-file ./session-key.txt
+rill request GET https://api.example.test/me \
+  --session ./cookies.rill --session-key-file ./session-key.txt --json
+```
+
+Development source supports opt-in cookie sessions for `request`, including streaming downloads. Use a dedicated random 32-byte key written as 64 hexadecimal digits. The key and any existing session must be regular, owner-only files. Rill creates the encrypted session and its lock with private permissions in an existing directory. Store the key separately from the session when sharing or backing up files.
+
+The first completed request binds the session to its resolved scheme, host and port. Reusing it for a different origin exits 2 before sending. The native jar applies cookie path, Secure and expiry rules. A session retains ordinary server cookies across invocations, including cookies without an expiry. Header overrides, request bodies, auth settings and TLS credentials stay invocation-local. Explicit Cookie headers and insecure TLS settings are rejected with a session. Non-Secure cookies on an explicitly selected HTTP origin travel over HTTP.
+
+The session is authenticated with AES-GCM and limited to 128 cookies and 256 KiB on disk. The key is supplied from its explicit file, with no Keychain lookup for session encryption. A concurrent invocation using the same file exits 2 before sending. Updates replace the prior encrypted file atomically. A completed HTTP error response can still set or expire cookies. Cancellation, transport failure and an unsuccessful session write preserve the previous session. The session is separate from Workbench and run-local cookie jars.
 
 ## Terminal run experience
 

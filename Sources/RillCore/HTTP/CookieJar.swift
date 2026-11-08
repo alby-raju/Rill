@@ -4,7 +4,17 @@ import Foundation
 public final class CookieJar: Sendable {
     private let storage = URLSessionConfiguration.ephemeral.httpCookieStorage
 
-    public init() {}
+    private let scope: CookieSessionScope?
+
+    public init() { scope = nil }
+
+    init(scope: CookieSessionScope) { self.scope = scope }
+
+    func validate(_ request: URLRequest, insecure: Bool) throws {
+        try scope?.validate(request, insecure: insecure)
+    }
+
+    func store(_ cookie: HTTPCookie) { storage?.setCookie(cookie) }
 
     public var cookies: [HTTPCookie] { storage?.cookies ?? [] }
 

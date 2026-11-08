@@ -11,6 +11,27 @@ public enum BoundedFileInput {
         guard descriptor >= 0 else { throw ArchiveImportError.unavailable }
         return try consume(descriptor, limit: limit)
     }
+    static func readPrivate(_ url: URL, limit: Int) throws -> Data? {
+        try Task.checkCancellation()
+        guard (1...BoundedArchive.totalBytes).contains(limit) else {
+            throw ArchiveImportError.limit
+        }
+        let descriptor = Darwin.open(url.path, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC)
+        if descriptor < 0, errno == ENOENT { return nil }
+        guard descriptor >= 0 else { throw ArchiveImportError.unavailable }
+        guard isPrivateRegularFile(descriptor) else {
+            Darwin.close(descriptor)
+            throw ArchiveImportError.unavailable
+        }
+        return try consume(descriptor, limit: limit)
+    }
+
+    static func isPrivateRegularFile(_ descriptor: Int32) -> Bool {
+        var info = stat()
+        return fstat(descriptor, &info) == 0 && (info.st_mode & S_IFMT) == S_IFREG
+            && info.st_uid == geteuid() && (info.st_mode & 0o077) == 0 && info.st_nlink == 1
+    }
+
     public static func brunoFolder(_ location: URL) throws -> [ImportFile] {
         try Task.checkCancellation()
         let selected = location.standardizedFileURL
