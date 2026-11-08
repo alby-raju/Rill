@@ -363,9 +363,9 @@ exit $errors
 
 
 ========================================================================
-grpc-swift-nio-transport 2.11.0
+grpc-swift-nio-transport 2.12.0
 https://github.com/grpc/grpc-swift-nio-transport.git
-Pinned revision: 9765a256477383b9d441f20952118b75104304e8
+Pinned revision: 71c5da80432b10e87778928b309808fa89ad1911
 
 --- LICENSE · SHA256 cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30 ---
 
