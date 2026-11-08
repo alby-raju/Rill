@@ -99,6 +99,105 @@ import XCTest
         XCTAssertEqual(try Data(contentsOf: password), phrase)
         XCTAssertEqual(try Data(contentsOf: key), keyData)
     }
+
+    func testClientMapSelectsIdentityForEachOriginAndDoesNotFollowCrossOriginRedirects()
+        async throws
+    {
+        let folder = try root()
+        let first = try endpoint(true)
+        let second = try XCTUnwrap(ProcessInfo.processInfo.environment["RILL_TEST_SECOND_MTLS_URL"])
+        let materials = folder.appendingPathComponent("TLS inputs", isDirectory: true)
+        try FileManager.default.createDirectory(at: materials, withIntermediateDirectories: false)
+        for name in ["client.p12", "ec-client.pem", "ec-client.key"] {
+            try FileManager.default.copyItem(
+                at: fixture(name), to: materials.appendingPathComponent(name))
+        }
+        try Data("rill-fixture\n".utf8).write(to: materials.appendingPathComponent("password.txt"))
+        let manifest = materials.appendingPathComponent("identities.json")
+        let entries = [
+            ["origin": first, "pkcs12": "client.p12", "passphraseFile": "password.txt"],
+            ["origin": second, "certificate": "ec-client.pem", "key": "ec-client.key"],
+        ]
+        try JSONSerialization.data(withJSONObject: ["schemaVersion": 1, "identities": entries])
+            .write(to: manifest)
+        let config = folder.appendingPathComponent("run.json")
+        try JSONSerialization.data(withJSONObject: [
+            "kind": "rill.run-config", "schemaVersion": 1,
+            "options": ["ssl-client-map": "TLS inputs/identities.json"],
+        ]).write(to: config)
+        let rows = folder.appendingPathComponent("rows.json")
+        try JSONSerialization.data(withJSONObject: [
+            ["endpoint": first + "/client-rsa"], ["endpoint": second + "/client-ec"],
+            ["endpoint": endpoint() + "/json"],
+        ]).write(to: rows)
+        let source = folder.appendingPathComponent("source.json")
+        let args = [
+            "run", source.path, "--config", config.path, "--ca-cert", try fixture("ca.pem").path,
+            "--json",
+        ]
+        for format in ["postman", "native"] {
+            try input(format: format, url: "{{endpoint}}").write(to: source)
+            let result = try await cli(args + ["--format", format, "--iteration-data", rows.path])
+            XCTAssertEqual(result.status, 0, String(decoding: result.diagnostics, as: UTF8.self))
+            let summary = try XCTUnwrap(
+                JSONSerialization.jsonObject(with: result.output) as? [String: Any])
+            XCTAssertEqual(summary["passed"] as? Bool, true)
+            XCTAssertEqual(summary["attempts"] as? Int, 3)
+        }
+        try input(format: "postman", url: first + "/redirect-second").write(to: source)
+        let report = folder.appendingPathComponent("redirect.json")
+        let redirect = try await cli(args + ["--report", report.path])
+        XCTAssertEqual(redirect.status, 4, String(decoding: redirect.diagnostics, as: UTF8.self))
+        let document = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: Data(contentsOf: report)) as? [String: Any])
+        let outcomes = try XCTUnwrap(document["outcomes"] as? [[String: Any]])
+        XCTAssertEqual(outcomes.compactMap { $0["status"] as? Int }, [302])
+    }
+
+    func testClientMapRejectsDuplicateOriginsAndProtectsReferencedInputs() async throws {
+        let folder = try root()
+        let source = folder.appendingPathComponent("source.json")
+        try input(format: "postman", url: endpoint() + "/json").write(to: source)
+        let manifest = folder.appendingPathComponent("map.json")
+        let key = try fixture("client.key")
+        let entry = ["certificate": try fixture("client.pem").path, "key": key.path]
+        let args = ["run", source.path, "--ssl-client-map", manifest.path, "--insecure", "--json"]
+        func writeMap(_ origins: [String]) throws -> Data {
+            let data = try JSONSerialization.data(withJSONObject: [
+                "schemaVersion": 1,
+                "identities": origins.map { entry.merging(["origin": $0]) { _, new in new } },
+            ])
+            try data.write(to: manifest)
+            return data
+        }
+        _ = try writeMap(["https://localhost", "https://LOCALHOST:443/"])
+        let duplicate = try await cli(args)
+        XCTAssertEqual(duplicate.status, 2)
+        XCTAssertTrue(duplicate.output.isEmpty)
+        XCTAssertTrue(String(decoding: duplicate.diagnostics, as: UTF8.self).contains("unique"))
+        _ = try writeMap(["https://localhost/private-origin"])
+        let invalid = try await cli(args)
+        XCTAssertEqual(invalid.status, 2)
+        XCTAssertFalse(
+            String(decoding: invalid.diagnostics, as: UTF8.self).contains("private-origin"))
+        let original = try writeMap([endpoint(true)])
+        let originalKey = try Data(contentsOf: key)
+        for destination in [manifest, key] {
+            let collision = try await cli(args + ["--report", destination.path, "--overwrite"])
+            XCTAssertEqual(collision.status, 2)
+            XCTAssertTrue(collision.output.isEmpty)
+        }
+        let mixed = try await cli(args + ["--ssl-client-origin", endpoint(true)])
+        XCTAssertEqual(mixed.status, 2)
+        XCTAssertEqual(try Data(contentsOf: manifest), original)
+        XCTAssertEqual(try Data(contentsOf: key), originalKey)
+        let unmapped = try XCTUnwrap(
+            ProcessInfo.processInfo.environment["RILL_TEST_SECOND_MTLS_URL"])
+        try input(format: "postman", url: unmapped + "/client-rsa").write(to: source)
+        let noIdentity = try await cli(args)
+        XCTAssertEqual(noIdentity.status, 3)
+    }
+
     func testSystemTrustHostnameAndInsecureModesHaveExplicitOutcomes() async throws {
         let folder = try root()
         let source = folder.appendingPathComponent("source.json")

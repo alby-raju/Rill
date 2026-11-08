@@ -3,16 +3,36 @@ import Security
 
 public enum FileTLSError: Error {
     case invalidOptions, invalidCertificate, invalidIdentity, invalidPassphrase, invalidOrigin
+    case duplicateOrigin
 }
 
 /// Immutable Security objects are retained only in this process. No Keychain imports or lookups.
 public final class FileTLSConfiguration: @unchecked Sendable {
     public let profile: TLSProfile
     public let overridesTrust: Bool
-    public var hasClientIdentity: Bool { identity != nil }
-    private let identity: SecIdentity?
-    private let chain: [SecCertificate]
-    private let clientOrigin: HTTPSOrigin?
+    public static let maximumClientIdentities = 16
+    public var hasClientIdentity: Bool { !identities.isEmpty }
+    private typealias ClientIdentity = (SecIdentity, [SecCertificate])
+    private let identities: [HTTPSOrigin: ClientIdentity]
+
+    public init(trust: FileTLSConfiguration, clientIdentities: [FileTLSConfiguration]) throws {
+        guard !trust.hasClientIdentity,
+            (1...Self.maximumClientIdentities).contains(clientIdentities.count)
+        else { throw FileTLSError.invalidOptions }
+        var identities: [HTTPSOrigin: ClientIdentity] = [:]
+        for configuration in clientIdentities {
+            try Task.checkCancellation()
+            guard !configuration.overridesTrust, configuration.identities.count == 1,
+                let (origin, identity) = configuration.identities.first
+            else { throw FileTLSError.invalidOptions }
+            guard identities.updateValue(identity, forKey: origin) == nil else {
+                throw FileTLSError.duplicateOrigin
+            }
+        }
+        profile = trust.profile
+        overridesTrust = trust.overridesTrust
+        self.identities = identities
+    }
 
     public init(
         caCertificates: Data? = nil, clientCertificate: Data? = nil, clientKey: Data? = nil,
@@ -44,7 +64,8 @@ public final class FileTLSConfiguration: @unchecked Sendable {
         }
         self.profile = profile
         overridesTrust = caCertificates != nil || insecure
-        self.clientOrigin = try clientOrigin.map(HTTPSOrigin.init)
+        let origin = try clientOrigin.map(HTTPSOrigin.init)
+        let credential: ClientIdentity?
         if let pkcs12 {
             guard pkcs12.count <= 4 * 1024 * 1024 else { throw FileTLSError.invalidIdentity }
             var items: CFArray?
@@ -90,8 +111,7 @@ public final class FileTLSConfiguration: @unchecked Sendable {
                     chain.append(candidate)
                 }
             }
-            self.identity = identity
-            self.chain = chain
+            credential = (identity, chain)
         } else if let clientCertificate, let clientKey {
             let certificates = try Self.certificates(clientCertificate)
             guard let certificate = certificates.first, clientKey.count <= 1024 * 1024,
@@ -128,11 +148,14 @@ public final class FileTLSConfiguration: @unchecked Sendable {
                 throw FileTLSError.invalidIdentity
             }
             try Self.validateClientCertificate(certificate)
-            self.identity = identity
-            self.chain = Array(certificates.dropFirst())
+            credential = (identity, Array(certificates.dropFirst()))
         } else {
-            identity = nil
-            chain = []
+            credential = nil
+        }
+        if let origin, let credential {
+            identities = [origin: credential]
+        } else {
+            identities = [:]
         }
     }
 
@@ -192,9 +215,8 @@ public final class FileTLSConfiguration: @unchecked Sendable {
     }
 
     func credential(for url: URL?) -> (SecIdentity, [SecCertificate])? {
-        guard let url, let origin = HTTPSOrigin(url: url), origin == clientOrigin, let identity
-        else { return nil }
-        return (identity, chain)
+        guard let url, let origin = HTTPSOrigin(url: url) else { return nil }
+        return identities[origin]
     }
 
     static func matches(_ space: URLProtectionSpace, url: URL?) -> Bool {
@@ -205,7 +227,7 @@ public final class FileTLSConfiguration: @unchecked Sendable {
     }
 }
 
-private struct HTTPSOrigin: Equatable, Sendable {
+private struct HTTPSOrigin: Hashable, Sendable {
     let host: String
     let port: Int
     static func host(_ name: String) -> String {
