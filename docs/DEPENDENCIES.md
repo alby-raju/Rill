@@ -12,7 +12,7 @@ Rill's original code is MIT licensed. Third-party libraries, vendored components
 | [gRPC NIO transport](https://github.com/grpc/grpc-swift-nio-transport) | 2.12.0 | Native transport; Apache-2.0 and transitive notices |
 | [SwiftProtobuf](https://github.com/apple/swift-protobuf) | 1.39.0 | Models/compiler; Apache-2.0 with runtime exception |
 | [Swift Kafka client](https://github.com/swift-server/swift-kafka-client) | 1.0.0 | Native librdkafka wrapper; retain its graph's native/TLS/compression notices |
-| [Swift Log](https://github.com/apple/swift-log) | 1.16.2 | Logging interface; Apache-2.0 |
+| [Swift Log](https://github.com/apple/swift-log) | 1.17.0 | Logging interface; Apache-2.0 |
 
 SwiftPM resolves 26 pinned packages. Not every transitive source component is linked into every artifact. Kafka uses the stable 1.0 API and is isolated behind an adapter. No office/reference runtime or Java bundle is shipped. MQTT/AMQP use first-party bounded codecs and Apple's Network framework; HTTP and native UI use Apple platform APIs.
 
