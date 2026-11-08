@@ -93,6 +93,19 @@ private struct RejectFileTLSLookups: TLSIdentityProvider {
         XCTAssertThrowsError(
             try FileTLSConfiguration.validateClientCertificate(certificate, now: .distantPast))
     }
+    func testEncryptedPEMRejectsExcessiveIterationsBeforeDerivation() {
+        // Synthetic PBES2 with an eight-byte salt, 1,000,001 PBKDF2 iterations,
+        // AES-256-CBC and an all-zero IV and ciphertext.
+        let envelope =
+            "MF4wSgYJKoZIhvcNAQUNMD0wHAYJKoZIhvcNAQUMMA8ECDEyMzQ1Njc4AgMPQkEwHQYJYIZIAWUDBAEqBBAAAAAAAAAAAAAAAAAAAAAABBAAAAAAAAAAAAAAAAAAAAAA"
+        XCTAssertThrowsError(try EncryptedPKCS8.decrypt(envelope[...], passphrase: "fixture")) {
+            error in
+            guard case FileTLSError.unsupportedKeyEncryption = error else {
+                return XCTFail("Unexpected error for out-of-range KDF")
+            }
+        }
+    }
+
     func testPublicKeyValidationRejectsUnrelatedECKeyOnSameCurve() throws {
         let certificate = try XCTUnwrap(
             FileTLSConfiguration.certificates(file("ec-client.pem")).first)

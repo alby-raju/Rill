@@ -21,9 +21,9 @@ struct FileTLSOptions {
         func configuration(
             ca: Data? = nil, insecure: Bool = false, includeSystemRoots: Bool = false
         ) throws -> FileTLSConfiguration {
-            guard passphraseFile == nil || pkcs12 != nil else {
+            guard passphraseFile == nil || pkcs12 != nil || key != nil else {
                 throw CLIError.usage(
-                    "A passphrase file requires a PKCS#12 identity. PEM keys must be unencrypted. No requests sent."
+                    "A passphrase file requires an encrypted PEM key or a PKCS#12 identity. No requests sent."
                 )
             }
             return try FileTLSConfiguration(
@@ -33,7 +33,7 @@ struct FileTLSOptions {
                 },
                 clientKey: key.map { try BoundedFileInput.read($0, limit: 1024 * 1024) },
                 pkcs12: pkcs12.map { try BoundedFileInput.read($0, limit: 4 * 1024 * 1024) },
-                passphrase: passphraseFile.map(FileTLSOptions.readPassphrase) ?? "",
+                passphrase: passphraseFile.map(FileTLSOptions.readPassphrase),
                 clientOrigin: origin, insecure: insecure, includeSystemRoots: includeSystemRoots)
         }
     }
@@ -70,7 +70,9 @@ struct FileTLSOptions {
             mappedIdentities = try map.identities.map { entry in
                 let keys = Set(entry.keys)
                 guard let origin = entry["origin"],
-                    keys == ["origin", "certificate", "key"] || keys == ["origin", "pkcs12"]
+                    keys == ["origin", "certificate", "key"]
+                        || keys == ["origin", "certificate", "key", "passphraseFile"]
+                        || keys == ["origin", "pkcs12"]
                         || keys == ["origin", "pkcs12", "passphraseFile"]
                 else { throw FileTLSError.invalidOptions }
                 func file(_ name: String) throws -> URL? {
@@ -86,7 +88,7 @@ struct FileTLSOptions {
             }
         } catch is CancellationError { throw CancellationError() } catch {
             throw CLIError.usage(
-                "Invalid --ssl-client-map. Use a version 1 JSON file within 64 KiB with 1–16 entries, each containing origin and either certificate/key or pkcs12 with optional passphraseFile. No requests sent; input content omitted."
+                "Invalid --ssl-client-map. Use a version 1 JSON file within 64 KiB with 1–16 entries, each containing origin and either certificate/key or pkcs12 and a passphraseFile for encrypted PEM. No requests sent; input content omitted."
             )
         }
     }
@@ -132,6 +134,14 @@ struct FileTLSOptions {
             case .duplicateOrigin:
                 reason =
                     "Each origin in --ssl-client-map must be unique after normalizing host and port."
+            case .missingKeyPassphrase:
+                reason =
+                    "Encrypted PEM keys require --ssl-passphrase-file or passphraseFile in the identity map."
+            case .unexpectedKeyPassphrase:
+                reason = "Omit the passphrase file when using an unencrypted PEM key."
+            case .unsupportedKeyEncryption:
+                reason =
+                    "Encrypted PEM keys require PKCS#8 with PBKDF2, AES-CBC, an 8–64 byte salt and at most 1,000,000 iterations."
             case .invalidPassphrase:
                 reason =
                     "Passphrase input must be bounded UTF-8 single-line text; one trailing line ending is allowed."
@@ -140,7 +150,7 @@ struct FileTLSOptions {
                     "Certificate input must be bounded DER or a PEM bundle of at most 16 certificates."
             case .invalidIdentity:
                 reason =
-                    "Client identity is invalid, mismatched, expired or not yet valid. Use an unencrypted PEM key pair or one PKCS#12 identity with its correct passphrase."
+                    "Client identity is invalid, mismatched, expired or not yet valid. Check the key format and any passphrase file."
             }
             throw CLIError.usage(reason + " No requests sent; input content omitted.")
         } catch {

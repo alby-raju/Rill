@@ -3,7 +3,7 @@ import Security
 
 public enum FileTLSError: Error {
     case invalidOptions, invalidCertificate, invalidIdentity, invalidPassphrase, invalidOrigin
-    case duplicateOrigin
+    case duplicateOrigin, unsupportedKeyEncryption, missingKeyPassphrase, unexpectedKeyPassphrase
 }
 
 /// Immutable Security objects are retained only in this process. No Keychain imports or lookups.
@@ -36,7 +36,7 @@ public final class FileTLSConfiguration: @unchecked Sendable {
 
     public init(
         caCertificates: Data? = nil, clientCertificate: Data? = nil, clientKey: Data? = nil,
-        pkcs12: Data? = nil, passphrase: String = "", clientOrigin: String? = nil,
+        pkcs12: Data? = nil, passphrase: String? = nil, clientOrigin: String? = nil,
         insecure: Bool = false, includeSystemRoots: Bool = false
     ) throws {
         try Task.checkCancellation()
@@ -44,11 +44,11 @@ public final class FileTLSConfiguration: @unchecked Sendable {
         let hasIdentity = hasPEM || pkcs12 != nil
         guard (clientCertificate == nil) == (clientKey == nil),
             pkcs12 == nil || !hasPEM, hasIdentity == (clientOrigin != nil),
-            passphrase.isEmpty || pkcs12 != nil,
+            passphrase == nil || hasIdentity,
             !insecure || caCertificates == nil,
             !includeSystemRoots || caCertificates != nil
         else { throw FileTLSError.invalidOptions }
-        guard passphrase.utf8.count <= 4096, !passphrase.contains("\0") else {
+        if let passphrase, passphrase.utf8.count > 4096 || passphrase.contains("\0") {
             throw FileTLSError.invalidPassphrase
         }
         var profile = TLSProfile()
@@ -73,7 +73,7 @@ public final class FileTLSConfiguration: @unchecked Sendable {
             guard
                 SecPKCS12Import(
                     pkcs12 as CFData,
-                    [kSecImportExportPassphrase: passphrase, kSecImportToMemoryOnly: true]
+                    [kSecImportExportPassphrase: passphrase ?? "", kSecImportToMemoryOnly: true]
                         as CFDictionary,
                     &items) == errSecSuccess,
                 let entries = items as? [[String: Any]]
@@ -120,29 +120,29 @@ public final class FileTLSConfiguration: @unchecked Sendable {
                 !text.contains("DEK-Info:")
             else { throw FileTLSError.invalidIdentity }
             let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-            let labels = ["PRIVATE KEY", "RSA PRIVATE KEY", "EC PRIVATE KEY"]
+            let labels = [
+                "PRIVATE KEY", "RSA PRIVATE KEY", "EC PRIVATE KEY", EncryptedPKCS8.pemLabel,
+            ]
             guard
                 let label = labels.first(where: { trimmed.hasPrefix("-----BEGIN " + $0 + "-----") }
                 ),
                 trimmed.hasSuffix("-----END " + label + "-----"),
                 trimmed.components(separatedBy: "-----BEGIN ").count == 2
             else { throw FileTLSError.invalidIdentity }
-            var format = SecExternalFormat.formatUnknown
-            var type = SecExternalItemType.itemTypePrivateKey
-            var parameters = SecItemImportExportKeyParameters()
-            let empty = "" as CFString
-            parameters.passphrase = Unmanaged.passUnretained(empty)
-            var items: CFArray?
-            let status = withExtendedLifetime(empty) {
-                SecItemImport(
-                    clientKey as CFData, "pem" as CFString, &format, &type, [],
-                    &parameters, nil, &items)
+            let key: SecKey
+            if label == EncryptedPKCS8.pemLabel {
+                guard let passphrase else { throw FileTLSError.missingKeyPassphrase }
+                let body = trimmed.dropFirst("-----BEGIN \(label)-----".count)
+                    .dropLast("-----END \(label)-----".count)
+                var decrypted = try EncryptedPKCS8.decrypt(body, passphrase: passphrase)
+                defer { decrypted.resetBytes(in: 0..<decrypted.count) }
+                key =
+                    try EncryptedPKCS8.ecPrivateKey(from: decrypted)
+                    ?? Self.importPrivateKey(decrypted, pem: false)
+            } else {
+                guard passphrase == nil else { throw FileTLSError.unexpectedKeyPassphrase }
+                key = try Self.importPrivateKey(clientKey, pem: true)
             }
-            guard status == errSecSuccess, type == .itemTypePrivateKey,
-                let objects = items as? [Any], objects.count == 1, let raw = objects.first,
-                CFGetTypeID(raw as CFTypeRef) == SecKeyGetTypeID()
-            else { throw FileTLSError.invalidIdentity }
-            let key = raw as! SecKey
             try Self.validateKeyPair(certificate, privateKey: key)
             guard let identity = SecIdentityCreate(nil, certificate, key) else {
                 throw FileTLSError.invalidIdentity
@@ -157,6 +157,25 @@ public final class FileTLSConfiguration: @unchecked Sendable {
         } else {
             identities = [:]
         }
+    }
+
+    private static func importPrivateKey(_ data: Data, pem: Bool) throws -> SecKey {
+        var format = SecExternalFormat.formatUnknown
+        var type = SecExternalItemType.itemTypePrivateKey
+        var parameters = SecItemImportExportKeyParameters()
+        let empty = "" as CFString
+        parameters.passphrase = Unmanaged.passUnretained(empty)
+        var items: CFArray?
+        let status = withExtendedLifetime(empty) {
+            SecItemImport(
+                data as CFData, pem ? "pem" as CFString : nil, &format, &type, [],
+                &parameters, nil, &items)
+        }
+        guard status == errSecSuccess, type == .itemTypePrivateKey,
+            let objects = items as? [Any], objects.count == 1, let raw = objects.first,
+            CFGetTypeID(raw as CFTypeRef) == SecKeyGetTypeID()
+        else { throw FileTLSError.invalidIdentity }
+        return raw as! SecKey
     }
 
     static func validateKeyPair(_ certificate: SecCertificate, privateKey: SecKey) throws {

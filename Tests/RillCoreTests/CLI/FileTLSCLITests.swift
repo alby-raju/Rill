@@ -108,15 +108,21 @@ import XCTest
         let second = try XCTUnwrap(ProcessInfo.processInfo.environment["RILL_TEST_SECOND_MTLS_URL"])
         let materials = folder.appendingPathComponent("TLS inputs", isDirectory: true)
         try FileManager.default.createDirectory(at: materials, withIntermediateDirectories: false)
-        for name in ["client.p12", "ec-client.pem", "ec-client.key"] {
+        for name in ["client.p12", "ec-client.pem", "ec-client-encrypted.pem"] {
             try FileManager.default.copyItem(
                 at: fixture(name), to: materials.appendingPathComponent(name))
         }
         try Data("rill-fixture\n".utf8).write(to: materials.appendingPathComponent("password.txt"))
+        let pemPassphrase = materials.appendingPathComponent("PEM password.txt")
+        let password = Data(" rill-fixture \r\n".utf8)
+        try password.write(to: pemPassphrase)
         let manifest = materials.appendingPathComponent("identities.json")
         let entries = [
             ["origin": first, "pkcs12": "client.p12", "passphraseFile": "password.txt"],
-            ["origin": second, "certificate": "ec-client.pem", "key": "ec-client.key"],
+            [
+                "origin": second, "certificate": "ec-client.pem", "key": "ec-client-encrypted.pem",
+                "passphraseFile": "PEM password.txt",
+            ],
         ]
         try JSONSerialization.data(withJSONObject: ["schemaVersion": 1, "identities": entries])
             .write(to: manifest)
@@ -152,6 +158,42 @@ import XCTest
             JSONSerialization.jsonObject(with: Data(contentsOf: report)) as? [String: Any])
         let outcomes = try XCTUnwrap(document["outcomes"] as? [[String: Any]])
         XCTAssertEqual(outcomes.compactMap { $0["status"] as? Int }, [302])
+        let collision = try await cli(args + ["--report", pemPassphrase.path, "--overwrite"])
+        XCTAssertEqual(collision.status, 2)
+        XCTAssertEqual(try Data(contentsOf: pemPassphrase), password)
+    }
+
+    func testEncryptedPEMRequiresAnExplicitCorrectPassphraseBeforeSending() async throws {
+        let folder = try root()
+        let source = folder.appendingPathComponent("source.json")
+        let report = folder.appendingPathComponent("report.json")
+        let password = folder.appendingPathComponent("passphrase.txt")
+        let origin = try endpoint(true)
+        try input(format: "postman", url: origin + "/client-rsa").write(to: source)
+        let key = try fixture("client-encrypted.pem")
+        let originalKey = try Data(contentsOf: key)
+        let args = [
+            "run", source.path, "--ssl-client-cert", try fixture("client.pem").path,
+            "--ssl-client-key", key.path, "--ssl-client-origin", origin,
+            "--ca-cert", try fixture("ca.pem").path, "--report", report.path, "--json",
+        ]
+        let missing = try await cli(args)
+        XCTAssertEqual(missing.status, 2)
+        XCTAssertTrue(
+            String(decoding: missing.diagnostics, as: UTF8.self).contains("--ssl-passphrase-file"))
+        try Data("private-wrong-passphrase\n".utf8).write(to: password)
+        let withPassword = args + ["--ssl-passphrase-file", password.path]
+        let wrong = try await cli(withPassword)
+        XCTAssertEqual(wrong.status, 2)
+        XCTAssertTrue(wrong.output.isEmpty)
+        XCTAssertFalse(String(decoding: wrong.diagnostics, as: UTF8.self).contains("private-wrong"))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: report.path))
+        try Data(" rill-fixture \n".utf8).write(to: password)
+        let success = try await cli(withPassword)
+        XCTAssertEqual(success.status, 0, String(decoding: success.diagnostics, as: UTF8.self))
+        let ordinary = try success.output + success.diagnostics + Data(contentsOf: report)
+        XCTAssertFalse(String(decoding: ordinary, as: UTF8.self).contains("rill-fixture"))
+        XCTAssertEqual(try Data(contentsOf: key), originalKey)
     }
 
     func testClientMapRejectsDuplicateOriginsAndProtectsReferencedInputs() async throws {
