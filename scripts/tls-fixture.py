@@ -218,6 +218,10 @@ openssl(
 )
 
 
+if sys.argv[2:] == ["--materials-only"]:
+    sys.exit(0)
+
+
 class Server(ThreadingHTTPServer):
     def server_bind(self):
         TCPServer.server_bind(self)

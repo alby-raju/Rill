@@ -44,6 +44,19 @@ python3 verification/verify.py --cli /absolute/path/to/rill
 
 Optional Python gRPC and generated TLS/mTLS need explicit setup. The core kit installs nothing, changes no global trust and uses public dummy credentials. CI runs its default self-check against the newly built CLI on each macOS configuration.
 
+### Installed CLI TLS acceptance
+
+Build the development artifacts from a clean checkout, then quit Rill and pass the trusted CLI ZIP to the verifier. Keep its checksum and provenance sidecars in the same directory.
+
+```sh
+bash scripts/release-artifacts.sh
+python3 scripts/verify-installed-cli-tls.py "dist/RillCLI-0.4.5-$(uname -m)-development.zip"
+```
+
+The verifier extracts the signed CLI into a temporary path with spaces. It generates a 600-request Postman collection, environment file and disposable certificates. Two loopback HTTPS servers require different client identities and check request order, four variable overrides and the client certificate on every request. The verifier checks terminal and JSON reports for success and credential redaction, compares input hashes, and checks the default workspace metadata before and after. It prints a JSON evidence record with the source commit, archive hash, OS, architecture and TLS provider.
+
+On November 8, 2026, the ad-hoc development archive built from `978b3ba6ca866ff8ef760be89943800660aa0293` passed all 600 requests on arm64 macOS 27.2 with LibreSSL 2.8.3 serving the two endpoints. The ZIP SHA-256 was `dad94759eedc274658193c04931fee54189a93e7f82381a6c56162d9c218775d`. This is synthetic installed-artifact evidence for the tested Mac. Record Intel, other supported macOS versions and independent service or owner-suite results separately.
+
 ## Visual and performance diagnostics
 
 ```sh
