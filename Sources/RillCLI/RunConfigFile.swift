@@ -6,7 +6,7 @@ enum FileRunOptions {
         "environment-file", "env-var", "iterations", "delay", "retries", "retry-delay",
         "report", "report-format", "allure", "output", "timeout", "color", "folder",
         "format", "collection", "environment", "seed", "seed-time", "deadline", "comparison-output",
-        "iteration-data", "iteration-data-format", "globals", "export-environment",
+        "iteration-data", "iteration-data-format", "globals", "export-environment", "attachments",
     ]).union(FileTLSOptions.values)
     static let flags: Set<String> = [
         "json", "quiet", "detail", "continue-on-failure", "fail-fast", "overwrite",
@@ -15,7 +15,8 @@ enum FileRunOptions {
         "dry-run",
     ]
     static let paths: Set<String> = Set([
-        "environment-file", "iteration-data", "globals", "report", "allure", "output",
+        "environment-file", "iteration-data", "globals", "attachments", "report", "allure",
+        "output",
         "export-environment", "comparison-output",
     ]).union(FileTLSOptions.inputNames)
 }

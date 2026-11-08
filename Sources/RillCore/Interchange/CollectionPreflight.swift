@@ -44,7 +44,7 @@ public struct CollectionPreflight: Encodable, Sendable {
     static func inspect(
         _ selection: PostmanFolderSelection, environment: Data?, overrides: [String: String],
         globals: Data? = nil, includeScriptInventory: Bool = false, translateScripts: Bool = false,
-        preparedScripts: PostmanScriptPlan? = nil
+        preparedScripts: PostmanScriptPlan? = nil, discardUploadPaths: Bool = false
     ) throws -> Self {
         func object(_ data: Data) throws -> [String: Any] {
             try WorkspaceFile.checkJSONBounds(data)
@@ -92,7 +92,9 @@ public struct CollectionPreflight: Encodable, Sendable {
             }
         }
         // Never hydrate imported credentials or apply this workspace.
-        do { _ = try PostmanImporter.parse(selection.data) } catch {
+        do {
+            _ = try PostmanImporter.parse(selection.data, discardUploadPaths: discardUploadPaths)
+        } catch {
             issue("collection.unsupported_representation", "/")
         }
         var variables: [String: String] = [:]
@@ -215,7 +217,28 @@ public struct CollectionPreflight: Encodable, Sendable {
                 if let object = request as? [String: Any], object["event"] != nil {
                     issue("scripts.unsupported_request_location", path + "/request/event")
                 }
-                fields(request, path: path + "/request")
+                var inspected = request
+                if discardUploadPaths, var object = request as? [String: Any],
+                    var body = object["body"] as? [String: Any]
+                {
+                    if body["mode"] as? String == "file", var file = body["file"] as? [String: Any]
+                    {
+                        file.removeValue(forKey: "src")
+                        body["file"] = file
+                    }
+                    if body["mode"] as? String == "formdata",
+                        let parts = body["formdata"] as? [[String: Any]]
+                    {
+                        body["formdata"] = parts.map { row in
+                            var part = row
+                            if part["type"] as? String == "file" { part.removeValue(forKey: "src") }
+                            return part
+                        }
+                    }
+                    object["body"] = body
+                    inspected = object
+                }
+                fields(inspected, path: path + "/request")
             }
             if let children = row["item"] as? [[String: Any]] {
                 for (i, child) in children.enumerated() {

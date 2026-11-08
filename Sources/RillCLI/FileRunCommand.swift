@@ -4,9 +4,11 @@ import RillCore
 extension RillCLI {
     static func runFile(_ input: Arguments) async throws {
         let tlsOptions = try FileTLSOptions(input)
+        let attachments = try AttachmentOptions(input)
         var resolved = input
         if !input.flags.contains("dry-run") {
-            resolved.referencedTLSInputs = tlsOptions.referencedInputs
+            resolved.referencedRunInputs =
+                tlsOptions.referencedInputs + Array(attachments.files.values)
         }
         let args = resolved
         let dryRun = args.flags.contains("dry-run")
@@ -37,10 +39,11 @@ extension RillCLI {
                     && !args.flags.contains("allow-insecure")),
             format != "native"
                 || (args.value("folder") == nil && args.value("environment-file") == nil
-                    && args.value("globals") == nil && !args.flags.contains("translate-scripts"))
+                    && args.value("globals") == nil && args.value("attachments") == nil
+                    && !args.flags.contains("translate-scripts"))
         else {
             throw CLIError.usage(
-                "Postman runs use --folder/--globals/--environment-file; native runs use --collection/--environment and optional --allow-insecure. Choose --format postman|native explicitly; no requests sent."
+                "Postman runs use --folder/--globals/--environment-file/--attachments; native runs use --collection/--environment and optional --allow-insecure. Choose --format postman|native explicitly; no requests sent."
             )
         }
         var config = RunConfiguration()
@@ -132,7 +135,7 @@ extension RillCLI {
                             try BoundedFileInput.read(
                                 URL(fileURLWithPath: $0), limit: ResourceLimits.workspaceBytes)
                         }, translateScripts: args.flags.contains("translate-scripts"),
-                        planningOnly: dryRun))
+                        planningOnly: dryRun, attachmentFiles: attachments.files))
             }
         } catch let error as PostmanScriptPlanError {
             throw CLIError.usage(
@@ -175,10 +178,17 @@ extension RillCLI {
             throw CLIError.usage(
                 "Collection file blocked by offline preflight; no requests sent. Resolve unsupported scripts, variables or representations first."
             )
-        } catch PostmanFileRunError.unsupportedBody {
-            throw CLIError.usage(
-                "File runs currently reject multipart and binary/upload bodies; no referenced files opened and no requests sent."
-            )
+        } catch let error as PostmanAttachmentError {
+            let reason: String
+            switch error {
+            case .tooMany: reason = "The selected collection exceeds 256 attachment slots."
+            case .unknownSlot:
+                reason = "The attachment manifest contains a slot outside the selected requests."
+            case .missing(let slot):
+                reason = "Missing attachment at \(slot). Use --dry-run to list slots."
+            case .unavailable(let slot): reason = "Attachment unavailable or too large at \(slot)."
+            }
+            throw CLIError.usage(reason + " No requests sent; file paths omitted.")
         } catch is CancellationError { throw CancellationError() } catch let error as CLIError {
             throw error
         } catch {
@@ -202,6 +212,9 @@ extension RillCLI {
                 try args.json(output)
             } else {
                 try args.text(output.terminal(detail: args.flags.contains("detail")))
+            }
+            guard output.passed else {
+                throw CLIError.usage("Missing attachment bindings. No requests sent.")
             }
             return
         }
@@ -294,8 +307,8 @@ extension RillCLI {
             args.value("comparison-output"),
         ].compactMap { $0 }
         let normalized = destinations.map { URL(fileURLWithPath: $0).resolvingSymlinksInPath() }
-        let inputs = args.fileRunInputs
-        guard Set(normalized).count == normalized.count, Set(normalized).isDisjoint(with: inputs),
+        guard Set(normalized).count == normalized.count,
+            !normalized.contains(where: args.protectsFileRunInput),
             !normalized.contains(args.workspaceURL.resolvingSymlinksInPath())
         else {
             throw CLIError.usage(
@@ -310,7 +323,7 @@ extension RillCLI {
         }
         if let directory = args.value("allure") {
             var isDirectory: ObjCBool = false
-            guard !inputs.contains(URL(fileURLWithPath: directory).resolvingSymlinksInPath()),
+            guard !args.protectsFileRunInput(URL(fileURLWithPath: directory)),
                 URL(fileURLWithPath: directory).resolvingSymlinksInPath()
                     != args.workspaceURL.resolvingSymlinksInPath(),
                 !FileManager.default.fileExists(atPath: directory, isDirectory: &isDirectory)
@@ -386,15 +399,18 @@ private enum FileRunPlan {
     ) -> OfflineRunPlan {
         let sources: [String: String]
         let environment: String
+        let attachments: [PostmanAttachmentSlot]
         let deferred: Set<Int>
         let dynamicOrder: Bool
         switch self {
         case .postman(let plan):
             sources = plan.sourceLocations
+            attachments = plan.attachmentSlots
             environment = args.value("environment-file") == nil ? "none" : "explicitFile"
             deferred = plan.deferredRequestPositions
             dynamicOrder = plan.scriptsMayChangeOrder
         case .native(let plan):
+            attachments = []
             sources = plan.sourceLocations
             environment =
                 args.value("environment") != nil
@@ -409,12 +425,13 @@ private enum FileRunPlan {
                 runtimeValidationDeferred: deferred.contains(position))
         }
         return OfflineRunPlan(
-            inputFormat: format,
+            passed: attachments.allSatisfy(\.bound), inputFormat: format,
             selection: args.value("folder") != nil
                 ? "folder" : args.value("collection") != nil ? "collection" : "entireFile",
             environmentSource: environment, iterations: configuration.iterations,
             baseSteps: steps.count * configuration.iterations, retries: configuration.retries,
-            dynamicOrder: dynamicOrder, tlsInputsDeferred: tlsInputsDeferred, steps: steps)
+            dynamicOrder: dynamicOrder, tlsInputsDeferred: tlsInputsDeferred,
+            attachments: attachments.isEmpty ? nil : attachments, steps: steps)
     }
 
     func run(

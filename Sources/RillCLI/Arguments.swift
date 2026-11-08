@@ -6,7 +6,7 @@ enum CLIError: Error { case usage(String), assertion, runtime }
 struct Arguments: Sendable {
     var command = "help", operands: [String] = [], values: [String: [String]] = [:],
         flags: Set<String> = []
-    var referencedTLSInputs: [URL] = []
+    var referencedRunInputs: [URL] = []
     static let booleanOptions: Set<String> = [
         "quiet", "detail", "json", "apply", "continue-on-failure", "allow-insecure",
         "allow-lan", "overwrite", "show-messages", "help", "version", "insecure",
@@ -28,7 +28,7 @@ struct Arguments: Sendable {
         "environment-file", "env-var", "ssl-client-cert", "ssl-client-key", "folder",
         "iteration-data", "iteration-data-format", "globals", "export-environment",
         "ca-cert", "ssl-client-p12", "ssl-passphrase-file", "ssl-client-origin", "ssl-client-map",
-        "binary-file", "form", "download",
+        "binary-file", "form", "download", "attachments",
     ]
     init(_ input: [String]) throws {
         guard input.count <= 512, input.reduce(0, { $0 + $1.utf8.count }) <= 2 * 1024 * 1024 else {
@@ -135,6 +135,9 @@ struct Arguments: Sendable {
         {
             throw CLIError.usage("Upload and download options require request.")
         }
+        if command != "run", value("attachments") != nil {
+            throw CLIError.usage("--attachments requires a Postman file run.")
+        }
         if command != "run", flags.contains("dry-run") {
             throw CLIError.usage("--dry-run is supported only by file runs.")
         }
@@ -240,8 +243,7 @@ struct Arguments: Sendable {
     func write(_ data: Data, to path: String) throws {
         let destination = URL(fileURLWithPath: path)
         if command == "run" {
-            let inputs = fileRunInputs
-            guard !inputs.contains(destination.resolvingSymlinksInPath()) else {
+            guard !protectsFileRunInput(destination) else {
                 throw CLIError.usage(
                     "Output cannot replace run inputs, including data and TLS files.")
             }
@@ -340,6 +342,7 @@ let usage = """
           --format native          Read a native Rill workspace file without opening Keychain
           --collection NAME_OR_ID --environment NAME_OR_ID   Native selection
           --allow-insecure         Native insecure profiles require explicit opt-in
+          --attachments FILE       Bind Postman upload slots to explicit local files
           --dry-run                Print a redacted plan without sending or writing outputs
           --ca-cert FILE           DER/PEM roots for this run; --include-system-roots adds system trust
           --ssl-client-cert FILE --ssl-client-key FILE   PEM identity (encrypted PKCS#8 or clear)

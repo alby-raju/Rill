@@ -17,12 +17,15 @@ public enum PostmanImporter {
         try parse(WorkspaceFile.readBounded(from: url))
     }
     public static func parse(_ input: Data) throws -> ForeignWorkspaceImport {
+        try parse(input, discardUploadPaths: false)
+    }
+    static func parse(_ input: Data, discardUploadPaths: Bool) throws -> ForeignWorkspaceImport {
         try WorkspaceFile.checkJSONBounds(input)
         let data = input.starts(with: [0xef, 0xbb, 0xbf]) ? Data(input.dropFirst(3)) : input
         guard String(data: data, encoding: .utf8) != nil,
             let root = try JSONSerialization.jsonObject(with: data) as? [String: Any]
         else { throw PostmanImportError.invalid }
-        return try Decoder().decode(root)
+        return try Decoder(discardUploadPaths: discardUploadPaths).decode(root)
     }
     // File-run globals reuse the environment importer and its transient secret handling.
     // Keep globals opt-in here; ordinary collection-import format detection is unchanged.
@@ -38,6 +41,9 @@ public enum PostmanImporter {
         return try Decoder().decode(root)
     }
     private final class Decoder {
+        let discardUploadPaths: Bool
+        init(discardUploadPaths: Bool = false) { self.discardUploadPaths = discardUploadPaths }
+
         var requestBytes = 0
         var workspace = Workspace(), secrets: [UUID: String] = [:], warnings: Set<String> = []
         func text(_ value: Any?) throws -> String {
@@ -300,6 +306,7 @@ public enum PostmanImporter {
             }
         }
         func uploadReference(_ value: Any?) throws -> UploadFileReference? {
+            if discardUploadPaths { return nil }
             if value == nil || value is NSNull || (value as? String) == "" {
                 warnings.insert(
                     "Unselected upload placeholders were preserved. Select a local file for each enabled upload before Send."

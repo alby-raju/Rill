@@ -282,6 +282,10 @@ public enum RequestEngine {
         guard draft.method != .GET && draft.method != .HEAD else {
             throw RillError.unsupportedBodyMethod
         }
+        guard
+            draft.bodyMode != .multipart
+                || !headerEdits.contains(where: { $0.name.lowercased() == "content-type" })
+        else { throw WorkflowError.invalidConfiguration }
         var headersOnly = draft
         headersOnly.bodyMode = RequestBodyMode.none
         var request = try prepareHeaders(headersOnly)
