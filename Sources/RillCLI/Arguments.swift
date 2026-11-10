@@ -397,6 +397,7 @@ let usage = """
       openapi-list                  List saved definition IDs/operations
       openapi-import FILE_OR_URL    Preview; --apply commits linked requests
       openapi-refresh SOURCE_ID     Refresh saved location; --source overrides it; --apply
+      openapi-review SOURCE_ID      Review a local candidate with --source FILE [--json]
       contract-check REQUEST       Send a contract-linked request through shared checks
       graphql --endpoint URL       --query TEXT or --query-file FILE; --variables JSON
       grpc --endpoint URL          --proto FILE or --descriptor FILE; --method service/method
