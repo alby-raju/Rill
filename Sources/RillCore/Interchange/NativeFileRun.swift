@@ -178,9 +178,12 @@ public struct NativeFileRun: Sendable {
         exportEnvironment: CollectionRunner.EnvironmentExport? = nil, cookieJar: CookieJar? = nil
     ) async throws -> RunReport {
         guard !planningOnly else { throw WorkflowError.invalidConfiguration }
-        var report = try await executeRun(
-            configuration: configuration, timeout: timeout, exportEnvironment: exportEnvironment,
-            cookieJar: cookieJar)
+        var report = try await FileRunHTTPConnections.withSession {
+            try await executeRun(
+                configuration: configuration, timeout: timeout,
+                exportEnvironment: exportEnvironment,
+                cookieJar: cookieJar)
+        }
         let ids = Set(requests.map { $0.id.uuidString })
         report.sources = sourceLocations.filter { ids.contains($0.key) }
         report.sourceFormat = "native-id-v1"
