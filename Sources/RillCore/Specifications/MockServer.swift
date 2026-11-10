@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import Network
 
@@ -290,28 +291,44 @@ public actor MockServer {
     }
 }
 public enum DefinitionMocks {
-    public static func routes(_ definition: APIDefinition) throws -> [MockRoute] {
+    /// Generates a portable project without importing a definition into a workspace.
+    public static func project(from input: Data, seed: UInt64? = nil) throws -> MockProject {
+        guard input.count <= 8 * 1024 * 1024 else { throw SchemaError.limit }
+        var sourceHash = SHA256()
+        sourceHash.update(data: Data("rill.mock-definition.v1:".utf8))
+        sourceHash.update(data: input)
+        var bytes = Array(sourceHash.finalize().prefix(16))
+        bytes[6] = (bytes[6] & 15) | 0x80
+        bytes[8] = (bytes[8] & 63) | 0x80
+        let sourceID = bytes.withUnsafeBytes { UUID(uuid: $0.loadUnaligned(as: uuid_t.self)) }
+        let definition = try APIDefinitionLoader.parse(
+            input, location: "local definition", sourceID: sourceID)
+        let routes = try routes(definition, seed: seed)
+        guard !routes.isEmpty else { throw WorkflowError.invalidConfiguration }
+        return MockProject(name: definition.source.title, routes: routes)
+    }
+
+    public static func routes(_ definition: APIDefinition, seed: UInt64? = nil) throws
+        -> [MockRoute]
+    {
         let root = try JSONValueParser(definition.source.snapshot).parse()
+        let generator = seed.map { SeededTemplates(seed: $0, epoch: 0) }
         var routes: [MockRoute] = []
+        var bodyBytes = 0
         for operation in definition.operations {
-            guard let separator = operation.key.firstIndex(of: " ") else {
-                throw SchemaError.invalid
-            }
-            let path = String(operation.key[operation.key.index(after: separator)...])
-            let context = try APIContractContext(
-                APIRequestLink(
-                    sourceID: definition.source.id, operationKey: operation.key, baseline: Data()),
-                definitions: [definition.source])!
+            try Task.checkCancellation()
+            let context = try APIContractContext(root: root, operationKey: operation.key)
             guard let responses = context.operation["responses"]?.object,
                 let status = responses.keys.sorted().first(where: {
                     Int($0).map { (200...299).contains($0) } == true
-                })
+                }), let statusCode = Int(status), let selected = responses[status]
             else { continue }
-            let response = try context.resolve(responses[status]!)
+            guard routes.count < 1000 else { throw WorkflowError.limit }
+            let response = try context.resolve(selected)
             var route = MockRoute()
-            route.path = path
+            route.path = context.path
             route.method = operation.request.method
-            route.status = Int(status)!
+            route.status = statusCode
             if let content = response["content"]?.object, let type = content.keys.sorted().first,
                 let media = content[type]
             {
@@ -319,13 +336,14 @@ public enum DefinitionMocks {
                 let example =
                     try media["example"] ?? media["examples"]?.object?.sorted(by: {
                         $0.key < $1.key
-                    }).first?.value["value"] ?? APISamples.value(schema, root: root)
+                    }).first?.value["value"]
+                    ?? APISamples.value(schema, root: root, generator: generator)
                 route.headers = [Field(name: "Content-Type", value: type)]
                 route.body =
                     type.contains("json")
                     ? try ResponseJSON.encoded(example) : try ResponseJSON.text(example)
             } else if let schema = response["schema"] {
-                let sample = try APISamples.value(schema, root: root)
+                let sample = try APISamples.value(schema, root: root, generator: generator)
                 route.body = try ResponseJSON.encoded(sample)
             } else {
                 route.body = ""
@@ -333,6 +351,8 @@ public enum DefinitionMocks {
             }
             route.origin = MockFixtureOrigin(
                 kind: .definition, sourceID: definition.source.id, operation: operation.key)
+            bodyBytes += route.body.utf8.count
+            guard bodyBytes <= 16 * 1024 * 1024 else { throw WorkflowError.limit }
             routes.append(route)
         }
         try MockServer.validate(routes)

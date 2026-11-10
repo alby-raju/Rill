@@ -334,9 +334,12 @@ enum APISamples {
         var nodes = 0
         var bytes = 0
     }
-    static func value(_ schema: JSONValue, root: JSONValue) throws -> JSONValue {
+    static func value(_ schema: JSONValue, root: JSONValue, generator: SeededTemplates? = nil)
+        throws -> JSONValue
+    {
         var budget = Budget()
-        return try walk(schema, root: root, depth: 0, references: [], budget: &budget)
+        return try walk(
+            schema, root: root, depth: 0, references: [], generator: generator, budget: &budget)
     }
     private static func literal(_ value: JSONValue, budget: inout Budget) throws -> JSONValue {
         budget.bytes += try ResponseJSON.encoded(value).utf8.count
@@ -345,7 +348,7 @@ enum APISamples {
     }
     private static func walk(
         _ schema: JSONValue, root: JSONValue, depth: Int, references: Set<String>,
-        budget: inout Budget
+        generator: SeededTemplates?, budget: inout Budget
     ) throws -> JSONValue {
         try Task.checkCancellation()
         budget.nodes += 1
@@ -355,42 +358,77 @@ enum APISamples {
             guard !references.contains(ref) else { throw SchemaError.unsupported }
             return try walk(
                 root.pointer(ref), root: root, depth: depth + 1,
-                references: references.union([ref]), budget: &budget)
+                references: references.union([ref]), generator: generator, budget: &budget)
         }
-        if let sample = schema["example"] ?? schema["default"] ?? schema["const"]
-            ?? schema["enum"]?.array?.first
-        {
-            budget.bytes += try ResponseJSON.encoded(sample).utf8.count
-            guard budget.bytes <= 1024 * 1024 else { throw SchemaError.limit }
-            return sample
+        if let sample = schema["example"] ?? schema["default"] ?? schema["const"] {
+            return try literal(sample, budget: &budget)
+        }
+        if let choices = schema["enum"]?.array, !choices.isEmpty {
+            let index = generator?.integer(in: 0...(choices.count - 1)) ?? 0
+            return try literal(choices[index], budget: &budget)
         }
         if let alternatives = schema["oneOf"]?.array ?? schema["anyOf"]?.array {
             guard let first = alternatives.first else { throw SchemaError.invalid }
             return try walk(
-                first, root: root, depth: depth + 1, references: references, budget: &budget)
+                first, root: root, depth: depth + 1, references: references, generator: generator,
+                budget: &budget)
         }
         switch schema["type"]?.string {
         case "object", nil:
             var object: [JSONKey: JSONValue] = [:]
             let properties = schema["properties"]?.object ?? [:]
             guard properties.count <= 128 else { throw SchemaError.limit }
-            for (name, child) in properties {
+            for (name, child) in properties.sorted(by: { $0.key < $1.key }) {
                 budget.bytes += name.utf8.count + 6
                 object[JSONKey(name)] = try walk(
-                    child, root: root, depth: depth + 1, references: references, budget: &budget)
+                    child, root: root, depth: depth + 1, references: references,
+                    generator: generator, budget: &budget)
             }
             return .object(object)
         case "array":
             return .array([
                 try walk(
                     schema["items"] ?? .object([:]), root: root, depth: depth + 1,
-                    references: references, budget: &budget)
+                    references: references, generator: generator, budget: &budget)
             ])
-        case "integer", "number":
+        case "integer":
+            if let generator, let range = integerRange(schema) {
+                return try literal(.number(String(generator.integer(in: range))), budget: &budget)
+            }
             return try literal(schema["minimum"] ?? .number("0"), budget: &budget)
-        case "boolean": return try literal(.bool(false), budget: &budget)
+        case "number":
+            return try literal(schema["minimum"] ?? .number("0"), budget: &budget)
+        case "boolean":
+            return try literal(.bool(generator?.integer(in: 0...1) == 1), budget: &budget)
         case "null": return try literal(.null, budget: &budget)
+        case "string":
+            let sample = generator.map { sampleString(schema, generator: $0) } ?? "example"
+            return try literal(.string(Data(sample.utf8)), budget: &budget)
         default: return try literal(.string(Data("example".utf8)), budget: &budget)
+        }
+    }
+
+    private static func integerRange(_ schema: JSONValue) -> ClosedRange<Int>? {
+        guard schema["exclusiveMinimum"] == nil, schema["exclusiveMaximum"] == nil,
+            schema["multipleOf"] == nil
+        else { return nil }
+        if schema["minimum"] == nil, schema["maximum"] == nil { return 0...9999 }
+        guard let minimum = schema["minimum"], case .number = minimum,
+            let maximum = schema["maximum"], case .number = maximum,
+            let lower = (try? parameterText(minimum)).flatMap(Int.init),
+            let upper = (try? parameterText(maximum)).flatMap(Int.init), lower <= upper
+        else { return nil }
+        return lower...upper
+    }
+
+    private static func sampleString(_ schema: JSONValue, generator: SeededTemplates) -> String {
+        guard schema["minLength"] == nil, schema["maxLength"] == nil, schema["pattern"] == nil
+        else { return "example" }
+        switch schema["format"]?.string {
+        case "uuid": return generator.generate(["$uuid"])
+        case "email": return generator.generate(["$email"])
+        case nil: return "example-\(generator.integer(in: 0...9999))"
+        default: return "example"
         }
     }
 }

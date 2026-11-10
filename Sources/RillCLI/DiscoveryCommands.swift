@@ -14,6 +14,8 @@ extension RillCLI {
         let focused: [String: String] = [
             "report-diff":
                 "report-diff BEFORE AFTER [--metadata-only] [--ignore-json POINTER] [--ignore-header NAME] [--strict-headers] [--latency-percent N] [--latency-floor MS] [--json|--quiet]\nCompare versioned reports or explicit raw snapshots. Missing payloads are unknown; ordinary reports require --metadata-only. Exit 4 for observed drift, 2 for incomplete/invalid comparison, 0 for complete equality under selected rules. Output never echoes payload/header values.",
+            "mock-generate":
+                "mock-generate FILE --output PROJECT [--seed UINT64] [--overwrite] [--json|--quiet]\nGenerate an editable mock project from a local OpenAPI or Swagger file. Explicit examples take precedence. Seeded schema fallback is reproducible. No listener, network fetch or workspace access.",
             "mock-serve":
                 "mock-serve --project FILE|--routes FILE [--port N] [--json] [--control-stdin] [--quiet]\nLoopback-only HTTP. Port 0 chooses an available port. Project version 1 is shared with the desktop. --json emits one compact readiness record. --control-stdin accepts newline-terminated status/reset/stop (64 bytes maximum); EOF stops. Ctrl+C/SIGTERM stops and exits 130. No personal workspace or Keychain access.",
             "doctor":
@@ -43,7 +45,7 @@ extension RillCLI {
         "collection-import", "openapi-list", "openapi-import", "openapi-refresh", "contract-check",
         "perf", "history-diff", "git-status", "git-init", "git-commit", "plugins", "plugin-enable",
         "plugin-disable", "plugin-template", "oauth-client", "share-serve", "share-pull", "graphql",
-        "grpc", "sse", "ws", "mock-serve",
+        "grpc", "sse", "ws", "mock-generate", "mock-serve",
     ]
 
     static func doctor(_ args: Arguments) throws {

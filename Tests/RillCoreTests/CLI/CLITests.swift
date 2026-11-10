@@ -101,6 +101,51 @@ import XCTest
         let failure = try await cli(["run-request", "fixture", "--workspace", file.path])
         XCTAssertEqual(failure.status, 3)
     }
+
+    func testMockGenerateWritesReproducibleProjectAndProtectsInput() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "rill seeded mock " + UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let source = directory.appendingPathComponent("definition.yaml")
+        let first = directory.appendingPathComponent("first.json")
+        let second = directory.appendingPathComponent("second.json")
+        let input = Data(
+            """
+            openapi: 3.1.1
+            info: {title: Private fixture title}
+            paths:
+              /generated:
+                get:
+                  responses:
+                    '200':
+                      content:
+                        application/json:
+                          schema: {type: string, format: uuid}
+            """.utf8)
+        try input.write(to: source)
+        let command = ["mock-generate", source.path, "--seed", "42", "--json"]
+        let result = try await cli(command + ["--output", first.path])
+        XCTAssertEqual(result.status, 0, String(decoding: result.diagnostics, as: UTF8.self))
+        XCTAssertFalse(
+            String(decoding: result.output, as: UTF8.self).contains("Private fixture title"))
+        let repeated = try await cli(command + ["--output", second.path])
+        XCTAssertEqual(repeated.status, 0)
+        let bytes = try Data(contentsOf: first)
+        XCTAssertEqual(bytes, try Data(contentsOf: second))
+        XCTAssertEqual(try MockProjectFile.decode(bytes).routes.first?.path, "/generated")
+        let exists = try await cli(command + ["--output", first.path])
+        XCTAssertEqual(exists.status, 2)
+        let protected = try await cli(command + ["--output", source.path, "--overwrite"])
+        XCTAssertEqual(protected.status, 2)
+        XCTAssertEqual(try Data(contentsOf: source), input)
+        XCTAssertEqual(try Data(contentsOf: first), bytes)
+        let invalid = try await cli([
+            "mock-generate", source.path, "--output", second.path, "--seed", "-1", "--overwrite",
+        ])
+        XCTAssertEqual(invalid.status, 2)
+        XCTAssertEqual(try Data(contentsOf: second), bytes)
+    }
     func testCLIBackupRestoreGraphQLAndImportPreview() async throws {
         guard let base = ProcessInfo.processInfo.environment["RILL_TEST_LIVE_URL"] else {
             throw XCTSkip("Live fixture required")

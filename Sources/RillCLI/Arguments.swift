@@ -74,13 +74,16 @@ struct Arguments: Sendable {
         }
         try applyRunConfig()
         if command != "run",
-            !Set(["config", "seed", "seed-time", "deadline", "comparison-output"]).isDisjoint(
+            !Set(["config", "seed-time", "deadline", "comparison-output"]).isDisjoint(
                 with: values.keys)
                 || !Set(["github-annotations", "fail-fast"]).isDisjoint(with: flags)
         {
             throw CLIError.usage(
-                "Run configuration, seed, deadline, snapshot and annotation options require a file run."
+                "Run configuration, seed time, deadline, snapshot and annotation options require a file run."
             )
+        }
+        if !["run", "mock-generate"].contains(command), value("seed") != nil {
+            throw CLIError.usage("--seed requires a file run or mock-generate.")
         }
         if command != "report-diff",
             !Set(["ignore-json", "ignore-header", "latency-percent", "latency-floor"]).isDisjoint(
@@ -408,6 +411,7 @@ let usage = """
       sse --endpoint URL           Bounded SSE session
       ws --endpoint URL            --send TEXT --wait SECONDS; bounded WebSocket session
       perf REQUEST                 --count N --concurrency N --ramp MILLISECONDS
+      mock-generate FILE           Write a local mock project with --output FILE [--seed UINT64]
       mock-serve --project FILE     Or --routes FILE; --port N --json --control-stdin
       history-diff ID ID            Compare two saved history entries
       git-init | git-status         --repo DIRECTORY (separate from runtime data)
