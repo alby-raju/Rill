@@ -349,6 +349,18 @@ Optional PEM certificate/key inspection uses the fixed system `/usr/bin/openssl`
 
 Exit 0 means these static checks passed, **not** that the suite executed or matched Newman semantics. Blocked/invalid input exits 2; cancellation exits 130. JSON output has `passed`, `sendsRequests: false`, and a versioned `checks` object containing counts and `{code, location}` diagnostics. Malformed/unreadable input can instead produce a redacted stderr configuration error with exit 2. No request, workspace import, credential hydration or file export occurs.
 
+## Offline OpenAPI change review (development source)
+
+Get the saved definition ID with `openapi-list`, then review a candidate before refreshing:
+
+```sh
+rill openapi-review SOURCE_ID --workspace ./workspace.json --source ./candidate.yaml --json
+```
+
+The command reads a local JSON/YAML definition and uses the same plan as refresh. It reports the definition change separately from the planned workspace change, so a changed operation can show `locallyEdited` for its saved request. A removed operation with a locally edited request would keep the request and unlink it. A removed operation without a linked request has no workspace action. Rows identify the HTTP method, linked request ID where present, and one-based operation positions in the baseline and candidate. An empty list means the planner found no operations to review.
+
+The review is offline and read-only. Use `--show-messages` to include operation paths in the version 1 JSON report. A successful review exits 0 even if there are changes. `configurationOnly` means the definition snapshot changed while the existing operation fingerprint stayed the same. The classifications describe refresh behavior and can include shared or descriptive changes.
+
 ## Saved mock projects (development source)
 
 `mock-generate FILE --output PROJECT [--seed UINT64]` creates a portable mock project from a local OpenAPI or Swagger JSON/YAML file. A seed makes supported schema-derived responses reproducible while retaining explicit examples, defaults and constants. The command does not open a workspace, fetch definitions or start a listener. Existing projects require `--overwrite`. Review generated payloads before sharing them.

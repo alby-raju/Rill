@@ -7,10 +7,20 @@ public struct APIDriftItem: Sendable {
     public let key: String
     public let state: APIDrift
 }
+public struct APIDriftReview: Sendable {
+    public let key: String
+    public let method: HTTPMethod
+    public let baselinePosition: Int?
+    public let candidatePosition: Int?
+    public let definitionState: APIDrift
+    public let workspaceState: APIDrift?
+    public let linkedRequestID: UUID?
+}
 public struct APIImportPlan: Sendable {
     private let baseline: Workspace
     private let updated: Workspace
     public let changes: [APIDriftItem]
+    public let review: [APIDriftReview]
     public let warnings: [String]
     public let sourceID: UUID
     public init(_ definition: APIDefinition, current: Workspace, refreshing sourceID: UUID? = nil)
@@ -27,6 +37,14 @@ public struct APIImportPlan: Sendable {
         }
         let prior = Dictionary(uniqueKeysWithValues: (old?.operations ?? []).map { ($0.key, $0) })
         let new = Dictionary(uniqueKeysWithValues: definition.operations.map { ($0.key, $0) })
+        let keys = Set(prior.keys).union(new.keys).sorted()
+        let snapshotChanged = oldSource?.snapshot != definition.source.snapshot
+        func definitionState(_ key: String) -> APIDrift {
+            guard let operation = new[key] else { return .removed }
+            guard let previous = prior[key] else { return .added }
+            if previous.fingerprint != operation.fingerprint { return .changed }
+            return snapshotChanged ? .configurationOnly : .unchanged
+        }
         var result = current
         var changes: [APIDriftItem] = []
         var warnings = definition.warnings
@@ -57,13 +75,16 @@ public struct APIImportPlan: Sendable {
                 result.collections.append(collection)
             }
         }
-        for key in Set(prior.keys).union(new.keys).sorted() {
+        var linkedRequestIDs: [String: UUID] = [:]
+        for key in keys {
+            try Task.checkCancellation()
             let linked = result.requests.indices.filter {
                 result.requests[$0].apiLink?.sourceID == id
                     && result.requests[$0].apiLink?.operationKey == key
             }
             guard linked.count <= 1 else { throw SchemaError.invalid }
             let index = linked.first
+            if let index { linkedRequestIDs[key] = result.requests[index].id }
             if let operation = new[key] {
                 var generated = operation.request
                 generated.collectionID = collections[operation.group]
@@ -77,11 +98,8 @@ public struct APIImportPlan: Sendable {
                         continue
                     }
                     generated.id = existing.id
-                    let drift: APIDrift =
-                        prior[key]?.fingerprint != operation.fingerprint
-                        ? .changed
-                        : oldSource?.snapshot == definition.source.snapshot
-                            ? .unchanged : .configurationOnly
+                    let upstream = definitionState(key)
+                    let drift = upstream == .added ? .changed : upstream
                     changes.append(APIDriftItem(key: key, state: drift))
                     // Preserve unchanged local values and identities even when unrelated source metadata changes.
                     if drift == .unchanged { continue }
@@ -122,7 +140,22 @@ public struct APIImportPlan: Sendable {
         _ = try WorkspaceFile.encode(result)
         updated = result
         self.changes = changes
+        let workspaceStates = Dictionary(uniqueKeysWithValues: changes.map { ($0.key, $0.state) })
+        let baselinePositions = Self.positions(old?.operations ?? [])
+        let candidatePositions = Self.positions(definition.operations)
+        review = keys.compactMap { key in
+            guard let operation = new[key] ?? prior[key] else { return nil }
+            return APIDriftReview(
+                key: key, method: operation.request.method,
+                baselinePosition: baselinePositions[key],
+                candidatePosition: candidatePositions[key], definitionState: definitionState(key),
+                workspaceState: workspaceStates[key], linkedRequestID: linkedRequestIDs[key])
+        }
         self.warnings = Array(warnings.prefix(100))
+    }
+    private static func positions(_ operations: [APIOperation]) -> [String: Int] {
+        Dictionary(
+            uniqueKeysWithValues: operations.enumerated().map { ($0.element.key, $0.offset + 1) })
     }
     static func encode(_ request: RequestDraft) throws -> Data {
         let encoder = JSONEncoder()

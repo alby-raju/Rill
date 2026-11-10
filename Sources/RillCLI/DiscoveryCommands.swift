@@ -12,6 +12,8 @@ extension RillCLI {
             throw CLIError.usage("Unknown help command; use --help.")
         }
         let focused: [String: String] = [
+            "openapi-review":
+                "openapi-review SOURCE_ID --source FILE [--workspace FILE] [--json|--quiet] [--show-messages]\nCompare a saved definition with a local candidate and list impacted request IDs and planned refresh actions. Paths are omitted unless explicitly requested. Reads workspace metadata without applying changes, accessing Keychain or sending requests.",
             "report-diff":
                 "report-diff BEFORE AFTER [--metadata-only] [--ignore-json POINTER] [--ignore-header NAME] [--strict-headers] [--latency-percent N] [--latency-floor MS] [--json|--quiet]\nCompare versioned reports or explicit raw snapshots. Missing payloads are unknown; ordinary reports require --metadata-only. Exit 4 for observed drift, 2 for incomplete/invalid comparison, 0 for complete equality under selected rules. Output never echoes payload/header values.",
             "mock-generate":
@@ -42,7 +44,8 @@ extension RillCLI {
         "report-diff", "help", "version", "doctor", "completion", "preflight", "request", "run",
         "init", "list",
         "search", "run-request", "run-collection", "run-folder", "backup", "restore", "diagnostics",
-        "collection-import", "openapi-list", "openapi-import", "openapi-refresh", "contract-check",
+        "collection-import", "openapi-list", "openapi-import", "openapi-refresh", "openapi-review",
+        "contract-check",
         "perf", "history-diff", "git-status", "git-init", "git-commit", "plugins", "plugin-enable",
         "plugin-disable", "plugin-template", "oauth-client", "share-serve", "share-pull", "graphql",
         "grpc", "sse", "ws", "mock-generate", "mock-serve",
