@@ -5,6 +5,22 @@ public enum RunReportFormat: String, CaseIterable, Sendable {
     case html = "Offline HTML", ndjson = "NDJSON events"
 }
 public enum RunReportExporter {
+    private struct JSONReport: Encodable {
+        let report: RunReport
+
+        private enum Metadata: String, CodingKey {
+            case kind, schemaVersion, passed
+        }
+
+        func encode(to encoder: Encoder) throws {
+            try report.encode(to: encoder)
+            var metadata = encoder.container(keyedBy: Metadata.self)
+            try metadata.encode("rill.run-report", forKey: .kind)
+            try metadata.encode(1, forKey: .schemaVersion)
+            try metadata.encode(report.passed, forKey: .passed)
+        }
+    }
+
     /// Allowlist only. Labels, URLs, checks' expected values, bodies, fingerprints and errors may contain secrets.
     static func sanitized(_ report: RunReport) -> RunReport {
         var copy = report
@@ -73,15 +89,7 @@ public enum RunReportExporter {
         let files: [String: Data]
         switch format {
         case .json:
-            var object =
-                try JSONSerialization.jsonObject(with: encoder.encode(safe)) as! [String: Any]
-            object["passed"] = safe.passed
-            object["schemaVersion"] = 1
-            object["kind"] = "rill.run-report"
-            files = [
-                "rill-run.json": try JSONSerialization.data(
-                    withJSONObject: object, options: [.prettyPrinted, .sortedKeys])
-            ]
+            files = ["rill-run.json": try encoder.encode(JSONReport(report: safe))]
         case .ndjson:
             files = ["rill-run.ndjson": try ndjson(safe)]
         case .html:
