@@ -75,12 +75,7 @@ extension RillCLI {
                     try args.transport($0, workspace: workspace)
                 }
             }
-            var config = RunConfiguration()
-            config.iterations = try args.integer("iterations", default: 1)
-            config.retries = try args.integer("retries", default: 0)
-            config.delayMilliseconds = try args.integer("delay", default: 0)
-            config.retryDelayMilliseconds = try args.integer("retry-delay", default: 0)
-            config.stopOnFailure = !args.flags.contains("continue-on-failure")
+            let config = try args.savedRunConfiguration()
             let progressLabels = Dictionary(
                 requests.map { ($0.id, RunConsole.label($0.name, limit: 40)) },
                 uniquingKeysWith: { first, _ in first })

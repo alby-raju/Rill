@@ -53,6 +53,7 @@ import RillCore
         case "preflight": try await preflight(args)
         case "openapi-review": try reviewOpenAPI(args)
         case "request": try await request(args)
+        case "contract-run": try await runContracts(args)
         case "run": try await runFile(args)
         case "report-diff": try reportDiff(args)
         case "mock-generate": try generateMock(args)

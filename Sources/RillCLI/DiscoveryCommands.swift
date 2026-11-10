@@ -12,6 +12,8 @@ extension RillCLI {
             throw CLIError.usage("Unknown help command; use --help.")
         }
         let focused: [String: String] = [
+            "contract-run":
+                "contract-run SOURCE_ID [--workspace FILE] [--request-id UUID ...] [--environment NAME] [--continue-on-failure] [--report FILE --report-format json|markdown|junit|html|ndjson] [--json|--detail|--quiet]\nRun saved contract-linked requests in workspace order using their configured endpoints. Select exact request IDs or run the source's complete saved selection. Contract checks must be enabled and native hooks must keep execution sequential.",
             "openapi-review":
                 "openapi-review SOURCE_ID --source FILE [--workspace FILE] [--json|--quiet] [--show-messages]\nCompare a saved definition with a local candidate and list impacted request IDs and planned refresh actions. Paths are omitted unless explicitly requested. Reads workspace metadata without applying changes, accessing Keychain or sending requests.",
             "report-diff":
@@ -45,8 +47,8 @@ extension RillCLI {
         "init", "list",
         "search", "run-request", "run-collection", "run-folder", "backup", "restore", "diagnostics",
         "collection-import", "openapi-list", "openapi-import", "openapi-refresh", "openapi-review",
-        "contract-check",
-        "perf", "history-diff", "git-status", "git-init", "git-commit", "plugins", "plugin-enable",
+        "contract-check", "contract-run", "perf", "history-diff", "git-status", "git-init",
+        "git-commit", "plugins", "plugin-enable",
         "plugin-disable", "plugin-template", "oauth-client", "share-serve", "share-pull", "graphql",
         "grpc", "sse", "ws", "mock-generate", "mock-serve",
     ]
