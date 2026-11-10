@@ -55,6 +55,8 @@ python3 scripts/verify-installed-cli-tls.py "dist/RillCLI-0.4.5-$(uname -m)-deve
 
 The verifier extracts the signed CLI into a temporary path with spaces. It generates a 600-request Postman collection, environment file and disposable certificates. Two loopback HTTPS servers require different client identities and check request order, four variable overrides and the client certificate on every request. The verifier checks terminal and JSON reports for success and credential redaction, compares input hashes, and checks the default workspace metadata before and after. It prints a JSON evidence record with the source commit, archive hash, OS, architecture and TLS provider.
 
+The scheduled and manually dispatched Swift CI matrix verifies the newly built CLI ZIP and retains a JSON evidence artifact for each runner and Xcode combination. The development release matrix runs the same check on each candidate ZIP before attestation and staging. Both require the ZIP provenance to match the exact workflow revision via `--source-commit`.
+
 On November 8, 2026, the ad-hoc development archive built from `978b3ba6ca866ff8ef760be89943800660aa0293` passed all 600 requests on arm64 macOS 27.2 with LibreSSL 2.8.3 serving the two endpoints. The ZIP SHA-256 was `dad94759eedc274658193c04931fee54189a93e7f82381a6c56162d9c218775d`. This is synthetic installed-artifact evidence for the tested Mac. Record Intel, other supported macOS versions and independent service or owner-suite results separately.
 
 ## Visual and performance diagnostics
