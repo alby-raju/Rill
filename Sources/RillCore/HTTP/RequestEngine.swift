@@ -50,6 +50,39 @@ enum HTTPClientConfiguration {
     }
 }
 
+final class FileRunHTTPConnections: @unchecked Sendable {
+    @TaskLocal static var current: FileRunHTTPConnections?
+    private let lock = NSLock()
+    private var active: (host: String, port: Int, session: URLSession)?
+
+    static func withSession<T: Sendable>(_ operation: @Sendable () async throws -> T) async rethrows
+        -> T
+    {
+        let connections = FileRunHTTPConnections()
+        defer { connections.close() }
+        return try await $current.withValue(connections) { try await operation() }
+    }
+
+    func session(for url: URL) -> URLSession? {
+        guard let host = url.host?.lowercased() else { return nil }
+        let port = url.port ?? 80
+        return lock.withLock {
+            if let active, active.host == host, active.port == port { return active.session }
+            active?.session.invalidateAndCancel()
+            let session = URLSession(configuration: HTTPClientConfiguration.make())
+            active = (host, port, session)
+            return session
+        }
+    }
+
+    private func close() {
+        lock.withLock {
+            active?.session.invalidateAndCancel()
+            active = nil
+        }
+    }
+}
+
 enum RequestHeaderAction: String, Sendable { case add, upsert, remove }
 
 struct RequestHeaderEdit: Sendable {
@@ -372,17 +405,35 @@ public enum RequestEngine {
                 throw ContractError.requestRejected
             }
         }
-        let configuration = HTTPClientConfiguration.make()
         try cookieJar?.validate(request, insecure: tlsProfile?.mode == .insecure)
-        cookieJar?.configure(configuration)
         let delegate = HTTPTransportDelegate(
             prepared: frozen, profile: tlsProfile, identity: identity,
             certificates: fileCredential?.1,
             identityPersistence: fileTLS == nil ? .forSession : .none,
             followRedirects: followRedirects)
-        let session = URLSession(
-            configuration: configuration, delegate: delegate, delegateQueue: nil)
-        defer { session.invalidateAndCancel() }
+        // Keep challenge state and body replay isolated on the original path. For plain,
+        // bodyless HTTP reads, the task delegate still enforces the same redirect policy.
+        let pooled: URLSession?
+        if let url = request.url, url.scheme == "http", url.user == nil, url.password == nil,
+            draft.method == .GET || draft.method == .HEAD, fileTLS == nil, tlsProfile == nil,
+            cookieJar == nil, request.value(forHTTPHeaderField: "Authorization") == nil,
+            request.value(forHTTPHeaderField: "Proxy-Authorization") == nil,
+            request.value(forHTTPHeaderField: "Cookie") == nil
+        {
+            pooled = FileRunHTTPConnections.current?.session(for: url)
+        } else {
+            pooled = nil
+        }
+        let session: URLSession
+        if let pooled {
+            session = pooled
+        } else {
+            let configuration = HTTPClientConfiguration.make()
+            cookieJar?.configure(configuration)
+            session = URLSession(
+                configuration: configuration, delegate: delegate, delegateQueue: nil)
+        }
+        defer { if pooled == nil { session.invalidateAndCancel() } }
         func transportFailure(_ error: Error) throws -> Never {
             if Task.isCancelled { throw CancellationError() }
             if let code = delegate.tlsRejection { throw URLError(code) }
@@ -390,7 +441,10 @@ public enum RequestEngine {
         }
         let start = ProcessInfo.processInfo.systemUptime
         let received: (URLSession.AsyncBytes, URLResponse)
-        do { received = try await session.bytes(for: request) } catch {
+        do {
+            received = try await session.bytes(
+                for: request, delegate: pooled == nil ? nil : delegate)
+        } catch {
             try transportFailure(error)
         }
         let (bytes, response) = received

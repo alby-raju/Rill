@@ -41,6 +41,8 @@ Use the [manual kit](../verification/README.md) and [testing guide](TESTING.md),
 
 Run **Development release** manually on `main`, supplying a new tag matching the source version, such as `v0.4.5-dev.2` for another 0.4.5 preview. Run the **Security** workflow manually on the intended main revision and wait for deep Swift analysis before starting release preparation (the nightly run also qualifies if it analyzed that exact revision). The release workflow rejects other branches, mismatched/reused tags and revisions without successful build, dependency scan and both CodeQL checks. Routine PR security checks do not substitute for deep Swift analysis. It tests and packages on separate Apple Silicon and Intel runners, audits dependencies, verifies notices, and attests each DMG and CLI-only ZIP using GitHub OIDC (no stored signing key).
 
+Before attestation, each runner verifies its exact CLI ZIP with the [600-request installed mTLS check](TESTING.md#installed-cli-tls-acceptance). The workflow retains the evidence JSON alongside the build artifacts for review. Fresh-machine and independent service acceptance remain separate release evidence.
+
 Only after both builds pass does it create a **draft prerelease** containing both installers, checksums, provenance, verification kit, MIT license, third-party notices and dependency pins. A failed build creates no release. A failed draft upload may leave an incomplete draft: inspect/delete that unpublished draft before retrying; never replace a published tag. Review all assets and replace the notes' maintainer placeholder with highlights, limitations and actual acceptance results, then publish explicitly:
 
 ```sh

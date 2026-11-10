@@ -1,8 +1,9 @@
 # Performance baselines
 
 Performance work starts with reproducible workloads, not comparisons with other clients.
-The first harness measures metadata and offline Postman validation on synthetic
-600/5,000/10,000-request files. It does not send requests or open personal data/Keychain.
+The harness measures metadata and offline Postman validation on synthetic
+600/5,000/10,000-request files. Optional loopback workloads measure scripted execution and
+reporting. The harness uses temporary files and local endpoints.
 
 ## Run the harness
 
@@ -16,8 +17,22 @@ python3 scripts/benchmark-cli.py \
   --output /tmp/rill-cli-baseline.json --repetitions 5
 ```
 
-The script uses deterministic synthetic UUIDs, identical request shapes and loopback URLs
-that are never contacted. Each sample starts a separate CLI process. The first invocation
+Add `--include-runs` to measure a scripted Postman run with no report, with a JSON report,
+and with an NDJSON report at each size. The fixture binds to an ephemeral loopback port,
+checks request order and a header added by the pre-request script, and returns JSON that
+the post-response script checks. The 600-request workload returns 64 KiB per request.
+The 5,000- and 10,000-request workloads return 1 KiB per request. The record includes
+accepted TCP connections, response bytes and report bytes for each run sample.
+
+Native and Postman file runs reuse connections for eligible plain HTTP GET and HEAD
+requests. The pool is scoped to one run and one active origin. The task delegate still
+checks redirects against the request's origin. HTTPS, request bodies, cookie jars and
+requests with URL credentials or explicit authorization or cookie headers use their own
+sessions. Reports remain redacted and bounded. Versioned JSON exports encode the report
+and its schema metadata in one pass.
+
+The script uses deterministic synthetic UUIDs and identical request shapes. Each sample
+starts a separate CLI process. The first invocation
 is recorded separately; repeated samples benefit from OS caches. These are not truly cold
 cache measurements: the harness does not reboot, flush caches or control thermal state.
 macOS `/usr/bin/time -l` records per-process peak resident memory in bytes. The JSON records
@@ -50,10 +65,33 @@ No speed claim against Postman, Newman or HTTPie follows from these measurements
 equivalent workloads, setup and distributions have not been measured. CLI metadata timings
 also do not measure native search interaction or frame/main-thread latency.
 
+## Scripted loopback runs: 10 November 2026
+
+Apple M5 Pro, 24 GiB RAM, 15 logical CPUs, arm64, macOS 27.2.1. Optimized CLI built from
+`bdbf252` with the connection and reporting changes in the working tree. Three repeated
+samples followed the first invocation for each row. All 36 runs passed, and 35 used one TCP
+connection. The first 5,000-request NDJSON run used two. The harness includes CLI startup,
+plan preparation, HTTP traffic, checks, summary and any report write in elapsed time.
+
+| Requests | Export | Median s | Sample p95 s | Maximum RSS MiB |
+| ---: | --- | ---: | ---: | ---: |
+| 600 | None | 0.616 | 0.622 | 52.8 |
+| 600 | JSON | 0.622 | 0.628 | 55.9 |
+| 600 | NDJSON | 0.619 | 0.628 | 53.6 |
+| 5,000 | None | 1.709 | 1.710 | 48.1 |
+| 5,000 | JSON | 1.744 | 1.745 | 66.0 |
+| 5,000 | NDJSON | 1.752 | 1.772 | 51.8 |
+| 10,000 | None | 3.389 | 3.391 | 77.0 |
+| 10,000 | JSON | 3.460 | 3.469 | 114.7 |
+| 10,000 | NDJSON | 3.619 | 3.621 | 84.8 |
+
+The 10,000-request reports occupied approximately 6.6 MiB in JSON and 5.6 MiB in NDJSON.
+These local samples characterize one scripted workload per size. TLS, remote latency and
+independent hardware results require separate measurements.
+
 ## Still required by PERF-01
 
 Native startup/tab/search/close-all interaction and main-thread profiling; many-tab and
-large-response workloads; script-heavy native workflows; HTTP connection reuse and report
-generation overhead; independent hardware/OS results, stable repetition counts and CI
+script-heavy native workflows; independent hardware/OS results, stable repetition counts and CI
 history/regression thresholds. Preserve installed-resource launch and pane-sizing checks
 while optimizing. The broader [roadmap](../ROADMAP.md) remains open.
