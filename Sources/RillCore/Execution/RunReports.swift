@@ -30,19 +30,22 @@ public enum RunReportExporter {
         copy.sources = report.sources?.filter {
             UUID(uuidString: $0.key) != nil && RunSources.valid($0.value)
         }
-        for index in copy.outcomes.indices {
-            copy.outcomes[index].retainedBody = nil
-            copy.outcomes[index].responseHeaders = nil
-            copy.outcomes[index].headersOmitted = true
-            copy.outcomes[index].bodyOmitted = true
-            copy.outcomes[index].fingerprint = nil
-            copy.outcomes[index].checkSignature = nil
-            copy.outcomes[index].checks = copy.outcomes[index].checks.enumerated().map {
-                offset, check in CheckResult(title: "Check \(offset + 1)", passed: check.passed)
-            }
-            if copy.outcomes[index].failure != nil {
-                copy.outcomes[index].failure = "Execution unsuccessful; runtime details omitted"
-            }
+        copy.outcomes = report.outcomes.map(sanitizedAttempt)
+        return copy
+    }
+    static func sanitizedAttempt(_ attempt: RunAttempt) -> RunAttempt {
+        var copy = attempt
+        copy.retainedBody = nil
+        copy.responseHeaders = nil
+        copy.headersOmitted = true
+        copy.bodyOmitted = true
+        copy.fingerprint = nil
+        copy.checkSignature = nil
+        copy.checks = attempt.checks.enumerated().map {
+            offset, check in CheckResult(title: "Check \(offset + 1)", passed: check.passed)
+        }
+        if copy.failure != nil {
+            copy.failure = "Execution unsuccessful; runtime details omitted"
         }
         return copy
     }
@@ -82,7 +85,7 @@ public enum RunReportExporter {
     public static func files(_ report: RunReport, format: RunReportFormat) throws -> [String: Data]
     {
         try validate(report)
-        let safe = sanitized(report)
+        let safe = format == .ndjson ? report : sanitized(report)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
@@ -91,7 +94,9 @@ public enum RunReportExporter {
         case .json:
             files = ["rill-run.json": try encoder.encode(JSONReport(report: safe))]
         case .ndjson:
-            files = ["rill-run.ndjson": try ndjson(safe)]
+            var data = Data()
+            try encodeNDJSON(report) { data.append($0) }
+            files = ["rill-run.ndjson": data]
         case .html:
             files = ["rill-run.html": html(safe)]
         case .markdown:
