@@ -100,6 +100,8 @@ Acceptance: create and run a mock without discovering a hidden submenu, close it
 - [ ] **FLOW-01 — API change workflow.** OpenAPI change review → impacted requests → generated examples/mocks → contract run → local report. Reuse current definition, contract and mock support rather than replacing it.
 - [ ] **FLOW-02 — Better migration and reproducibility.** Portable text-oriented project files, semantic diffs, read-only discovery, import previews and exact file/line diagnostics. Evaluate HTTPie interoperability against documented exports; do not claim to reproduce its complete app behavior.
 
+Development-source CLI writes [NDJSON run reports](docs/RUN-INVESTIGATION.md) in bounded chunks and publishes complete files atomically at the end of a run. Other export formats still use buffered output.
+
 Initial performance targets are hypotheses to calibrate after PERF-01: p95 warm metadata listing under 200 ms for 600 requests; p95 search/close-all interaction under 100 ms of main-thread work; no more than 20% regression in stable reference benchmarks. Publish workload, throughput, latency and memory together. Do not claim to beat Postman/Newman/HTTPie until comparable public benchmarks substantiate it.
 
 ## 5–6. Linux and Windows: CLI first, desktop separately
