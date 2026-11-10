@@ -324,6 +324,20 @@ Performance reports show throughput, p50/p95/p99 and min/max latency, plus optio
 
 TTY sessions show append-only progress on stderr as each attempt completes. Redirected output and `--json` have no progress; `--quiet` suppresses normal output and progress. Colors are automatic only on a capable TTY, respecting `NO_COLOR` and `TERM=dumb`; override with `--color always|never`. Color is supplementary: every result has a text state. Existing exit codes, cancellation/report flushing and payload export behavior are unchanged.
 
+### Run a saved contract batch
+
+Use `contract-run` with the definition ID from `openapi-list` and optional exact request IDs from a review or `list`:
+
+```sh
+rill contract-run SOURCE_ID --workspace ./workspace.json \
+  --request-id REQUEST_UUID --request-id ANOTHER_UUID \
+  --continue-on-failure --report ./contracts.json --json
+```
+
+The command sends requests to their configured endpoints in saved workspace order. Omit `--request-id` to select every saved request linked to the source. The entire selection requires current operation links and enabled contract checks before traffic. Linear hooks and extractions use the shared workflow engine. Hooks containing `next` or `stop` reject before traffic. The default stops after the first failed visit. `--continue-on-failure` runs the remaining visits.
+
+Use `--report-format json|markdown|junit|html|ndjson` with `--report FILE`. The report uses request IDs and redacted outcomes. Existing report files require `--overwrite`. The batch reads saved workspace data and resolves credentials for selected requests as needed. It uses the same assertion, configuration, runtime and cancellation exit codes as other run commands.
+
 ## Offline collection preflight (since 0.4.4)
 
 Included since 0.4.4. Build `RillCLI` from source or use the packaged CLI to inspect a local Postman v2 collection without importing or sending it:

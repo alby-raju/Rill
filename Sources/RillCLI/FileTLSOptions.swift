@@ -207,15 +207,18 @@ extension Arguments {
     }
 
     func protectsFileRunInput(_ destination: URL) -> Bool {
+        Self.aliasesInput(destination, among: fileRunInputs)
+    }
+
+    static func aliasesInput(_ destination: URL, among normalizedInputs: [URL]) -> Bool {
         let target = destination.resolvingSymlinksInPath()
-        let inputs = fileRunInputs
-        if inputs.contains(target) { return true }
+        if normalizedInputs.contains(target) { return true }
         // Different spellings can name the same file on a case-insensitive volume.
         let identity =
             try? target.resourceValues(forKeys: [.fileResourceIdentifierKey])
             .fileResourceIdentifier as? NSObject
         guard let identity else { return false }
-        return inputs.contains { input in
+        return normalizedInputs.contains { input in
             let candidate = try? input.resourceValues(forKeys: [.fileResourceIdentifierKey])
                 .fileResourceIdentifier
             return candidate.map { identity.isEqual($0) } ?? false

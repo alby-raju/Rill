@@ -185,6 +185,92 @@ import XCTest
         } catch {}
     }
 
+    func testContractRunSelectsLinkedRequestsAndReportsSchemaFailures() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let file = root.appendingPathComponent("workspace.json")
+        let report = root.appendingPathComponent("report.json")
+        let server = MockServer()
+        let paths = ["/first", "/second", "/unselected"]
+        let base = try await server.start(
+            routes: paths.map { path in
+                var route = MockRoute()
+                route.path = path
+                route.body = path == "/first" ? "42" : #""private-fixture-payload""#
+                return route
+            })
+        defer { Task { await server.stop() } }
+        let response = ["content": ["application/json": ["schema": ["type": "string"]]]]
+        let definition = try APIDefinitionLoader.parse(
+            JSONSerialization.data(withJSONObject: [
+                "openapi": "3.1.1", "info": ["title": "private-definition"],
+                "servers": [["url": base.absoluteString]],
+                "paths": Dictionary(
+                    uniqueKeysWithValues: paths.map {
+                        (
+                            $0,
+                            [
+                                "get": [
+                                    "summary": "private-operation", "responses": ["200": response],
+                                ]
+                            ]
+                        )
+                    }),
+            ]), location: "fixture.json")
+        let empty = Workspace()
+        var workspace = try APIImportPlan(definition, current: empty).applying(to: empty)
+        let first = workspace.requests[0].id.uuidString
+        let second = workspace.requests[1].id.uuidString
+        let arguments = ["contract-run", definition.source.id.uuidString, "--workspace", file.path]
+        let selection = ["--request-id", second, "--request-id", first]
+        var hook = RequestHook()
+        hook.enabled = true
+        hook.source = #"[{"op":"if","value":"x","equals":"y","then":[{"op":"stop"}]}]"#
+        workspace.requests[1].postHook = hook
+        try WorkspaceFile.save(workspace, to: file)
+        let blocked = try await cli(arguments + selection)
+        XCTAssertEqual(blocked.status, 2)
+        let before = await server.journal()
+        XCTAssertTrue(before.isEmpty)
+
+        hook.source = #"[{"op":"set","name":"linear","value":"ok"}]"#
+        workspace.requests[1].postHook = hook
+        workspace.requests[2].apiLink?.checkContract = false
+        try WorkspaceFile.save(workspace, to: file)
+        let workspaceBytes = try Data(contentsOf: file)
+        let alias = root.appendingPathComponent("workspace-link.json")
+        try FileManager.default.linkItem(at: file, to: alias)
+        let collision = try await cli(
+            arguments + selection + ["--report", alias.path, "--overwrite"])
+        XCTAssertEqual(collision.status, 2)
+        let unknown = try await cli(arguments + ["--request-id", UUID().uuidString])
+        XCTAssertEqual(unknown.status, 2)
+        let disabled = try await cli(arguments)
+        XCTAssertEqual(disabled.status, 2)
+        let afterInvalid = await server.journal()
+        XCTAssertTrue(afterInvalid.isEmpty)
+
+        let result = try await cli(
+            arguments + selection + ["--report", report.path, "--continue-on-failure", "--json"])
+        XCTAssertEqual(result.status, 4, String(decoding: result.diagnostics, as: UTF8.self))
+        let visits = await server.journal()
+        XCTAssertEqual(visits.map(\.path), ["/first", "/second"])
+        let bytes = try Data(contentsOf: report)
+        let decoded = try RunSnapshotFile.decode(bytes)
+        XCTAssertEqual(decoded.outcomes.map { $0.requestID.uuidString }, [first, second])
+        XCTAssertEqual(decoded.outcomes.map(\.state), [.failed, .passed])
+        XCTAssertEqual(decoded.sources?[first], "/requests/0")
+        XCTAssertFalse(String(decoding: result.output + bytes, as: UTF8.self).contains("private-"))
+        let passing = try await cli(arguments + ["--request-id", second])
+        XCTAssertEqual(passing.status, 0)
+        let console = String(decoding: passing.output, as: UTF8.self)
+        XCTAssertTrue(console.contains(second))
+        XCTAssertFalse(console.contains("private-"))
+        XCTAssertEqual(try Data(contentsOf: file), workspaceBytes)
+        XCTAssertEqual(try Data(contentsOf: alias), workspaceBytes)
+    }
+
     func testAPIRefreshAndHeadlessLiveCommandsUseSharedServices() async throws {
         guard let base = ProcessInfo.processInfo.environment["RILL_TEST_LIVE_URL"] else {
             throw XCTSkip("Live fixture required")

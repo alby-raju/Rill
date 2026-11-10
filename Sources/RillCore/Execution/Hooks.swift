@@ -21,7 +21,7 @@ public enum HookRuntime {
             throw WorkflowError.invalidConfiguration
         }
     }
-    public static func validate(_ hook: RequestHook) throws {
+    public static func validate(_ hook: RequestHook, allowControlFlow: Bool = true) throws {
         try validateStorage(hook)
         guard hook.enabled else { return }
         let data = Data(hook.source.utf8)
@@ -30,7 +30,7 @@ public enum HookRuntime {
         guard let operations = try JSONSerialization.jsonObject(with: data) as? [[String: Any]]
         else { throw WorkflowError.invalidConfiguration }
         var count = 0
-        try validate(operations, depth: 0, count: &count)
+        try validate(operations, depth: 0, count: &count, allowControlFlow: allowControlFlow)
     }
     private static let fields: [String: Set<String>] = [
         "set": ["op", "name", "value"], "unset": ["op", "name"],
@@ -40,12 +40,14 @@ public enum HookRuntime {
         "time": ["op", "name"], "uuid": ["op", "name"], "next": ["op", "value"], "stop": ["op"],
         "log": ["op", "value"], "if": ["op", "value", "equals", "then", "else"],
     ]
-    private static func validate(_ operations: [[String: Any]], depth: Int, count: inout Int) throws
-    {
+    private static func validate(
+        _ operations: [[String: Any]], depth: Int, count: inout Int, allowControlFlow: Bool
+    ) throws {
         guard depth <= 16 else { throw WorkflowError.limit }
         for operation in operations {
             count += 1
             guard count <= 1024, let op = operation["op"] as? String, let allowed = fields[op],
+                allowControlFlow || (op != "next" && op != "stop"),
                 Set(operation.keys).isSubset(of: allowed),
                 Set(operation.keys).isSuperset(of: allowed.subtracting(op == "if" ? ["else"] : []))
             else { throw WorkflowError.invalidConfiguration }
@@ -58,12 +60,14 @@ public enum HookRuntime {
                 guard let yes = operation["then"] as? [[String: Any]] else {
                     throw WorkflowError.invalidConfiguration
                 }
-                try validate(yes, depth: depth + 1, count: &count)
+                try validate(
+                    yes, depth: depth + 1, count: &count, allowControlFlow: allowControlFlow)
                 if let other = operation["else"] {
                     guard let no = other as? [[String: Any]] else {
                         throw WorkflowError.invalidConfiguration
                     }
-                    try validate(no, depth: depth + 1, count: &count)
+                    try validate(
+                        no, depth: depth + 1, count: &count, allowControlFlow: allowControlFlow)
                 }
             }
         }

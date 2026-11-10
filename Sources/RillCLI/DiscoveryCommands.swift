@@ -12,6 +12,8 @@ extension RillCLI {
             throw CLIError.usage("Unknown help command; use --help.")
         }
         let focused: [String: String] = [
+            "contract-run":
+                "contract-run SOURCE_ID [--workspace FILE] [--request-id UUID ...] [--environment NAME] [--continue-on-failure] [--report FILE --report-format json|markdown|junit|html|ndjson] [--json|--detail|--quiet]\nRun saved contract-linked requests in workspace order using their configured endpoints. Select exact request IDs or run the source's complete saved selection. Contract checks must be enabled and native hooks must keep execution sequential.",
             "report-diff":
                 "report-diff BEFORE AFTER [--metadata-only] [--ignore-json POINTER] [--ignore-header NAME] [--strict-headers] [--latency-percent N] [--latency-floor MS] [--json|--quiet]\nCompare versioned reports or explicit raw snapshots. Missing payloads are unknown; ordinary reports require --metadata-only. Exit 4 for observed drift, 2 for incomplete/invalid comparison, 0 for complete equality under selected rules. Output never echoes payload/header values.",
             "mock-serve":
@@ -41,7 +43,8 @@ extension RillCLI {
         "init", "list",
         "search", "run-request", "run-collection", "run-folder", "backup", "restore", "diagnostics",
         "collection-import", "openapi-list", "openapi-import", "openapi-refresh", "contract-check",
-        "perf", "history-diff", "git-status", "git-init", "git-commit", "plugins", "plugin-enable",
+        "contract-run", "perf", "history-diff", "git-status", "git-init", "git-commit", "plugins",
+        "plugin-enable",
         "plugin-disable", "plugin-template", "oauth-client", "share-serve", "share-pull", "graphql",
         "grpc", "sse", "ws", "mock-serve",
     ]

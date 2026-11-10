@@ -29,6 +29,7 @@ struct Arguments: Sendable {
         "iteration-data", "iteration-data-format", "globals", "export-environment",
         "ca-cert", "ssl-client-p12", "ssl-passphrase-file", "ssl-client-origin", "ssl-client-map",
         "binary-file", "form", "download", "attachments", "session", "session-key-file",
+        "request-id",
     ]
     init(_ input: [String]) throws {
         guard input.count <= 512, input.reduce(0, { $0 + $1.utf8.count }) <= 2 * 1024 * 1024 else {
@@ -55,7 +56,7 @@ struct Arguments: Sendable {
                         values[name] == nil
                             || [
                                 "header", "metadata", "proto-include", "env-var", "ignore-json",
-                                "ignore-header", "form",
+                                "ignore-header", "form", "request-id",
                             ].contains(name)
                     else { throw CLIError.usage("Duplicate option.") }
                     values[name, default: []].append(input[index])
@@ -107,6 +108,9 @@ struct Arguments: Sendable {
         }
         if value("collection") != nil && command != "run" {
             throw CLIError.usage("--collection is supported only by native file runs.")
+        }
+        if value("request-id") != nil && command != "contract-run" {
+            throw CLIError.usage("--request-id requires contract-run.")
         }
         if !["run", "request"].contains(command),
             !FileTLSOptions.values.subtracting(["ssl-client-cert", "ssl-client-key"]).isDisjoint(
@@ -184,6 +188,15 @@ struct Arguments: Sendable {
         guard let text = value(name) else { return fallback }
         guard let number = Int(text) else { throw CLIError.usage("Expected an integer option.") }
         return number
+    }
+    func savedRunConfiguration() throws -> RunConfiguration {
+        var configuration = RunConfiguration()
+        configuration.iterations = try integer("iterations", default: 1)
+        configuration.retries = try integer("retries", default: 0)
+        configuration.delayMilliseconds = try integer("delay", default: 0)
+        configuration.retryDelayMilliseconds = try integer("retry-delay", default: 0)
+        configuration.stopOnFailure = !flags.contains("continue-on-failure")
+        return configuration
     }
     func seconds(_ name: String = "timeout", default fallback: Double = 30) throws -> Double {
         guard let text = value(name) else { return fallback }
@@ -398,6 +411,7 @@ let usage = """
       openapi-import FILE_OR_URL    Preview; --apply commits linked requests
       openapi-refresh SOURCE_ID     Refresh saved location; --source overrides it; --apply
       contract-check REQUEST       Send a contract-linked request through shared checks
+      contract-run SOURCE_ID       Run a saved definition's contracts [--request-id UUID ...]
       graphql --endpoint URL       --query TEXT or --query-file FILE; --variables JSON
       grpc --endpoint URL          --proto FILE or --descriptor FILE; --method service/method
           --data JSON              Sends one message and half-closes every call mode
