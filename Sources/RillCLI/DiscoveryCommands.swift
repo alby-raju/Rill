@@ -14,8 +14,12 @@ extension RillCLI {
         let focused: [String: String] = [
             "contract-run":
                 "contract-run SOURCE_ID [--workspace FILE] [--request-id UUID ...] [--environment NAME] [--continue-on-failure] [--report FILE --report-format json|markdown|junit|html|ndjson] [--json|--detail|--quiet]\nRun saved contract-linked requests in workspace order using their configured endpoints. Select exact request IDs or run the source's complete saved selection. Contract checks must be enabled and native hooks must keep execution sequential.",
+            "openapi-review":
+                "openapi-review SOURCE_ID --source FILE [--workspace FILE] [--json|--quiet] [--show-messages]\nCompare a saved definition with a local candidate and list impacted request IDs and planned refresh actions. Paths are omitted unless explicitly requested. Reads workspace metadata without applying changes, accessing Keychain or sending requests.",
             "report-diff":
                 "report-diff BEFORE AFTER [--metadata-only] [--ignore-json POINTER] [--ignore-header NAME] [--strict-headers] [--latency-percent N] [--latency-floor MS] [--json|--quiet]\nCompare versioned reports or explicit raw snapshots. Missing payloads are unknown; ordinary reports require --metadata-only. Exit 4 for observed drift, 2 for incomplete/invalid comparison, 0 for complete equality under selected rules. Output never echoes payload/header values.",
+            "mock-generate":
+                "mock-generate FILE --output PROJECT [--seed UINT64] [--overwrite] [--json|--quiet]\nGenerate an editable mock project from a local OpenAPI or Swagger file. Explicit examples take precedence. Seeded schema fallback is reproducible. No listener, network fetch or workspace access.",
             "mock-serve":
                 "mock-serve --project FILE|--routes FILE [--port N] [--json] [--control-stdin] [--quiet]\nLoopback-only HTTP. Port 0 chooses an available port. Project version 1 is shared with the desktop. --json emits one compact readiness record. --control-stdin accepts newline-terminated status/reset/stop (64 bytes maximum); EOF stops. Ctrl+C/SIGTERM stops and exits 130. No personal workspace or Keychain access.",
             "doctor":
@@ -42,11 +46,11 @@ extension RillCLI {
         "report-diff", "help", "version", "doctor", "completion", "preflight", "request", "run",
         "init", "list",
         "search", "run-request", "run-collection", "run-folder", "backup", "restore", "diagnostics",
-        "collection-import", "openapi-list", "openapi-import", "openapi-refresh", "contract-check",
-        "contract-run", "perf", "history-diff", "git-status", "git-init", "git-commit", "plugins",
-        "plugin-enable",
+        "collection-import", "openapi-list", "openapi-import", "openapi-refresh", "openapi-review",
+        "contract-check", "contract-run", "perf", "history-diff", "git-status", "git-init",
+        "git-commit", "plugins", "plugin-enable",
         "plugin-disable", "plugin-template", "oauth-client", "share-serve", "share-pull", "graphql",
-        "grpc", "sse", "ws", "mock-serve",
+        "grpc", "sse", "ws", "mock-generate", "mock-serve",
     ]
 
     static func doctor(_ args: Arguments) throws {

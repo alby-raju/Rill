@@ -327,6 +327,7 @@ extension RillCLI {
 
     static func reports(_ report: RunReport, arguments args: Arguments) async throws {
         var outputs: [String: Data] = [:]
+        var ndjsonPath: String?
         if let destination = args.value("report") {
             let format: RunReportFormat
             switch args.value("report-format") ?? "json" {
@@ -337,10 +338,13 @@ extension RillCLI {
             case "ndjson": format = .ndjson
             default: throw CLIError.usage("Unknown report format.")
             }
-            guard let data = try RunReportExporter.files(report, format: format).values.first else {
-                throw CLIError.runtime
+            if format == .ndjson {
+                ndjsonPath = destination
+            } else {
+                guard let data = try RunReportExporter.files(report, format: format).values.first
+                else { throw CLIError.runtime }
+                outputs[destination] = data
             }
-            outputs[destination] = data
         }
         if let directory = args.value("allure") {
             for (name, data) in try RunReportExporter.files(report, format: .allure) {
@@ -348,10 +352,17 @@ extension RillCLI {
             }
         }
         let files = outputs
+        let eventDestination = ndjsonPath
         // A bounded report flush has its own cancellation context so an interrupted run can
         // still write its explicitly requested cancelled outcome without restarting traffic.
-        try await Task.detached { for (path, data) in files { try args.write(data, to: path) } }
-            .value
+        try await Task.detached {
+            if let eventDestination {
+                try RunReportExporter.writeNDJSON(
+                    report, to: args.outputDestination(eventDestination),
+                    overwrite: args.flags.contains("overwrite"))
+            }
+            for (path, data) in files { try args.write(data, to: path) }
+        }.value
     }
     static func tokenFromFile(_ path: String) throws -> String {
         guard

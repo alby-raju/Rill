@@ -227,6 +227,68 @@ actor ConcurrencyProbe {
             }
         }
     }
+    func testStreamedNDJSONMatchesBufferedExportAndPublishesAtomically() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let destination = root.appendingPathComponent("events.ndjson")
+        let requestID = UUID()
+        let invalidSourceID = UUID()
+        var report = RunReport(requestedSteps: 600)
+        report.sources = [
+            requestID.uuidString: "/item/0", invalidSourceID.uuidString: "private-url",
+        ]
+        report.outcomes = (0..<600).map { index in
+            RunAttempt(
+                requestID: index == 0 ? invalidSourceID : requestID, iteration: 1, attempt: 1,
+                state: .passed, status: 200, duration: 0,
+                checks: [CheckResult(title: "private-check", passed: true)],
+                retainedBody: Data("private-body".utf8), bodyBytes: 12, bodyOmitted: false)
+        }
+        let expected = try XCTUnwrap(
+            RunReportExporter.files(report, format: .ndjson)["rill-run.ndjson"])
+        XCTAssertGreaterThan(expected.count, 64 * 1024)
+        let old = Data("old report".utf8)
+        try old.write(to: destination)
+        XCTAssertThrowsError(try RunReportExporter.writeNDJSON(report, to: destination))
+        XCTAssertEqual(try Data(contentsOf: destination), old)
+        XCTAssertThrowsError(
+            try WorkspaceFile.atomicWrite(to: destination, replaceExisting: true) { handle in
+                try RunReportExporter.encodeNDJSON(report) { chunk in
+                    try handle.write(contentsOf: chunk)
+                    throw CancellationError()
+                }
+            }
+        ) { XCTAssertTrue($0 is CancellationError) }
+        XCTAssertEqual(try Data(contentsOf: destination), old)
+        try RunReportExporter.writeNDJSON(report, to: destination, overwrite: true)
+        let actual = try Data(contentsOf: destination)
+        XCTAssertEqual(
+            try FileManager.default.contentsOfDirectory(atPath: root.path), ["events.ndjson"])
+        let text = String(decoding: actual, as: UTF8.self)
+        XCTAssertFalse(text.contains("private-"))
+        func parseEvents(_ data: Data) throws -> [[String: Any]] {
+            try data.split(separator: 10).map { line in
+                var event = try XCTUnwrap(
+                    JSONSerialization.jsonObject(with: Data(line)) as? [String: Any])
+                if var attempt = event["attempt"] as? [String: Any],
+                    var checks = attempt["checks"] as? [[String: Any]]
+                {
+                    // Redaction assigns fresh IDs to exported checks.
+                    for index in checks.indices { checks[index]["id"] = nil }
+                    attempt["checks"] = checks
+                    event["attempt"] = attempt
+                }
+                return event
+            }
+        }
+        let events = try parseEvents(actual)
+        XCTAssertEqual(events as NSArray, try parseEvents(expected) as NSArray)
+        XCTAssertEqual(events.compactMap { $0["sequence"] as? Int }, Array(0...601))
+        XCTAssertNil(events[1]["sourceLocation"])
+        XCTAssertEqual(events[2]["sourceLocation"] as? String, "/item/0")
+        XCTAssertEqual(events.last?["passed"] as? Bool, true)
+    }
     func testBranchingBudgetAndInvalidTargetRollback() async throws {
         var first = RequestDraft()
         first.name = "first"

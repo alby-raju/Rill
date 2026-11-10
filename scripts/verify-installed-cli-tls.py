@@ -131,7 +131,7 @@ def write_json(path, document):
     return path
 
 
-def check_archive(archive, root):
+def check_archive(archive, root, expected_source=None):
     checksum = Path(str(archive) + ".sha256").read_text(encoding="utf-8").split()[0]
     require(checksum == digest(archive), "CLI archive checksum mismatch.")
     provenance = json.loads(archive.with_suffix(".provenance.json").read_text(encoding="utf-8"))
@@ -141,6 +141,11 @@ def check_archive(archive, root):
         and not provenance["dirtySource"],
         "Expected a clean source archive for this architecture.",
     )
+    if expected_source is not None:
+        require(
+            provenance["sourceCommit"] == expected_source,
+            "CLI archive source does not match the expected revision.",
+        )
     subprocess.run(["ditto", "-x", "-k", str(archive), str(root)], check=True, timeout=60)
     binary = root / archive.stem / "bin" / "rill"
     subprocess.run(["codesign", "--verify", "--strict", binary], check=True, timeout=10)
@@ -256,11 +261,12 @@ def main():
     parser.add_argument(
         "archive", type=Path, help="trusted CLI ZIP with checksum and provenance sidecars"
     )
+    parser.add_argument("--source-commit", help="require the archive's exact source revision")
     args = parser.parse_args()
     require_desktop_closed()
     with tempfile.TemporaryDirectory(prefix="Rill installed TLS ") as temporary:
         root = Path(temporary)
-        binary, source, checksum = check_archive(args.archive.resolve(), root)
+        binary, source, checksum = check_archive(args.archive.resolve(), root, args.source_commit)
         elapsed = run_acceptance(binary, root)
     require_desktop_closed()
     print(

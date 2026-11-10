@@ -40,6 +40,71 @@ import XCTest
         XCTAssertEqual(quiet.status, 0)
         XCTAssertTrue(quiet.output.isEmpty)
     }
+
+    func testOpenAPIReviewReportsDefinitionAndWorkspaceImpactWithoutApplying() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+            UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let workspaceURL = directory.appendingPathComponent("workspace.json")
+        let candidateURL = directory.appendingPathComponent("candidate.json")
+        func source(_ paths: [String: String]) throws -> Data {
+            try JSONSerialization.data(withJSONObject: [
+                "openapi": "3.1.1", "info": ["title": "private-definition-title"],
+                "paths": paths.mapValues { status in
+                    ["get": ["responses": [status: ["description": "fixture"]]]]
+                },
+            ])
+        }
+        let baseline = try APIDefinitionLoader.parse(
+            source(["/private-edit": "200", "/private-remove": "200", "/private-unlinked": "200"]),
+            location: "https://offline.invalid/baseline.json")
+        let empty = Workspace()
+        var workspace = try APIImportPlan(baseline, current: empty).applying(to: empty)
+        let editIndex = try XCTUnwrap(
+            workspace.requests.firstIndex {
+                $0.apiLink?.operationKey == "GET /private-edit"
+            })
+        workspace.requests[editIndex].bodyContains = "private-local-edit"
+        let editedID = workspace.requests[editIndex].id.uuidString
+        let removedID = try XCTUnwrap(
+            workspace.requests.first {
+                $0.apiLink?.operationKey == "GET /private-remove"
+            }?.id.uuidString)
+        workspace.requests.removeAll { $0.apiLink?.operationKey == "GET /private-unlinked" }
+        try WorkspaceFile.save(workspace, to: workspaceURL)
+        let workspaceBytes = try Data(contentsOf: workspaceURL)
+        let candidateBytes = try source(["/private-edit": "201", "/private-add": "200"])
+        try candidateBytes.write(to: candidateURL)
+        let arguments = [
+            "openapi-review", baseline.source.id.uuidString, "--workspace", workspaceURL.path,
+            "--source", candidateURL.path, "--json",
+        ]
+        let result = try await cli(arguments)
+        XCTAssertEqual(result.status, 0, String(decoding: result.diagnostics, as: UTF8.self))
+        XCTAssertFalse(String(decoding: result.output, as: UTF8.self).contains("private-"))
+        let report = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: result.output) as? [String: Any])
+        let rows = try XCTUnwrap(report["operations"] as? [[String: Any]])
+        XCTAssertEqual(rows.count, 4)
+        XCTAssertEqual(
+            rows.map { $0["definitionState"] as? String },
+            ["added", "changed", "removed", "removed"])
+        XCTAssertEqual(
+            rows.map { $0["workspaceState"] as? String },
+            ["added", "locallyEdited", "removed", nil])
+        XCTAssertEqual(
+            rows.map { $0["linkedRequestID"] as? String }, [nil, editedID, removedID, nil])
+        XCTAssertEqual(rows.map { $0["baselinePosition"] as? Int }, [nil, 1, 2, 3])
+        XCTAssertEqual(rows.map { $0["candidatePosition"] as? Int }, [1, 2, nil, nil])
+        let detailed = try await cli(arguments + ["--show-messages"])
+        XCTAssertEqual(detailed.status, 0)
+        XCTAssertTrue(String(decoding: detailed.output, as: UTF8.self).contains("private-edit"))
+        let apply = try await cli(arguments + ["--apply"])
+        XCTAssertEqual(apply.status, 2)
+        XCTAssertEqual(try Data(contentsOf: workspaceURL), workspaceBytes)
+        XCTAssertEqual(try Data(contentsOf: candidateURL), candidateBytes)
+    }
     func testSharedRunnerReportsRawOutputAndStableFailureExitCodes() async throws {
         guard let base = ProcessInfo.processInfo.environment["RILL_TEST_BASE_URL"] else {
             throw XCTSkip("HTTP fixture required")
@@ -100,6 +165,51 @@ import XCTest
         try WorkspaceFile.save(workspace, to: file)
         let failure = try await cli(["run-request", "fixture", "--workspace", file.path])
         XCTAssertEqual(failure.status, 3)
+    }
+
+    func testMockGenerateWritesReproducibleProjectAndProtectsInput() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "rill seeded mock " + UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let source = directory.appendingPathComponent("definition.yaml")
+        let first = directory.appendingPathComponent("first.json")
+        let second = directory.appendingPathComponent("second.json")
+        let input = Data(
+            """
+            openapi: 3.1.1
+            info: {title: Private fixture title}
+            paths:
+              /generated:
+                get:
+                  responses:
+                    '200':
+                      content:
+                        application/json:
+                          schema: {type: string, format: uuid}
+            """.utf8)
+        try input.write(to: source)
+        let command = ["mock-generate", source.path, "--seed", "42", "--json"]
+        let result = try await cli(command + ["--output", first.path])
+        XCTAssertEqual(result.status, 0, String(decoding: result.diagnostics, as: UTF8.self))
+        XCTAssertFalse(
+            String(decoding: result.output, as: UTF8.self).contains("Private fixture title"))
+        let repeated = try await cli(command + ["--output", second.path])
+        XCTAssertEqual(repeated.status, 0)
+        let bytes = try Data(contentsOf: first)
+        XCTAssertEqual(bytes, try Data(contentsOf: second))
+        XCTAssertEqual(try MockProjectFile.decode(bytes).routes.first?.path, "/generated")
+        let exists = try await cli(command + ["--output", first.path])
+        XCTAssertEqual(exists.status, 2)
+        let protected = try await cli(command + ["--output", source.path, "--overwrite"])
+        XCTAssertEqual(protected.status, 2)
+        XCTAssertEqual(try Data(contentsOf: source), input)
+        XCTAssertEqual(try Data(contentsOf: first), bytes)
+        let invalid = try await cli([
+            "mock-generate", source.path, "--output", second.path, "--seed", "-1", "--overwrite",
+        ])
+        XCTAssertEqual(invalid.status, 2)
+        XCTAssertEqual(try Data(contentsOf: second), bytes)
     }
     func testCLIBackupRestoreGraphQLAndImportPreview() async throws {
         guard let base = ProcessInfo.processInfo.environment["RILL_TEST_LIVE_URL"] else {

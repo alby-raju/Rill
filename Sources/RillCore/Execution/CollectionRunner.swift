@@ -67,19 +67,18 @@ public struct RunReport: Codable, Identifiable, Sendable {
     /// A failed attempt recovered by an explicit retry does not fail the whole run.
     public var passed: Bool {
         guard !outcomes.isEmpty, !cancelled, !exhausted, timedOut != true else { return false }
-        let executed = outcomes.filter { $0.state != .notRun }
-        guard !executed.isEmpty else { return false }
-        return executed.enumerated().allSatisfy { index, outcome in
-            if index + 1 < executed.count {
-                let next = executed[index + 1]
-                if next.requestID == outcome.requestID && next.iteration == outcome.iteration
-                    && next.attempt == outcome.attempt + 1
-                {
-                    return true
-                }
+        var executed = outcomes.lazy.filter { $0.state != .notRun }.makeIterator()
+        guard var previous = executed.next() else { return false }
+        while let next = executed.next() {
+            let retry =
+                next.requestID == previous.requestID && next.iteration == previous.iteration
+                && next.attempt == previous.attempt + 1
+            guard retry || previous.state == .passed || previous.state == .skipped else {
+                return false
             }
-            return outcome.state == .passed || outcome.state == .skipped
+            previous = next
         }
+        return previous.state == .passed || previous.state == .skipped
     }
 }
 public struct RunProgress: Sendable {
