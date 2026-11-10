@@ -46,7 +46,7 @@ public enum DynamicTemplates {
 }
 
 /// Lock scope contains only arithmetic/formatting; no callbacks, suspension, I/O or shared globals.
-private final class SeededTemplates: @unchecked Sendable {
+final class SeededTemplates: @unchecked Sendable {
     private let lock = NSLock()
     private var state: UInt64
     private let epoch: Int64
@@ -72,6 +72,26 @@ private final class SeededTemplates: @unchecked Sendable {
             ([4, 6, 8, 10].contains(index) ? "-" : "") + String(format: "%02x", byte)
         }.joined()
     }
+    func integer(in range: ClosedRange<Int>) -> Int {
+        lock.withLock { drawInteger(in: range) }
+    }
+    private func drawInteger(in range: ClosedRange<Int>) -> Int {
+        // Map signed order to unsigned order.
+        let lower = UInt64(bitPattern: Int64(range.lowerBound)) ^ (1 << 63)
+        let upper = UInt64(bitPattern: Int64(range.upperBound)) ^ (1 << 63)
+        let span = upper &- lower
+        let offset: UInt64
+        if span == UInt64.max {
+            offset = next()
+        } else {
+            let bound = span + 1
+            let threshold = (0 &- bound) % bound
+            var value = next()
+            while value < threshold { value = next() }
+            offset = value % bound
+        }
+        return Int(Int64(bitPattern: (lower &+ offset) ^ (1 << 63)))
+    }
     func generate(_ parts: [String]) -> String {
         lock.lock()
         defer { lock.unlock() }
@@ -80,21 +100,8 @@ private final class SeededTemplates: @unchecked Sendable {
         case "$uuid": return uuid()
         case "$email": return "rill-" + uuid() + "@example.test"
         default:
-            // Syntax/range were validated by supports(). Map signed order to unsigned order.
-            let lower = UInt64(bitPattern: Int64(parts[1])!) ^ (1 << 63)
-            let upper = UInt64(bitPattern: Int64(parts[2])!) ^ (1 << 63)
-            let span = upper &- lower
-            let offset: UInt64
-            if span == UInt64.max {
-                offset = next()
-            } else {
-                let bound = span + 1
-                let threshold = (0 &- bound) % bound
-                var value = next()
-                while value < threshold { value = next() }
-                offset = value % bound
-            }
-            return String(Int64(bitPattern: (lower &+ offset) ^ (1 << 63)))
+            // Syntax and range were validated by supports().
+            return String(drawInteger(in: Int(parts[1])!...Int(parts[2])!))
         }
     }
 }
