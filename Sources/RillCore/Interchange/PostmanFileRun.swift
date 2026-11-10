@@ -179,9 +179,12 @@ public struct PostmanFileRun: Sendable {
         exportEnvironment: CollectionRunner.EnvironmentExport? = nil, cookieJar: CookieJar? = nil
     ) async throws -> RunReport {
         guard !planningOnly else { throw WorkflowError.invalidConfiguration }
-        var report = try await executeRun(
-            configuration: configuration, timeout: timeout, exportEnvironment: exportEnvironment,
-            cookieJar: cookieJar)
+        var report = try await FileRunHTTPConnections.withSession {
+            try await executeRun(
+                configuration: configuration, timeout: timeout,
+                exportEnvironment: exportEnvironment,
+                cookieJar: cookieJar)
+        }
         report.sources = sourceLocations
         report.sourceFormat = "postman-position-v1"
         return report

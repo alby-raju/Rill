@@ -211,7 +211,16 @@ actor ConcurrencyProbe {
                 for secret in [
                     "secret-name", "secret-url", "seeded-secret", "header-value", "next",
                 ] { XCTAssertFalse(text.contains(secret), format.rawValue + ": " + secret) }
-                if format == .json || format == .allure {
+                if format == .json {
+                    let object = try XCTUnwrap(
+                        try JSONSerialization.jsonObject(with: data) as? [String: Any])
+                    XCTAssertEqual(object["passed"] as? Bool, true)
+                    let decoded = try RunSnapshotFile.decode(data)
+                    XCTAssertEqual(decoded.id, report.id)
+                    XCTAssertEqual(decoded.outcomes.map(\.id), report.outcomes.map(\.id))
+                    XCTAssertTrue(decoded.passed)
+                }
+                if format == .allure {
                     XCTAssertNoThrow(try JSONSerialization.jsonObject(with: data))
                 }
                 if format == .junit { XCTAssertTrue(text.contains("tests=\"3\"")) }

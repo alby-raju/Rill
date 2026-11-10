@@ -160,6 +160,39 @@ import XCTest
             String(decoding: invalid.diagnostics, as: UTF8.self).contains("private-late-row"))
     }
 
+    func testFileRunReusesPlainHTTPConnectionsWithoutAmbientCookiesOrCrossOriginRedirects()
+        async throws
+    {
+        guard let base = ProcessInfo.processInfo.environment["RILL_TEST_BASE_URL"] else {
+            throw XCTSkip("Fixture required")
+        }
+        let root = try directory()
+        let source = root.appendingPathComponent("collection.json")
+        let snapshot = root.appendingPathComponent("snapshot.json")
+        try collection(
+            ["first", "second", "cross-origin"].map { path in
+                [
+                    "name": path,
+                    "request": ["method": "GET", "url": base + "/run-connection/" + path],
+                ]
+            }
+        ).write(to: source)
+        let result = try await cli([
+            "run", source.path, "--comparison-output", snapshot.path, "--json",
+        ])
+        XCTAssertEqual(result.status, 4)
+        let report = try RunSnapshotFile.decode(Data(contentsOf: snapshot))
+        XCTAssertEqual(report.outcomes.map(\.status), [200, 200, 302])
+        let bodies = try report.outcomes.prefix(2).map { outcome in
+            try XCTUnwrap(
+                JSONSerialization.jsonObject(with: XCTUnwrap(outcome.retainedBody))
+                    as? [String: Any])
+        }
+        let ports = try bodies.map { try XCTUnwrap($0["peerPort"] as? Int) }
+        XCTAssertEqual(Set(ports).count, 1)
+        XCTAssertTrue(bodies.allSatisfy { $0["cookie"] is NSNull })
+    }
+
     func testUnsupportedScriptsAndLateInvalidURLBlockBeforeRunArtifacts() async throws {
         let root = try directory()
         let source = root.appendingPathComponent("collection.json")
