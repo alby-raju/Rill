@@ -160,6 +160,39 @@ import XCTest
             String(decoding: invalid.diagnostics, as: UTF8.self).contains("private-late-row"))
     }
 
+    func testFileRunReusesPlainHTTPConnectionsWithoutAmbientCookiesOrCrossOriginRedirects()
+        async throws
+    {
+        guard let base = ProcessInfo.processInfo.environment["RILL_TEST_BASE_URL"] else {
+            throw XCTSkip("Fixture required")
+        }
+        let root = try directory()
+        let source = root.appendingPathComponent("collection.json")
+        let snapshot = root.appendingPathComponent("snapshot.json")
+        try collection(
+            ["first", "second", "cross-origin"].map { path in
+                [
+                    "name": path,
+                    "request": ["method": "GET", "url": base + "/run-connection/" + path],
+                ]
+            }
+        ).write(to: source)
+        let result = try await cli([
+            "run", source.path, "--comparison-output", snapshot.path, "--json",
+        ])
+        XCTAssertEqual(result.status, 4)
+        let report = try RunSnapshotFile.decode(Data(contentsOf: snapshot))
+        XCTAssertEqual(report.outcomes.map(\.status), [200, 200, 302])
+        let bodies = try report.outcomes.prefix(2).map { outcome in
+            try XCTUnwrap(
+                JSONSerialization.jsonObject(with: XCTUnwrap(outcome.retainedBody))
+                    as? [String: Any])
+        }
+        let ports = try bodies.map { try XCTUnwrap($0["peerPort"] as? Int) }
+        XCTAssertEqual(Set(ports).count, 1)
+        XCTAssertTrue(bodies.allSatisfy { $0["cookie"] is NSNull })
+    }
+
     func testUnsupportedScriptsAndLateInvalidURLBlockBeforeRunArtifacts() async throws {
         let root = try directory()
         let source = root.appendingPathComponent("collection.json")
@@ -477,12 +510,30 @@ import XCTest
         XCTAssertFalse(String(decoding: transport.diagnostics, as: UTF8.self).contains("(unknown)"))
     }
     func testCancellationFlushesAnUnsuccessfulReport() async throws {
+        let data = try await cancelRunAndReadReport(format: "json")
+        let result = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(result["cancelled"] as? Bool, true)
+        XCTAssertEqual(result["passed"] as? Bool, false)
+    }
+
+    func testCancellationFlushesACompleteNDJSONReport() async throws {
+        let data = try await cancelRunAndReadReport(format: "ndjson")
+        let events = try data.split(separator: 10).map {
+            try XCTUnwrap(JSONSerialization.jsonObject(with: Data($0)) as? [String: Any])
+        }
+        XCTAssertEqual(
+            events.compactMap { $0["type"] as? String }, ["started", "attempt", "finished"])
+        XCTAssertEqual(events.last?["cancelled"] as? Bool, true)
+        XCTAssertEqual(events.last?["passed"] as? Bool, false)
+    }
+
+    private func cancelRunAndReadReport(format: String) async throws -> Data {
         guard let base = ProcessInfo.processInfo.environment["RILL_TEST_BASE_URL"] else {
             throw XCTSkip("Fixture required")
         }
         let root = try directory()
         let source = root.appendingPathComponent("input.json")
-        let report = root.appendingPathComponent("cancelled.json")
+        let report = root.appendingPathComponent("cancelled.\(format)")
         let console = root.appendingPathComponent("console.txt")
         // The startup line proves signal handlers are installed and input planning completed.
         var slow = request("slow", base + "/slow")
@@ -493,7 +544,9 @@ import XCTest
         defer { try? handle.close() }
         let process = Process()
         process.executableURL = URL(fileURLWithPath: try executable())
-        process.arguments = ["run", source.path, "--report", report.path]
+        process.arguments = [
+            "run", source.path, "--report", report.path, "--report-format", format,
+        ]
         process.standardOutput = handle
         process.standardError = FileHandle.nullDevice
         try process.run()
@@ -503,7 +556,8 @@ import XCTest
             try await Task.sleep(for: .milliseconds(25))
         }
         guard process.isRunning, !(try Data(contentsOf: console)).isEmpty else {
-            return XCTFail("File runner exited before readiness")
+            XCTFail("File runner exited before readiness")
+            return Data()
         }
         process.interrupt()
         for _ in 0..<200 {
@@ -512,9 +566,6 @@ import XCTest
         }
         XCTAssertFalse(process.isRunning)
         if !process.isRunning { XCTAssertEqual(process.terminationStatus, 130) }
-        let result = try XCTUnwrap(
-            JSONSerialization.jsonObject(with: Data(contentsOf: report)) as? [String: Any])
-        XCTAssertEqual(result["cancelled"] as? Bool, true)
-        XCTAssertEqual(result["passed"] as? Bool, false)
+        return try Data(contentsOf: report)
     }
 }

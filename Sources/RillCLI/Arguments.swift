@@ -247,6 +247,14 @@ struct Arguments: Sendable {
         if !quiet { try FileHandle.standardOutput.write(contentsOf: data + Data([10])) }
     }
     func write(_ data: Data, to path: String) throws {
+        let destination = try outputDestination(path)
+        if flags.contains("overwrite") {
+            try RunReportExporter.write(data, to: destination)
+        } else {
+            try WorkspaceFile.writeNew(data, to: destination)
+        }
+    }
+    func outputDestination(_ path: String) throws -> URL {
         let destination = URL(fileURLWithPath: path)
         if command == "run" {
             guard !protectsFileRunInput(destination) else {
@@ -260,11 +268,7 @@ struct Arguments: Sendable {
         if !flags.contains("overwrite"), FileManager.default.fileExists(atPath: destination.path) {
             throw CLIError.usage("Output exists; choose a new path or --overwrite.")
         }
-        if flags.contains("overwrite") {
-            try RunReportExporter.write(data, to: destination)
-        } else {
-            try WorkspaceFile.writeNew(data, to: destination)
-        }
+        return destination
     }
     func environment(_ workspace: Workspace) throws -> RillCore.Environment? {
         let selected: UUID?

@@ -1,6 +1,6 @@
 # Roadmap: CLI-first API testing
 
-Updated 6 November 2026. **This is a proposed delivery plan, not a list of shipped features or promised dates.** Current behavior is documented in [features and limits](docs/FEATURES.md) and the [CLI guide](docs/CLI.md).
+Updated 10 November 2026. **This is a proposed delivery plan, not a list of shipped features or promised dates.** Current behavior is documented in [features and limits](docs/FEATURES.md) and the [CLI guide](docs/CLI.md).
 
 Rill has reached an MVP development milestone. The next goal is a fast, local API testing workflow that moves from a collection file to a trustworthy CI result with minimal setup. Prioritize reproducibility, useful failure explanations and smooth migration over accumulating protocol names.
 
@@ -92,13 +92,15 @@ Acceptance: create and run a mock without discovering a hidden submenu, close it
 
 ## 4. Performance and features that earn repeat use
 
-- [ ] **PERF-01 — Establish baselines first.** [The initial reproducible CLI harness and local baseline](docs/PERFORMANCE.md) cover metadata/search/offline validation at all three sizes. Native interaction, response/script workloads, run/report overhead and independent reference measurements remain open. Reproducible 600/5,000/10,000-request workspaces, many tabs, large bounded responses and scripted suites. Measure cold/warm startup, metadata commands, import/validation time, search, tab operations, memory, request overhead and report generation. Record reference hardware/OS, release build, warm/cold conditions and distributions.
+- [ ] **PERF-01 — Establish baselines first.** [The reproducible CLI harness](docs/PERFORMANCE.md) covers metadata, search, offline validation, translated script execution and report export at 600/5,000/10,000 requests. It records wall time, peak CLI memory, connections and output sizes for the loopback runs. Native interaction, many-tab workloads, script-heavy native workflows and independent reference measurements remain open.
 - [ ] **PERF-02 — Responsive desktop.** Profile main-thread work; use incremental indexing, lazy editor/response construction, batched state updates and bounded history. Regressions must cover the previously slow Close All Tabs action and the installed-resource launch crash.
-- [ ] **PERF-03 — Efficient runner.** Reuse connections and compiled plans where safe, stream large reports and avoid retaining duplicate bodies. Bound concurrency; preserve sequential workflows by default. Parallel execution requires explicit isolation and deterministic reporting.
+- [ ] **PERF-03 — Efficient runner.** Eligible plain HTTP reads in file runs reuse one origin's connections per run. Versioned JSON reports encode directly from redacted outcomes. Broader connection reuse and streaming report output remain open. Bound concurrency and preserve sequential workflows by default. Parallel execution requires explicit isolation and deterministic reporting.
 - [ ] **PERF-04 — CI/build speed.** Measure critical paths, cache toolchains/dependencies using explicit keys, cancel stale PR runs and separate docs checks from native compilation. Preserve exact-source release tests, installed GUI checks, vulnerability scans and deep release analysis.
 - [ ] **DIFF-01 — Run comparison.** Development-source `report-diff` now compares versioned reports or explicit raw snapshots, including original positional Postman identity, normalized JSON/header/type-shape changes, status/check/retry drift, timing thresholds and missing-data states. See [scope and identity limits](docs/RUN-INVESTIGATION.md). Baseline versus current run: status/assertion changes, schema drift, normalized JSON/header diffs and latency changes. Configurable ignore rules and clear treatment of missing data.
 - [ ] **FLOW-01 — API change workflow.** OpenAPI change review → impacted requests → generated examples/mocks → contract run → local report. Reuse current definition, contract and mock support rather than replacing it.
 - [ ] **FLOW-02 — Better migration and reproducibility.** Portable text-oriented project files, semantic diffs, read-only discovery, import previews and exact file/line diagnostics. Evaluate HTTPie interoperability against documented exports; do not claim to reproduce its complete app behavior.
+
+Development-source CLI writes [NDJSON run reports](docs/RUN-INVESTIGATION.md) in bounded chunks and publishes complete files atomically at the end of a run. Other export formats still use buffered output.
 
 Initial performance targets are hypotheses to calibrate after PERF-01: p95 warm metadata listing under 200 ms for 600 requests; p95 search/close-all interaction under 100 ms of main-thread work; no more than 20% regression in stable reference benchmarks. Publish workload, throughput, latency and memory together. Do not claim to beat Postman/Newman/HTTPie until comparable public benchmarks substantiate it.
 

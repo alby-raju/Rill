@@ -95,6 +95,24 @@ class Handler(BaseHTTPRequestHandler):
     do_OPTIONS = do_echo
 
     def do_GET(self):
+        if self.path.startswith("/run-connection/"):
+            self.protocol_version = "HTTP/1.1"
+            self.close_connection = self.headers.get("Connection", "").lower() == "close"
+            if self.path.endswith("/cross-origin"):
+                self.send_response(302)
+                self.send_header("Location", "http://127.0.0.1:9/echo")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
+            body = json.dumps(
+                {"peerPort": self.client_address[1], "cookie": self.headers.get("Cookie")}
+            ).encode()
+            self.send_response(200)
+            self.send_header("Set-Cookie", "pooled=fixture; Path=/")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if self.path in ("/cookie/set", "/cookie/expire", "/cookie/redirect"):
             self.send_response(302 if self.path == "/cookie/redirect" else 200)
             if self.path == "/cookie/set":

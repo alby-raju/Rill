@@ -50,6 +50,10 @@ jobs:
       - run: bash scripts/test.sh
       - run: python3 scripts/collect-dependency-notices.py --check
       - run: bash scripts/release-artifacts.sh
+      - name: Verify the exact installed CLI archive with mTLS
+        run: |
+          python3 scripts/verify-installed-cli-tls.py --source-commit "$GITHUB_SHA" \
+            dist/RillCLI-*-"$(uname -m)"-development.zip > dist/installed-cli-tls.json
       - run: python3 scripts/build-verification-kit.py
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
@@ -64,6 +68,7 @@ jobs:
             dist/RillCLI-*-development.zip
             dist/*.sha256
             dist/*.provenance.json
+            dist/installed-cli-tls.json
             dist/Rill-Verification-Kit.zip
           if-no-files-found: error
           retention-days: 14

@@ -226,6 +226,14 @@ public enum WorkspaceFile {
     }
 
     static func atomicWrite(_ data: Data, to url: URL, replaceExisting: Bool = true) throws {
+        try atomicWrite(to: url, replaceExisting: replaceExisting) { handle in
+            try handle.write(contentsOf: data)
+        }
+    }
+
+    static func atomicWrite(
+        to url: URL, replaceExisting: Bool, write: (FileHandle) throws -> Void
+    ) throws {
         let directory = url.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let temporary = directory.appendingPathComponent(".rill-\(UUID().uuidString).tmp")
@@ -237,7 +245,7 @@ public enum WorkspaceFile {
             try? handle.close()
             try? FileManager.default.removeItem(at: temporary)
         }
-        try handle.write(contentsOf: data)
+        try write(handle)
         try handle.synchronize()
         try handle.close()
         let status =

@@ -23,8 +23,19 @@ public enum RunFailureKind: String, Codable, Sendable {
 }
 
 extension RunReportExporter {
-    /// Atomic end-of-run event export, not a live event stream. Same allowlist as JSON/HTML.
-    static func ndjson(_ safe: RunReport) throws -> Data {
+    /// Encode the completed run in bounded chunks, publishing only a complete report.
+    public static func writeNDJSON(_ report: RunReport, to url: URL, overwrite: Bool = false)
+        throws
+    {
+        try validate(report)
+        try Task.checkCancellation()
+        try WorkspaceFile.atomicWrite(to: url, replaceExisting: overwrite) { handle in
+            try encodeNDJSON(report) { try handle.write(contentsOf: $0) }
+            try Task.checkCancellation()
+        }
+    }
+
+    static func encodeNDJSON(_ report: RunReport, write: (Data) throws -> Void) throws {
         struct Event: Encodable {
             let schemaVersion = 1
             let kind = "rill.run-event"
@@ -44,31 +55,46 @@ extension RunReportExporter {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
-        var result = Data()
+        let chunkBytes = 64 * 1024
+        var buffer = Data()
+        var writtenBytes = 0
         func append(_ event: Event) throws {
             try Task.checkCancellation()
-            let data = try encoder.encode(event)
-            guard result.count + data.count + 1 <= 32 * 1024 * 1024 else {
+            var line = try encoder.encode(event)
+            line.append(10)
+            guard writtenBytes + line.count <= 32 * 1024 * 1024 else {
                 throw WorkflowError.limit
             }
-            result.append(data)
-            result.append(10)
+            writtenBytes += line.count
+            if buffer.count + line.count > chunkBytes, !buffer.isEmpty {
+                try write(buffer)
+                buffer.removeAll(keepingCapacity: true)
+            }
+            if line.count > chunkBytes {
+                try write(line)
+            } else {
+                buffer.append(line)
+            }
         }
         try append(
             Event(
-                type: "started", runID: safe.id, sequence: 0, started: safe.started,
-                requestedSteps: safe.requestedSteps))
-        for (index, attempt) in safe.outcomes.enumerated() {
+                type: "started", runID: report.id, sequence: 0, started: report.started,
+                requestedSteps: report.requestedSteps))
+        for (index, attempt) in report.outcomes.enumerated() {
+            let source = (report.sources?[attempt.requestID.uuidString]).flatMap {
+                RunSources.valid($0) ? $0 : nil
+            }
             try append(
                 Event(
-                    type: "attempt", runID: safe.id, sequence: index + 1, attempt: attempt,
-                    sourceLocation: safe.sources?[attempt.requestID.uuidString]))
+                    type: "attempt", runID: report.id, sequence: index + 1,
+                    attempt: sanitizedAttempt(attempt), sourceLocation: source))
         }
         try append(
             Event(
-                type: "finished", runID: safe.id, sequence: safe.outcomes.count + 1,
-                passed: safe.passed, cancelled: safe.cancelled, timedOut: safe.timedOut ?? false,
-                exhausted: safe.exhausted, stopped: safe.stopped))
-        return result
+                type: "finished", runID: report.id, sequence: report.outcomes.count + 1,
+                passed: report.passed, cancelled: report.cancelled,
+                timedOut: report.timedOut ?? false,
+                exhausted: report.exhausted, stopped: report.stopped))
+        if !buffer.isEmpty { try write(buffer) }
     }
 }
