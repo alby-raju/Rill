@@ -363,6 +363,8 @@ The review is offline and read-only. Use `--show-messages` to include operation 
 
 ## Saved mock projects (development source)
 
+`mock-generate FILE --output PROJECT [--seed UINT64]` creates a portable mock project from a local OpenAPI or Swagger JSON/YAML file. A seed makes supported schema-derived responses reproducible while retaining explicit examples, defaults and constants. The command does not open a workspace, fetch definitions or start a listener. Existing projects require `--overwrite`. Review generated payloads before sharing them.
+
 `mock-serve --project FILE [--port N] --json` reads the desktop's version 1 project format without opening a personal workspace. `--routes FILE` retains legacy route-array support; choose exactly one input. Readiness is compact one-line JSON, including the ephemeral loopback port. `--control-stdin` accepts bounded newline-terminated `status`, `reset` and `stop`; EOF stops normally. Ctrl+C/SIGTERM stops and exits 130. See [Local mocks](wiki/Local-Mocks.md) for matching, scenario, file and resource limits. No listener starts implicitly and no LAN bind is available.
 
 ## Reproducible runs and comparison (development source)

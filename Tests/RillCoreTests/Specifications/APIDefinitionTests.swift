@@ -162,6 +162,55 @@ import XCTest
         XCTAssertNotNil(restarted.port)
         await server.stop()
     }
+    func testSeededMockSamplesPreserveExplicitValuesAndServePortableProject() async throws {
+        let source = Data(
+            """
+            {
+              "openapi":"3.1.1","info":{"title":"Seeded fixture"},
+              "paths":{
+                "/sample":{"get":{"responses":{"200":{"content":{"application/json":{"schema":{
+                  "type":"object","properties":{
+                    "uuid":{"type":"string","format":"uuid"},
+                    "email":{"type":"string","format":"email"},
+                    "number":{"type":"integer","minimum":-20,"maximum":-10},
+                    "choice":{"type":"string","enum":["first","second","third"]},
+                    "enabled":{"type":"boolean"},
+                    "fixed":{"type":"integer","default":12}
+                  }
+                }}}}}}},
+                "/explicit":{"get":{"responses":{"200":{"content":{"application/json":{
+                  "example":{"message":"explicit"},"schema":{"type":"string"}
+                }}}}}}
+              }
+            }
+            """.utf8)
+        let first = try MockProjectFile.encode(DefinitionMocks.project(from: source, seed: 42))
+        XCTAssertEqual(
+            first, try MockProjectFile.encode(DefinitionMocks.project(from: source, seed: 42)))
+        let project = try MockProjectFile.decode(first)
+        let different = try DefinitionMocks.project(from: source, seed: 43)
+        XCTAssertEqual(project.routes.first?.body, #"{"message":"explicit"}"#)
+        XCTAssertEqual(project.routes.first?.body, different.routes.first?.body)
+        XCTAssertEqual(project.routes.first?.origin, different.routes.first?.origin)
+        XCTAssertNotEqual(project.routes.last?.body, different.routes.last?.body)
+        let server = MockServer()
+        let base = try await server.start(routes: project.routes)
+        var request = RequestDraft()
+        request.url = base.absoluteString + "/sample"
+        let exchange = try await RequestEngine.execute(request, environment: nil)
+        await server.stop()
+        XCTAssertEqual(exchange.status, 200)
+        let body = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: exchange.body) as? [String: Any])
+        let uuid = try XCTUnwrap(body["uuid"] as? String)
+        XCTAssertNotNil(UUID(uuidString: uuid))
+        XCTAssertTrue((body["email"] as? String)?.hasSuffix("@example.test") == true)
+        XCTAssertTrue((-20 ... -10).contains(try XCTUnwrap(body["number"] as? Int)))
+        XCTAssertTrue(
+            ["first", "second", "third"].contains(try XCTUnwrap(body["choice"] as? String)))
+        XCTAssertNotNil(body["enabled"] as? Bool)
+        XCTAssertEqual(body["fixed"] as? Int, 12)
+    }
     func testPassiveInspectionAndExplicitBoundedProbes() async throws {
         var response = Exchange(
             requestID: UUID(), requestName: "name", method: .GET, url: "https://example.test",

@@ -14,11 +14,16 @@ Generate fixtures from supported OpenAPI examples using **API Definitions and To
 
 ## Same configuration in the CLI
 
-Export a project from the workbench, then run:
+Export a project from the workbench or generate one offline from a local OpenAPI or Swagger JSON/YAML file:
 
 ```sh
+rill mock-generate ./openapi.yaml --output ./mock-project.json --seed 42
 rill mock-serve --project ./mock-project.json --port 0 --json
 ```
+
+`mock-generate` uses the same response selection as the workbench and writes a version 1 project that **Import project…** can open. The definition bytes and seed determine the portable output, including its source provenance. Explicit examples, defaults and constants take precedence. Seeded fallbacks select enum members and generate booleans, UUIDs, `example.test` emails, unconstrained strings and integers with supported bounds. Other schemas keep the existing sample behavior. The seed applies at generation time. The listener serves the saved response bytes across requests and restarts.
+
+The generator does not fetch references, contact endpoints or start a listener. It requires a supported explicit 2xx response and a separate output file. Use `--overwrite` to replace an existing project. Explicit examples can contain sensitive data, so review the project before sharing it.
 
 Readiness is one compact JSON line with `schemaVersion: 1`, `state: "ready"`, `baseURL` and `routeCount`. Ctrl+C or SIGTERM stops the listener and exits 130. A port override takes precedence over the saved port. Invalid configuration or an occupied port fails; no LAN bind option exists.
 

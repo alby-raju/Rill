@@ -86,7 +86,7 @@ Acceptance: a run with unsupported scripts cannot look green; intentional assert
 - [ ] **MOCK-04 — Contracts and fixtures.** Generate routes from supported OpenAPI examples and saved responses, validate fixture structure, and replay sanitized recordings. Record provenance and redact credentials before saving; interactive examples are not proof of full schema conformance.
 - [ ] **MOCK-05 — One app/CLI format.** Export/version the same route/project definition; CLI readiness output, ephemeral port discovery, CI teardown and reset controls. Request matching and scenario results must agree across app and CLI.
 
-Development-source details and limits are in [Local mocks](docs/wiki/Local-Mocks.md). Saved response fixtures are structural templates with every scalar replaced; arbitrary captured recordings are not replayed. Seeded value synthesis and independent acceptance remain open.
+Development-source details and limits are in [Local mocks](docs/wiki/Local-Mocks.md). The CLI can now generate versioned mock projects from local definitions with seeded schema fallbacks and explicit example precedence. Saved response fixtures are structural templates with every scalar replaced; arbitrary captured recordings and independent acceptance remain open.
 
 Acceptance: create and run a mock without discovering a hidden submenu, close its editor while requests continue, inspect calls, reset a scenario, export it and reproduce the same behavior with the CLI. Exercise port collisions, cancellation, oversized requests and process termination.
 
@@ -99,6 +99,8 @@ Acceptance: create and run a mock without discovering a hidden submenu, close it
 - [ ] **DIFF-01 — Run comparison.** Development-source `report-diff` now compares versioned reports or explicit raw snapshots, including original positional Postman identity, normalized JSON/header/type-shape changes, status/check/retry drift, timing thresholds and missing-data states. See [scope and identity limits](docs/RUN-INVESTIGATION.md). Baseline versus current run: status/assertion changes, schema drift, normalized JSON/header diffs and latency changes. Configurable ignore rules and clear treatment of missing data.
 - [ ] **FLOW-01 — API change workflow.** Development source adds [offline change review](docs/CLI.md#offline-openapi-change-review-development-source) with impacted linked request IDs, separate definition and refresh states, and optional operation paths. OpenAPI change review → impacted requests → generated examples/mocks → contract run → local report. Reuse current definition, contract and mock support rather than replacing it.
 - [ ] **FLOW-02 — Better migration and reproducibility.** Portable text-oriented project files, semantic diffs, read-only discovery, import previews and exact file/line diagnostics. Evaluate HTTPie interoperability against documented exports; do not claim to reproduce its complete app behavior.
+
+Development-source CLI writes [NDJSON run reports](docs/RUN-INVESTIGATION.md) in bounded chunks and publishes complete files atomically at the end of a run. Other export formats still use buffered output.
 
 Initial performance targets are hypotheses to calibrate after PERF-01: p95 warm metadata listing under 200 ms for 600 requests; p95 search/close-all interaction under 100 ms of main-thread work; no more than 20% regression in stable reference benchmarks. Publish workload, throughput, latency and memory together. Do not claim to beat Postman/Newman/HTTPie until comparable public benchmarks substantiate it.
 

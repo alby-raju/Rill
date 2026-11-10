@@ -19,12 +19,19 @@ struct APIContractContext {
     let operation: JSONValue
     init?(_ link: APIRequestLink?, definitions: [APIDefinitionSource]) throws {
         guard let link, link.checkContract else { return nil }
-        guard let source = definitions.first(where: { $0.id == link.sourceID }),
-            let space = link.operationKey.firstIndex(of: " ")
-        else { throw ContractError.missingSource }
-        root = try JSONValueParser(source.snapshot).parse()
-        method = String(link.operationKey[..<space])
-        path = String(link.operationKey[link.operationKey.index(after: space)...])
+        guard let source = definitions.first(where: { $0.id == link.sourceID }) else {
+            throw ContractError.missingSource
+        }
+        try self.init(
+            root: JSONValueParser(source.snapshot).parse(), operationKey: link.operationKey)
+    }
+    init(root: JSONValue, operationKey: String) throws {
+        guard let space = operationKey.firstIndex(of: " ") else {
+            throw ContractError.missingSource
+        }
+        self.root = root
+        method = String(operationKey[..<space])
+        path = String(operationKey[operationKey.index(after: space)...])
         guard let raw = root["paths"]?[path] else { throw ContractError.missingSource }
         func resolved(_ input: JSONValue, root: JSONValue, depth: Int = 0) throws -> JSONValue {
             guard depth <= 32 else { throw SchemaError.limit }
