@@ -141,6 +141,19 @@ Recommended sequence: strengthen the Mac CLI → Linux CI runner → Windows CLI
 
 These are proposed advantages to prove, not claims that competing tools lack local storage, CLI runners or mocks. Newman already supports file/environment/certificate/report flags; HTTPie documents local storage and collection variables. See [Newman options](https://learning.postman.com/docs/collections/using-newman-cli/newman-options), [HTTPie desktop documentation](https://httpie.io/docs/desktop), and [Swift platform support](https://www.swift.org/platform-support/).
 
+## HTTPie comparison plan
+
+Added 10 November 2026. Use HTTPie Terminal 3.2.4 and the documented HTTPie Web and Desktop workflows as the initial reference. Compare user tasks, observable results and safeguards. The current delivery scope remains macOS and local CI. Broader distribution and services are later scope decisions. [HTTPie Terminal](https://httpie.io/docs/cli/usage) · [HTTPie Web and Desktop](https://httpie.io/docs/desktop)
+
+| Order | Work | Evidence |
+| --- | --- | --- |
+| 1. Terminal requests | Finish request composition and offline preview first. Extend nested JSON input, method and URL shortcuts, stdin, output formatting, proxies, redirect controls, resumable downloads and encrypted sessions. | Run both clients against the same disposable loopback server. Compare request bytes, output, exit status and saved state. Test credential isolation separately. |
+| 2. Desktop workflows | Add live request preview, selective import and export, HTTPie workspace round-trips and better variable navigation. Improve keyboard flow, accessibility and large-response inspection. | Compare task completion time and errors for workspace import, environment changes, request composition and failure diagnosis in installed apps. Record OS, architecture and build versions. |
+| 3. Repeatable API testing | Promote an ad-hoc request to a test, route reviewed OpenAPI requests to a generated mock, and compare contract runs against a baseline. Reuse the existing runner, mock generator and redacted reports. | Exercise the whole workflow through CI and verify that a reproducible failure report identifies the changed request or response. |
+| 4. Distribution and ecosystem | Prove the portable CLI on Linux and Windows first. Evaluate FreeBSD, cross-platform desktop, browser access, optional sync and extensions as separate follow-up work. | Verify fresh installs, upgrades and the same workflow suite on each supported platform. |
+
+The first checkpoint is a focused request-composition and offline-preview PR paired with a pinned HTTPie comparison harness. Record exact versions and fixtures with the results. Use matched workloads and repeated samples for performance comparisons.
+
 ## Delivery and acceptance policy
 
 Continue fresh-install/upgrade/recovery, Keychain, real-provider interoperability, keyboard/VoiceOver and supported-window acceptance alongside these milestones. Keep per-architecture macOS packaging/provenance and the relocated release-app launch regression gate. Paid Developer ID signing/notarization remains deferred at the owner's request.
