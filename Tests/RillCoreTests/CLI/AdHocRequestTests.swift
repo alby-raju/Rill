@@ -490,6 +490,36 @@ import XCTest
         }
     }
 
+    func testPrettyXMLOutputPreservesMixedContentAndRejectsUnsafeInput() async throws {
+        let base = try XCTUnwrap(ProcessInfo.processInfo.environment["RILL_TEST_BASE_URL"])
+        let output = try await cli(["request", base + "/xml-items", "--pretty-xml"])
+        XCTAssertEqual(output.status, 0)
+        let text = String(decoding: output.output, as: UTF8.self)
+        XCTAssertTrue(
+            text.contains("<items>\n    <item id=\"1\">one &amp; two</item>\n    <item/>\n"))
+
+        let mixed = try await cli(["request", base + "/xml-mixed", "--pretty-xml"])
+        XCTAssertEqual(mixed.status, 0)
+        XCTAssertEqual(
+            String(decoding: mixed.output, as: UTF8.self), "<p>Read <b>this</b> first.</p>\n")
+        XCTAssertEqual(
+            try XMLTextFormatter.pretty("<r xml:space=\"preserve\"><a/> <b/></r>"),
+            "<r xml:space=\"preserve\"><a/> <b/></r>")
+
+        for path in ["/xml-invalid", "/xml-dtd"] {
+            let invalid = try await cli(["request", base + path, "--pretty-xml"])
+            XCTAssertEqual(invalid.status, 3)
+            XCTAssertTrue(invalid.output.isEmpty)
+            let diagnostic = String(decoding: invalid.diagnostics, as: UTF8.self)
+            XCTAssertTrue(diagnostic.contains("bounded UTF-8 XML"))
+            XCTAssertFalse(diagnostic.contains("items"))
+        }
+        let conflict = try await cli([
+            "request", base + "/xml-items", "--pretty-xml", "--pretty-json",
+        ])
+        XCTAssertEqual(conflict.status, 2)
+    }
+
     func testResponseHeaderOutputSelectsFinalHeadersWithoutReadingBody() async throws {
         let base = try XCTUnwrap(ProcessInfo.processInfo.environment["RILL_TEST_BASE_URL"])
         let all = try await cli(["request", base + "/echo", "--headers-stdout"])

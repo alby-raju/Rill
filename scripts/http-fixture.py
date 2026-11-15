@@ -204,12 +204,22 @@ class Handler(BaseHTTPRequestHandler):
             except (BrokenPipeError, ConnectionResetError):
                 pass
             return
-        if self.path == "/script-scalars":
+        xml = {
+            "/xml-items": b'<items><item id="1">one &amp; two</item><item/></items>',
+            "/xml-mixed": b"<p>Read <b>this</b> first.</p>",
+            "/xml-invalid": b"<items><item></items>",
+            "/xml-dtd": b"<!DOCTYPE items><items/>",
+        }.get(self.path)
+        if xml is not None:
+            body = xml
+        elif self.path == "/script-scalars":
             body = b'{"n":42,"text":"42","ok":true,"empty":null,"zero":-0}'
         else:
             body = b'{"message":"hello from fixture"}'
         self.send_response(200)
-        self.send_header("Content-Type", "application/json")
+        self.send_header(
+            "Content-Type", "application/xml" if xml is not None else "application/json"
+        )
         self.send_header("X-Fixture", "Rill")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()

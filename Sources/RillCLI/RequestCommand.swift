@@ -13,7 +13,7 @@ extension RillCLI {
         ]
         let requestFlags: Set<String> = [
             "json", "quiet", "overwrite", "allow-insecure", "multipart", "offline", "raw-preview",
-            "stdin", "no-follow", "body-stdout", "headers-stdout", "pretty-json",
+            "stdin", "no-follow", "body-stdout", "headers-stdout", "pretty-json", "pretty-xml",
         ]
         let fromStdin = args.flags.contains("stdin")
         let bodyOptions = ["data", "data-file", "binary-file", "form", "json-field"].filter {
@@ -96,10 +96,12 @@ extension RillCLI {
             throw CLIError.usage("--download requires GET and cannot be combined with --output.")
         }
         let prettyJSON = args.flags.contains("pretty-json")
-        guard !prettyJSON || !args.flags.contains("body-stdout") else {
-            throw CLIError.usage("Choose --pretty-json or --body-stdout.")
+        let prettyXML = args.flags.contains("pretty-xml")
+        let bodyModes = args.flags.intersection(["body-stdout", "pretty-json", "pretty-xml"])
+        guard bodyModes.count <= 1 else {
+            throw CLIError.usage("Choose --pretty-json, --pretty-xml or --body-stdout.")
         }
-        let bodyStdout = prettyJSON || args.flags.contains("body-stdout")
+        let bodyStdout = !bodyModes.isEmpty
         let selectedHeaders = args.values["response-header"] ?? []
         guard selectedHeaders.allSatisfy(HTTPEncoding.isHeaderName) else {
             throw CLIError.usage("--response-header expects a valid HTTP header name.")
@@ -287,11 +289,14 @@ extension RillCLI {
                 "Request variable expansion failed or exceeded its limits; input content omitted.")
         }
         if let stdoutBody {
-            if prettyJSON, !stdoutBody.isEmpty {
+            if (prettyJSON || prettyXML), !stdoutBody.isEmpty {
+                let formatter = prettyJSON ? JSONTextFormatter.pretty : XMLTextFormatter.pretty
                 guard let utf8 = String(data: stdoutBody, encoding: .utf8),
-                    let formatted = try? JSONTextFormatter.pretty(utf8)
+                    let formatted = try? formatter(utf8)
                 else {
-                    let message = "Response body could not be formatted as bounded UTF-8 JSON.\n"
+                    let format = prettyJSON ? "JSON" : "XML"
+                    let message =
+                        "Response body could not be formatted as bounded UTF-8 \(format).\n"
                     try FileHandle.standardError.write(contentsOf: Data(message.utf8))
                     throw CLIError.runtime
                 }
