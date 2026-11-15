@@ -13,7 +13,7 @@ extension RillCLI {
         ]
         let requestFlags: Set<String> = [
             "json", "quiet", "overwrite", "allow-insecure", "multipart", "offline", "raw-preview",
-            "stdin", "no-follow", "body-stdout", "headers-stdout",
+            "stdin", "no-follow", "body-stdout", "headers-stdout", "pretty-json",
         ]
         let fromStdin = args.flags.contains("stdin")
         let bodyOptions = ["data", "data-file", "binary-file", "form", "json-field"].filter {
@@ -95,7 +95,11 @@ extension RillCLI {
         guard download == nil || (method == .GET && rawOutput == nil) else {
             throw CLIError.usage("--download requires GET and cannot be combined with --output.")
         }
-        let bodyStdout = args.flags.contains("body-stdout")
+        let prettyJSON = args.flags.contains("pretty-json")
+        guard !prettyJSON || !args.flags.contains("body-stdout") else {
+            throw CLIError.usage("Choose --pretty-json or --body-stdout.")
+        }
+        let bodyStdout = prettyJSON || args.flags.contains("body-stdout")
         let selectedHeaders = args.values["response-header"] ?? []
         guard selectedHeaders.allSatisfy(HTTPEncoding.isHeaderName) else {
             throw CLIError.usage("--response-header expects a valid HTTP header name.")
@@ -114,7 +118,7 @@ extension RillCLI {
                     && args.flags.isDisjoint(with: ["json", "quiet"]))
         else {
             throw CLIError.usage(
-                "--body-stdout requires a live request without --output, --download, --json or --quiet."
+                "Response body output requires a live request without --output, --download, --json or --quiet."
             )
         }
         let destination = rawOutput ?? download
@@ -283,7 +287,18 @@ extension RillCLI {
                 "Request variable expansion failed or exceeded its limits; input content omitted.")
         }
         if let stdoutBody {
-            try FileHandle.standardOutput.write(contentsOf: stdoutBody)
+            if prettyJSON, !stdoutBody.isEmpty {
+                guard let utf8 = String(data: stdoutBody, encoding: .utf8),
+                    let formatted = try? JSONTextFormatter.pretty(utf8)
+                else {
+                    let message = "Response body could not be formatted as bounded UTF-8 JSON.\n"
+                    try FileHandle.standardError.write(contentsOf: Data(message.utf8))
+                    throw CLIError.runtime
+                }
+                try args.text(formatted)
+            } else {
+                try FileHandle.standardOutput.write(contentsOf: stdoutBody)
+            }
         } else if let stdoutHeaders {
             let names = Set(selectedHeaders.map { $0.lowercased() })
             let headers = stdoutHeaders.filter {
