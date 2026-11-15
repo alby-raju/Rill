@@ -305,6 +305,31 @@ import XCTest
         XCTAssertEqual(try Data(contentsOf: phrase), Data("rill-fixture\n".utf8))
     }
 
+    func testBodyStdoutPreservesResponseBytesAndHTTPFailureStatus() async throws {
+        guard let base = ProcessInfo.processInfo.environment["RILL_TEST_BASE_URL"] else {
+            throw XCTSkip("Fixture required")
+        }
+        let success = try await cli(["request", "GET", base + "/bytes/5", "--body-stdout"])
+        XCTAssertEqual(success.status, 0)
+        XCTAssertEqual(success.output, Data("xxxxx".utf8))
+        XCTAssertTrue(success.diagnostics.isEmpty)
+
+        let failure = try await cli([
+            "request", "POST", base + "/oauth/token", "--data", "invalid", "--body-stdout",
+        ])
+        XCTAssertEqual(failure.status, 3)
+        let body = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: failure.output) as? [String: String])
+        XCTAssertEqual(body["error"], "invalid_client")
+        XCTAssertFalse(failure.diagnostics.isEmpty)
+
+        let incompatible = try await cli([
+            "request", "GET", base + "/bytes/5", "--body-stdout", "--json",
+        ])
+        XCTAssertEqual(incompatible.status, 2)
+        XCTAssertTrue(incompatible.output.isEmpty)
+    }
+
     func testNoFollowReturnsRedirectAndPreservesDownloadDestination() async throws {
         guard let base = ProcessInfo.processInfo.environment["RILL_TEST_BASE_URL"] else {
             throw XCTSkip("Fixture required")

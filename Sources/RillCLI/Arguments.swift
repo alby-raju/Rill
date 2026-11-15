@@ -12,7 +12,7 @@ struct Arguments: Sendable {
         "allow-lan", "overwrite", "show-messages", "help", "version", "insecure",
         "fail-fast", "metadata-only", "strict-headers", "github-annotations", "control-stdin",
         "include-system-roots", "cookies", "script-inventory", "translate-scripts", "dry-run",
-        "multipart", "offline", "raw-preview", "stdin", "no-follow",
+        "multipart", "offline", "raw-preview", "stdin", "no-follow", "body-stdout",
     ]
     static let valueOptions: Set<String> = [
         "color", "workspace", "environment", "tls", "iterations", "delay", "retries",
@@ -114,6 +114,9 @@ struct Arguments: Sendable {
         }
         if value("request-id") != nil && command != "contract-run" {
             throw CLIError.usage("--request-id requires contract-run.")
+        }
+        if flags.contains("body-stdout") && command != "request" {
+            throw CLIError.usage("--body-stdout requires request.")
         }
         if flags.contains("no-follow") && command != "request" {
             throw CLIError.usage("--no-follow requires request.")
@@ -407,6 +410,7 @@ let usage = """
           --query-param NAME=VALUE   Append a URL query field (repeatable)
           --stdin                   Read a UTF-8 request body from standard input
           --no-follow               Return the first response without following redirects
+          --body-stdout             Write only the raw response body to stdout
           --json-field PATH=VALUE   Compose nested JSON fields (repeatable, := for typed JSON)
           -H, --header name:value   Repeatable request headers
           -d, --data TEXT           UTF-8 text body; or --data-file FILE (1 MiB)
