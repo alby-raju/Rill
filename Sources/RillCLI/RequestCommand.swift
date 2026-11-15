@@ -8,7 +8,7 @@ extension RillCLI {
             "header", "data", "data-file", "binary-file", "form", "env-var", "output", "download",
             "timeout",
             "color", "workspace", "environment", "auth-profile", "tls", "session",
-            "session-key-file", "query-param", "json-field", "header-file",
+            "session-key-file", "query-param", "json-field", "header-file", "default-scheme",
         ]
         let requestFlags: Set<String> = [
             "json", "quiet", "overwrite", "allow-insecure", "multipart", "offline", "raw-preview",
@@ -38,7 +38,8 @@ extension RillCLI {
         } else {
             method = hasBody ? .POST : .GET
         }
-        let requestURL = try expandRequestURL(urlOperand)
+        let requestURL = try expandRequestURL(
+            urlOperand, defaultScheme: args.value("default-scheme"))
         let hasFileTLS =
             !tlsValues.isDisjoint(with: args.values.keys)
             || !FileTLSOptions.flags.isDisjoint(with: args.flags)
@@ -278,8 +279,17 @@ extension RillCLI {
         if !(200...299).contains(summary.status) { throw CLIError.runtime }
     }
 
-    private static func expandRequestURL(_ value: String) throws -> String {
-        guard value.hasPrefix(":") else { return value }
+    private static func expandRequestURL(_ input: String, defaultScheme: String?) throws -> String {
+        if let defaultScheme, !["http", "https"].contains(defaultScheme) {
+            throw CLIError.usage("--default-scheme expects http or https.")
+        }
+        let value = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard value.hasPrefix(":") else {
+            guard let defaultScheme,
+                value.range(of: #"^[A-Za-z][A-Za-z0-9+.-]*://"#, options: .regularExpression) == nil
+            else { return input }
+            return "\(defaultScheme)://\(value)"
+        }
         let remainder = value.dropFirst()
         let port = remainder.prefix { !"/?#".contains($0) }
         if !port.isEmpty {
@@ -291,7 +301,7 @@ extension RillCLI {
         }
         let path = remainder.dropFirst(port.count)
         let authority = port.isEmpty ? "localhost" : "localhost:\(port)"
-        return "http://\(authority)\(path.hasPrefix("/") ? "" : "/")\(path)"
+        return "\(defaultScheme ?? "http")://\(authority)\(path.hasPrefix("/") ? "" : "/")\(path)"
     }
 
     private static func previewRequest(

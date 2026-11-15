@@ -79,6 +79,35 @@ import XCTest
         }
     }
 
+    func testExplicitDefaultSchemeCompletesBareURLs() async throws {
+        let options = ["request", "--offline", "--raw-preview"]
+        let cases = [
+            (
+                "example.test:8080/health?next=https://example.test", "https",
+                "https://example.test:8080/health?next=https://example.test"
+            ),
+            ("http://example.test/health", "https", "http://example.test/health"),
+            (":8443/health", "https", "https://localhost:8443/health"),
+            ("example.test/health", "http", "http://example.test/health"),
+        ]
+        for (input, scheme, url) in cases {
+            let result = try await cli(options + [input, "--default-scheme", scheme])
+            XCTAssertEqual(result.status, 0)
+            let preview = try XCTUnwrap(
+                JSONSerialization.jsonObject(with: result.output) as? [String: Any])
+            XCTAssertEqual(preview["url"] as? String, url)
+        }
+        for invalid in [
+            ["example.test/health"], ["example.test", "--default-scheme", "ftp"],
+            ["ftp://example.test", "--default-scheme", "https"],
+            ["user:password@example.test", "--default-scheme", "https"],
+        ] {
+            let result = try await cli(options + invalid)
+            XCTAssertEqual(result.status, 2)
+            XCTAssertTrue(result.output.isEmpty)
+        }
+    }
+
     func testHeaderFilesReachLoopbackAndRemainReadOnly() async throws {
         let root = try directory()
         let file = root.appendingPathComponent("private header=fixture.txt")
