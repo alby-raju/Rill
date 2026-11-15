@@ -10,8 +10,10 @@ public final class CookieJar: Sendable {
 
     init(scope: CookieSessionScope) { self.scope = scope }
 
-    func validate(_ request: URLRequest, insecure: Bool) throws {
-        try scope?.validate(request, insecure: insecure)
+    var hasSessionScope: Bool { scope != nil }
+
+    func prepare(_ request: inout URLRequest, insecure: Bool) throws {
+        try scope?.prepare(&request, insecure: insecure)
     }
 
     func store(_ cookie: HTTPCookie) { storage?.setCookie(cookie) }

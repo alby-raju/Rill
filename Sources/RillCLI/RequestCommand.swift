@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 import RillCore
 
@@ -22,8 +23,10 @@ extension RillCLI {
         let hasBody = fromStdin || !bodyOptions.isEmpty
         guard (1...2).contains(args.operands.count),
             let urlOperand = args.operands.last,
-            Set(args.values.keys).isSubset(of: requestValues.union(tlsValues)),
-            args.flags.isSubset(of: requestFlags.union(FileTLSOptions.flags)),
+            Set(args.values.keys).isSubset(
+                of: requestValues.union(tlsValues).union(RequestTransportOptions.values)),
+            args.flags.isSubset(
+                of: requestFlags.union(FileTLSOptions.flags).union(RequestTransportOptions.flags)),
             bodyOptions.count + (fromStdin ? 1 : 0) <= 1
         else {
             throw CLIError.usage(
@@ -46,6 +49,14 @@ extension RillCLI {
             || !FileTLSOptions.flags.isDisjoint(with: args.flags)
         let followRedirects = !args.flags.contains("no-follow")
         let offline = args.flags.contains("offline")
+        guard
+            !offline
+                || (args.flags.isDisjoint(with: RequestTransportOptions.flags)
+                    && RequestTransportOptions.values.isDisjoint(with: args.values.keys))
+        else {
+            throw CLIError.usage("Ad-hoc transport options require a live request.")
+        }
+        let transportOptions = try RequestTransportOptions(args)
         let rawPreview = args.flags.contains("raw-preview")
         guard !offline || followRedirects else {
             throw CLIError.usage("--no-follow applies only to live requests.")
@@ -79,7 +90,9 @@ extension RillCLI {
             + form.compactMap(\.file)
         let tlsInputs = FileTLSOptions.inputNames.compactMap { args.value($0) }
         let headerInputs = try (args.values["header-file"] ?? []).map(RequestHeaderFile.init)
-        let inputPaths = bodyInputs + tlsInputs + headerInputs.map(\.path)
+        let inputPaths =
+            bodyInputs + tlsInputs + headerInputs.map(\.path)
+            + [args.value("proxy-password-file")].compactMap { $0 }
         guard
             args.value("workspace") != nil
                 || ["environment", "auth-profile", "tls"].allSatisfy({ args.value($0) == nil })
@@ -92,14 +105,20 @@ extension RillCLI {
         }
         let download = args.value("download")
         let rawOutput = args.value("output")
+        guard transportOptions.resumeETag == nil || download != nil else {
+            throw CLIError.usage("--resume-etag requires --download.")
+        }
+        let streamBody = args.flags.contains("stream")
         guard download == nil || (method == .GET && rawOutput == nil) else {
             throw CLIError.usage("--download requires GET and cannot be combined with --output.")
         }
         let prettyJSON = args.flags.contains("pretty-json")
         let prettyXML = args.flags.contains("pretty-xml")
-        let bodyModes = args.flags.intersection(["body-stdout", "pretty-json", "pretty-xml"])
+        let bodyModes = args.flags.intersection([
+            "body-stdout", "pretty-json", "pretty-xml", "stream",
+        ])
         guard bodyModes.count <= 1 else {
-            throw CLIError.usage("Choose --pretty-json, --pretty-xml or --body-stdout.")
+            throw CLIError.usage("Choose one response body stdout mode.")
         }
         let bodyStdout = !bodyModes.isEmpty
         let selectedHeaders = args.values["response-header"] ?? []
@@ -138,7 +157,8 @@ extension RillCLI {
                     "Output cannot replace the workspace, request body, header or TLS inputs.")
             }
             guard
-                args.flags.contains("overwrite") || !FileManager.default.fileExists(atPath: output)
+                args.flags.contains("overwrite") || transportOptions.resumeETag != nil
+                    || !FileManager.default.fileExists(atPath: output)
             else {
                 throw CLIError.usage("Output exists; choose a new path or --overwrite.")
             }
@@ -229,6 +249,15 @@ extension RillCLI {
         let secrets = NamedSecretResolver(catalog: workspace.namedSecrets ?? [])
         let tlsProfiles = workspace.tlsProfiles ?? []
         let session = try sessionOptions?.open()
+        let stdoutFlags = streamBody ? fcntl(STDOUT_FILENO, F_GETFL) : -1
+        if streamBody {
+            guard stdoutFlags >= 0, fcntl(STDOUT_FILENO, F_SETFL, stdoutFlags | O_NONBLOCK) == 0
+            else { throw CLIError.runtime }
+            _ = signal(SIGPIPE, SIG_IGN)
+        }
+        defer {
+            if streamBody { _ = fcntl(STDOUT_FILENO, F_SETFL, stdoutFlags) }
+        }
         let summary: RequestSummary
         var stdoutBody: Data?
         var stdoutHeaders: [Field]?
@@ -239,16 +268,19 @@ extension RillCLI {
                     overwrite: args.flags.contains("overwrite"), profiles: profiles,
                     secrets: secrets,
                     tlsProfiles: tlsProfiles, followRedirects: followRedirects,
-                    fileTLS: fileTLS, cookieJar: session?.jar)
+                    fileTLS: fileTLS, cookieJar: session?.jar,
+                    transport: transportOptions.transport,
+                    resumeETag: transportOptions.resumeETag)
                 summary = RequestSummary(
                     status: result.status, duration: result.duration, bodyBytes: result.bodyBytes)
             } else {
                 let exchange = try await RequestEngine.execute(
                     draft, environment: environment, profiles: profiles, secrets: secrets,
                     tlsProfiles: tlsProfiles, followRedirects: followRedirects,
-                    fileTLS: fileTLS, cookieJar: session?.jar, headersOnly: headersOnly)
+                    fileTLS: fileTLS, cookieJar: session?.jar, headersOnly: headersOnly,
+                    transport: transportOptions.transport)
                 if let output = rawOutput { try args.write(exchange.body, to: output) }
-                if bodyStdout { stdoutBody = exchange.body }
+                if bodyStdout && !streamBody { stdoutBody = exchange.body }
                 if headersOnly { stdoutHeaders = exchange.headers }
                 summary = RequestSummary(
                     status: exchange.status, duration: exchange.duration,
@@ -258,6 +290,9 @@ extension RillCLI {
         } catch CookieSessionError.originMismatch {
             throw CLIError.usage(
                 "This cookie session belongs to a different origin. No request sent.")
+        } catch CookieSessionError.invalidHeaders {
+            throw CLIError.usage(
+                "Session headers require valid values and an HTTPS origin. No request sent.")
         } catch CookieSessionError.explicitCookieHeader {
             throw CLIError.usage(
                 "Choose a cookie session or an explicit Cookie header. No request sent.")
@@ -273,6 +308,10 @@ extension RillCLI {
             throw CLIError.usage("Invalid cookie session origin. No request sent.")
         } catch RillError.responseTooLarge {
             throw CLIError.runtime
+        } catch ResponseDownloadError.invalidResumeResponse {
+            let message = "Download resume response did not match the requested representation.\n"
+            try FileHandle.standardError.write(contentsOf: Data(message.utf8))
+            throw CLIError.runtime
         } catch is ResponseDownloadError {
             throw CLIError.usage("Could not write or install the download; destination omitted.")
         } catch is UploadError {
@@ -287,6 +326,10 @@ extension RillCLI {
         } catch is EditingError {
             throw CLIError.usage(
                 "Request variable expansion failed or exceeded its limits; input content omitted.")
+        }
+        if streamBody {
+            if !(200...299).contains(summary.status) { throw CLIError.runtime }
+            return
         }
         if let stdoutBody {
             if (prettyJSON || prettyXML), !stdoutBody.isEmpty {

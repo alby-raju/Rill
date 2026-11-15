@@ -4,11 +4,14 @@ import RillCore
 struct RequestSessionOptions {
     let session: URL
     let key: URL
+    let persist: Set<String>
 
     init?(_ args: Arguments, protected: [URL]) throws {
         let session = args.value("session")
         let key = args.value("session-key-file")
-        if session == nil && key == nil { return nil }
+        var persist = Set((args.values["session-save-header"] ?? []).map { $0.lowercased() })
+        if args.flags.contains("session-save-auth") { persist.insert("authorization") }
+        if session == nil && key == nil && persist.isEmpty { return nil }
         guard let session, let key, !session.isEmpty, !key.isEmpty,
             !session.contains("\0"), !key.contains("\0"),
             !args.flags.contains("insecure"), !args.flags.contains("allow-insecure")
@@ -28,6 +31,7 @@ struct RequestSessionOptions {
                 )
             }
         }
+        self.persist = persist
         self.session = sessionURL
         self.key = keyURL
     }
@@ -47,9 +51,11 @@ struct RequestSessionOptions {
 
     func open() throws -> PersistentCookieSession {
         do {
-            return try PersistentCookieSession(file: session, keyFile: key)
+            return try PersistentCookieSession(file: session, keyFile: key, persistHeaders: persist)
         } catch is CancellationError {
             throw CancellationError()
+        } catch CookieSessionError.invalidHeaders {
+            throw CLIError.usage("The session header selection is invalid.")
         } catch CookieSessionError.busy {
             throw CLIError.usage(
                 "The cookie session is in use by another invocation. No request sent.")
