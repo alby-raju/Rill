@@ -304,6 +304,8 @@ rill request GET https://example.test/archive --download ./archive.zip --json
 
 Ordinary output is a redacted status, timing and byte summary. `--json` emits `schemaVersion: 1`, `status`, `duration` in seconds and `bodyBytes`. `--quiet` suppresses the summary. Use `--output FILE` for explicit raw response export, including on non-2xx responses, with the usual 16 MiB limit. Choose either `--output` or `--download`. Both protect workspace, body and TLS inputs from overwrite. Non-2xx and transport failures exit 3, invalid configuration exits 2, and cancellation exits 130. The command runs a single request with no saved hooks or assertions. Cookies are disabled unless an encrypted session is selected.
 
+Use `--headers-stdout` for the HTTP status and all response headers, or repeat `--response-header NAME` to select headers by case-insensitive name. Add `--json` for a versioned object with `status` and a `headers` array of name/value pairs. Rill closes the response after receiving its headers. With redirects enabled it shows the final response. Use `--no-follow` to inspect the first redirect. Non-2xx responses still print their headers and exit 3. Header output can contain secrets such as cookies. Text output escapes control characters. This mode requires a live request and cannot be combined with a body destination or `--quiet`.
+
 ### Persist cookies across requests
 
 ```sh

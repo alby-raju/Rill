@@ -334,18 +334,19 @@ public enum RequestEngine {
     private static func hasInvalidHeaderValue(_ value: String) -> Bool {
         value.unicodeScalars.contains { ($0.value < 32 && $0.value != 9) || $0.value == 127 }
     }
+    /// With `headersOnly`, return after the response headers and skip body and response checks.
     public static func execute(
         _ draft: RequestDraft, environment: Environment?, budget: ResponseBudget = .standard,
         profiles: [AuthenticationProfile] = [], secrets: NamedSecretResolver? = nil,
         tlsProfiles: [TLSProfile] = [], identities: any TLSIdentityProvider = SystemTLSIdentities(),
         definitions: [APIDefinitionSource] = [], followRedirects: Bool = true,
-        fileTLS: FileTLSConfiguration? = nil, cookieJar: CookieJar? = nil
+        fileTLS: FileTLSConfiguration? = nil, cookieJar: CookieJar? = nil, headersOnly: Bool = false
     ) async throws -> Exchange {
         try await execute(
             draft, environment: environment, budget: budget, profiles: profiles, secrets: secrets,
             tlsProfiles: tlsProfiles, identities: identities, definitions: definitions,
             followRedirects: followRedirects, fileTLS: fileTLS, cookieJar: cookieJar,
-            headerEdits: [])
+            headerEdits: [], headersOnly: headersOnly)
     }
 
     public static func download(
@@ -377,7 +378,8 @@ public enum RequestEngine {
         tlsProfiles: [TLSProfile] = [], identities: any TLSIdentityProvider = SystemTLSIdentities(),
         definitions: [APIDefinitionSource] = [], followRedirects: Bool = true,
         fileTLS: FileTLSConfiguration? = nil, cookieJar: CookieJar? = nil,
-        headerEdits: [RequestHeaderEdit], download: ResponseFileSink? = nil
+        headerEdits: [RequestHeaderEdit], download: ResponseFileSink? = nil,
+        headersOnly: Bool = false
     ) async throws -> Exchange {
         try Task.checkCancellation()
         let selectedProfile = try TLSProfiles.selected(
@@ -476,6 +478,17 @@ public enum RequestEngine {
                 duration: ProcessInfo.processInfo.systemUptime - start,
                 headers: [], body: Data(), checks: [], originalBodyBytes: count)
         }
+        let headers = http.allHeaderFields.map {
+            Field(name: String(describing: $0.key), value: String(describing: $0.value))
+        }.sorted { $0.name < $1.name }
+        if headersOnly {
+            bytes.task.cancel()
+            try Task.checkCancellation()
+            return Exchange(
+                requestID: draft.id, requestName: draft.name, method: draft.method,
+                url: http.url?.absoluteString ?? "", status: http.statusCode,
+                duration: headersElapsed, headers: headers, body: Data(), checks: [])
+        }
         if response.expectedContentLength > Int64(maximum) { throw RillError.responseTooLarge }
         var data = Data()
         do {
@@ -485,9 +498,6 @@ public enum RequestEngine {
                 data.append(byte)
             }
         } catch { try transportFailure(error) }
-        let headers = http.allHeaderFields.map {
-            Field(name: String(describing: $0.key), value: String(describing: $0.value))
-        }.sorted { $0.name < $1.name }
         var checks: [CheckResult] = []
         if !draft.expectedStatus.isEmpty {
             checks.append(
