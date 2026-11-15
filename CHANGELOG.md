@@ -1,6 +1,11 @@
 # Changelog
 
-## Unreleased
+## 0.4.6 development preview (unreleased)
+
+- Compose ad-hoc requests with inferred methods, localhost shortcuts, file-backed headers, stdin and nested JSON. Inspect prepared requests offline.
+- Select response headers, format JSON or XML, color terminal output and stream response bytes to stdout.
+- Add explicit CONNECT and SOCKS5 proxies, scoped HTTPS proxy trust, same-origin redirect limits and hop traces, and strong-ETag download resume.
+- Persist selected headers and authorization in encrypted, exact-origin HTTPS sessions. Verify streaming, resume and session workflows against HTTPie 3.2.4.
 
 - Development source: reproducible run configs, SplitMix64-v1 template seeds, monotonic execution deadlines, versioned JSON/NDJSON and source-aware offline reports. Explicit raw snapshots feed redacted baseline comparisons for status/check/retry, normalized JSON/header/type-shape and latency drift; omitted data remains unknown.
 
