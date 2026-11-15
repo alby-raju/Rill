@@ -12,16 +12,20 @@ extension RillCLI {
         ]
         let requestFlags: Set<String> = [
             "json", "quiet", "overwrite", "allow-insecure", "multipart", "offline", "raw-preview",
+            "stdin",
         ]
+        let fromStdin = args.flags.contains("stdin")
+        let bodyOptions = ["data", "data-file", "binary-file", "form"].filter {
+            args.values[$0] != nil
+        }
         guard args.operands.count == 2,
             Set(args.values.keys).isSubset(of: requestValues.union(tlsValues)),
             args.flags.isSubset(of: requestFlags.union(FileTLSOptions.flags)),
             let method = HTTPMethod(rawValue: args.operands[0].uppercased()),
-            ["data", "data-file", "binary-file", "form"].filter({ args.values[$0] != nil }).count
-                <= 1
+            bodyOptions.count + (fromStdin ? 1 : 0) <= 1
         else {
             throw CLIError.usage(
-                "Use request METHOD URL with one body option: --data, --data-file, --binary-file or repeatable --form. See help request."
+                "Use request METHOD URL with one body option: --data, --data-file, --binary-file, --stdin or repeatable --form. See help request."
             )
         }
         let hasFileTLS =
@@ -114,13 +118,15 @@ extension RillCLI {
         guard draft.timeout >= 1 else {
             throw CLIError.usage("--timeout must be between 1 and 300 seconds.")
         }
-        if ["data", "data-file", "binary-file", "form"].contains(where: { args.values[$0] != nil })
-        {
+        if fromStdin || !bodyOptions.isEmpty {
             guard method != .GET && method != .HEAD else {
                 throw CLIError.usage("GET/HEAD bodies are not supported; no payload was discarded.")
             }
             do {
-                if let path = args.value("binary-file") {
+                if fromStdin {
+                    draft.bodyMode = .text
+                    draft.body = try await RequestStandardInput.read(timeout: draft.timeout)
+                } else if let path = args.value("binary-file") {
                     draft.bodyMode = .binary
                     draft.contentType = "application/octet-stream"
                     draft.binaryFile = try UploadFileReference.capture(URL(fileURLWithPath: path))
@@ -139,6 +145,8 @@ extension RillCLI {
                 }
             } catch is CancellationError {
                 throw CancellationError()
+            } catch let error as CLIError {
+                throw error
             } catch {
                 throw CLIError.usage(
                     "Could not prepare bounded request body inputs; paths and contents omitted.")

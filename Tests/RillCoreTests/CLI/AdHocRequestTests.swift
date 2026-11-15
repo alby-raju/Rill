@@ -3,11 +3,12 @@ import XCTest
 @testable import RillCore
 
 @MainActor final class AdHocRequestTests: XCTestCase {
-    private func cli(_ args: [String]) async throws -> ProcessRunResult {
+    private func cli(_ args: [String], input: Data = Data()) async throws -> ProcessRunResult {
         guard let path = ProcessInfo.processInfo.environment["RILL_TEST_CLI_PATH"] else {
             throw XCTSkip("Built CLI required")
         }
-        return try await BoundedProcess.run(executable: URL(fileURLWithPath: path), arguments: args)
+        return try await BoundedProcess.run(
+            executable: URL(fileURLWithPath: path), arguments: args, input: input)
     }
     private func directory() throws -> URL {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
@@ -68,6 +69,25 @@ import XCTest
         let invalid = try await cli(arguments + ["--query-param", "=missing-name"])
         XCTAssertEqual(invalid.status, 2)
         XCTAssertTrue(invalid.output.isEmpty)
+    }
+
+    func testStandardInputUsesBufferedBodyPreparation() async throws {
+        let url = "http://127.0.0.1:1/"
+        let arguments = ["request", "POST", url, "--stdin", "--offline"]
+        let body = Data("{\"key\":\"value\"}\n".utf8)
+        let result = try await cli(arguments + ["--raw-preview"], input: body)
+        XCTAssertEqual(result.status, 0)
+        let prepared = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: result.output) as? [String: Any])
+        XCTAssertEqual(prepared["bodyBase64"] as? String, body.base64EncodedString())
+        let empty = try await cli(arguments)
+        XCTAssertEqual(empty.status, 0)
+        let invalid = try await cli(arguments, input: Data([0xff]))
+        XCTAssertEqual(invalid.status, 2)
+        let oversized = try await cli(arguments, input: Data(repeating: 97, count: 1024 * 1024 + 1))
+        XCTAssertEqual(oversized.status, 2)
+        let conflict = try await cli(arguments + ["--data", "other"])
+        XCTAssertEqual(conflict.status, 2)
     }
 
     func testAdHocPOSTUsesSharedExpansionAndExplicitRawOutput() async throws {

@@ -14,12 +14,12 @@ REFERENCE_VERSION = "3.2.4"
 BASE = "http://127.0.0.1:1"
 
 
-def run(binary, options, directory):
+def run(binary, options, directory, input_bytes=b""):
     result = subprocess.run(
         [binary, *options],
         cwd=directory,
         env={**os.environ, "HTTPIE_CONFIG_DIR": str(directory)},
-        stdin=subprocess.DEVNULL,
+        input=input_bytes,
         capture_output=True,
         timeout=10,
     )
@@ -30,7 +30,7 @@ def run(binary, options, directory):
 
 def compare(rill, httpie, directory):
     cases = (
-        ("get-query", "GET", "/items?q=a%20b&q=c", [], [], b""),
+        ("get-query", "GET", "/items?q=a%20b&q=c", [], [], b"", b""),
         (
             "get-query-fields",
             "GET",
@@ -38,10 +38,12 @@ def compare(rill, httpie, directory):
             ["--query-param", "tag=a+b", "--query-param", "tag="],
             ["tag==a+b", "tag=="],
             b"",
+            b"",
         ),
-        ("post-text", "POST", "/items", ["--data", "sample"], ["--raw=sample"], b"sample"),
+        ("post-text", "POST", "/items", ["--data", "sample"], ["--raw=sample"], b"sample", b""),
+        ("post-stdin", "POST", "/items", ["--stdin"], [], b"piped text", b"piped text"),
     )
-    for name, method, target, rill_body, httpie_body, expected_body in cases:
+    for name, method, target, rill_body, httpie_body, expected_body, input_bytes in cases:
         url = BASE + target
         prepared = json.loads(
             run(
@@ -59,12 +61,13 @@ def compare(rill, httpie, directory):
                     *rill_body,
                 ],
                 directory,
+                input_bytes,
             )
         )
         reference = run(
             httpie,
             [
-                "--ignore-stdin",
+                *(["--ignore-stdin"] if not input_bytes else []),
                 "--offline",
                 "--pretty=none",
                 "--print=HB",
@@ -75,6 +78,7 @@ def compare(rill, httpie, directory):
                 *httpie_body,
             ],
             directory,
+            input_bytes,
         )
         head, separator, body = reference.partition(b"\r\n\r\n")
         if not separator and not expected_body:

@@ -273,6 +273,8 @@ Add `--offline` to preview preparation for a buffered request without sending it
 
 Repeat `--query-param NAME=VALUE` to append query fields to a live request or offline preview. Split each field at the first equals sign. Empty values and repeated names are allowed. The engine expands variables and percent-encodes the new fields while preserving the existing URL query.
 
+Use `--stdin` to read a UTF-8 body from a pipe or redirected file. It is an explicit alternative to `--data`, `--data-file`, `--binary-file` and `--form`. Input is capped at 1 MiB, read until EOF and subject to the request's `--timeout` as a separate input deadline. The body uses the same template expansion as inline text and works with offline preview.
+
 Use repeatable `-H`/`--header name:value`, `-d`/`--data TEXT` or `--data-file FILE` (UTF-8, at most 1 MiB). Development source also supports explicit binary and form uploads:
 
 ```sh
