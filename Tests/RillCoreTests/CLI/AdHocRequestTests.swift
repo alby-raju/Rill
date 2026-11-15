@@ -52,6 +52,24 @@ import XCTest
         XCTAssertTrue(refused.output.isEmpty)
     }
 
+    func testQueryFieldsPreserveExistingEncodingOrderAndEmptyValues() async throws {
+        let arguments = [
+            "request", "GET", "http://127.0.0.1:1/items?existing=%2b#fragment", "--offline",
+            "--raw-preview", "--query-param", "tag={{value}}", "--env-var", "value=hello + ☃",
+            "--query-param", "tag=", "--query-param", "key=a=b",
+        ]
+        let result = try await cli(arguments)
+        XCTAssertEqual(result.status, 0)
+        let prepared = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: result.output) as? [String: Any])
+        XCTAssertEqual(
+            prepared["url"] as? String,
+            "http://127.0.0.1:1/items?existing=%2b&tag=hello%20%2B%20%E2%98%83&tag=&key=a%3Db")
+        let invalid = try await cli(arguments + ["--query-param", "=missing-name"])
+        XCTAssertEqual(invalid.status, 2)
+        XCTAssertTrue(invalid.output.isEmpty)
+    }
+
     func testAdHocPOSTUsesSharedExpansionAndExplicitRawOutput() async throws {
         guard let base = ProcessInfo.processInfo.environment["RILL_TEST_BASE_URL"] else {
             throw XCTSkip("Fixture required")

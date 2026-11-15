@@ -20,7 +20,7 @@ struct Arguments: Sendable {
         "endpoint", "query", "query-file", "variables", "header", "metadata", "timeout",
         "proto", "descriptor", "method", "data", "data-file", "count", "concurrency", "ramp",
         "config", "seed", "seed-time", "deadline", "comparison-output", "ignore-json",
-        "ignore-header",
+        "ignore-header", "query-param",
         "latency-percent", "latency-floor", "port", "routes", "project", "repo", "message",
         "token-file", "destination", "client-id",
         "client-secret-name", "scope", "save-secret", "plugins-dir", "trust-file", "plugin",
@@ -56,7 +56,7 @@ struct Arguments: Sendable {
                         values[name] == nil
                             || [
                                 "header", "metadata", "proto-include", "env-var", "ignore-json",
-                                "ignore-header", "form", "request-id",
+                                "ignore-header", "form", "request-id", "query-param",
                             ].contains(name)
                     else { throw CLIError.usage("Duplicate option.") }
                     values[name, default: []].append(input[index])
@@ -114,6 +114,9 @@ struct Arguments: Sendable {
         }
         if value("request-id") != nil && command != "contract-run" {
             throw CLIError.usage("--request-id requires contract-run.")
+        }
+        if value("query-param") != nil && command != "request" {
+            throw CLIError.usage("--query-param requires request.")
         }
         if !["run", "request"].contains(command),
             !FileTLSOptions.values.subtracting(["ssl-client-cert", "ssl-client-key"]).isDisjoint(
@@ -395,6 +398,7 @@ let usage = """
           --latency-percent N --latency-floor MS --json; unknown data cannot prove equality
       request METHOD URL           Ad-hoc HTTP request; no workspace required
           --offline [--raw-preview]  Preview a buffered request as JSON without sending
+          --query-param NAME=VALUE   Append a URL query field (repeatable)
           -H, --header name:value   Repeatable request headers
           -d, --data TEXT           UTF-8 text body; or --data-file FILE (1 MiB)
           --binary-file FILE       Stream an explicit binary body
