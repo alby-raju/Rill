@@ -18,8 +18,13 @@ command -v "$RILL_SHFMT" >/dev/null || {
   echo 'Install shfmt 3.14.1 or set RILL_SHFMT to its executable.' >&2
   exit 2
 }
-[[ "$("$RILL_RUFF" --version)" == 'ruff 0.17.3' ]] || {
-  echo 'Expected Ruff 0.17.3.' >&2
+RILL_RUFF_VERSION="$(sed -n 's/^ruff==\([0-9][0-9.]*\)$/\1/p' requirements-dev.txt)"
+if [[ -z "$RILL_RUFF_VERSION" || "$RILL_RUFF_VERSION" == *$'\n'* ]]; then
+  echo 'Expected one exact Ruff pin in requirements-dev.txt.' >&2
+  exit 2
+fi
+[[ "$("$RILL_RUFF" --version)" == "ruff $RILL_RUFF_VERSION" ]] || {
+  echo "Expected Ruff $RILL_RUFF_VERSION." >&2
   exit 2
 }
 [[ "$("$RILL_SHFMT" --version)" == 'v3.14.1' ]] || {
