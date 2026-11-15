@@ -13,6 +13,7 @@ struct Arguments: Sendable {
         "fail-fast", "metadata-only", "strict-headers", "github-annotations", "control-stdin",
         "include-system-roots", "cookies", "script-inventory", "translate-scripts", "dry-run",
         "multipart", "offline", "raw-preview", "stdin", "no-follow", "body-stdout",
+        "headers-stdout",
     ]
     static let valueOptions: Set<String> = [
         "color", "workspace", "environment", "tls", "iterations", "delay", "retries",
@@ -21,6 +22,7 @@ struct Arguments: Sendable {
         "proto", "descriptor", "method", "data", "data-file", "count", "concurrency", "ramp",
         "config", "seed", "seed-time", "deadline", "comparison-output", "ignore-json",
         "ignore-header", "query-param", "json-field", "header-file", "default-scheme",
+        "response-header",
         "latency-percent", "latency-floor", "port", "routes", "project", "repo", "message",
         "token-file", "destination", "client-id",
         "client-secret-name", "scope", "save-secret", "plugins-dir", "trust-file", "plugin",
@@ -57,7 +59,7 @@ struct Arguments: Sendable {
                             || [
                                 "header", "metadata", "proto-include", "env-var", "ignore-json",
                                 "ignore-header", "form", "request-id", "query-param", "json-field",
-                                "header-file",
+                                "header-file", "response-header",
                             ].contains(name)
                     else { throw CLIError.usage("Duplicate option.") }
                     values[name, default: []].append(input[index])
@@ -118,6 +120,10 @@ struct Arguments: Sendable {
         }
         if flags.contains("body-stdout") && command != "request" {
             throw CLIError.usage("--body-stdout requires request.")
+        }
+        if command != "request", flags.contains("headers-stdout") || value("response-header") != nil
+        {
+            throw CLIError.usage("--headers-stdout and --response-header require request.")
         }
         if flags.contains("no-follow") && command != "request" {
             throw CLIError.usage("--no-follow requires request.")
@@ -420,6 +426,8 @@ let usage = """
           --stdin                   Read a UTF-8 request body from standard input
           --no-follow               Return the first response without following redirects
           --body-stdout             Write only the raw response body to stdout
+          --headers-stdout          Print the final HTTP status and response headers
+          --response-header NAME    Print only named response headers (repeatable; --json available)
           --json-field PATH=VALUE   Compose nested JSON fields (repeatable, := for typed JSON)
           -H, --header name:value   Repeatable request headers
           --header-file NAME=FILE   Read a request header value from a UTF-8 file (repeatable)

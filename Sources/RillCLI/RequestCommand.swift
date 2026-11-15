@@ -9,10 +9,11 @@ extension RillCLI {
             "timeout",
             "color", "workspace", "environment", "auth-profile", "tls", "session",
             "session-key-file", "query-param", "json-field", "header-file", "default-scheme",
+            "response-header",
         ]
         let requestFlags: Set<String> = [
             "json", "quiet", "overwrite", "allow-insecure", "multipart", "offline", "raw-preview",
-            "stdin", "no-follow", "body-stdout",
+            "stdin", "no-follow", "body-stdout", "headers-stdout",
         ]
         let fromStdin = args.flags.contains("stdin")
         let bodyOptions = ["data", "data-file", "binary-file", "form", "json-field"].filter {
@@ -95,6 +96,18 @@ extension RillCLI {
             throw CLIError.usage("--download requires GET and cannot be combined with --output.")
         }
         let bodyStdout = args.flags.contains("body-stdout")
+        let selectedHeaders = args.values["response-header"] ?? []
+        guard selectedHeaders.allSatisfy(HTTPEncoding.isHeaderName) else {
+            throw CLIError.usage("--response-header expects a valid HTTP header name.")
+        }
+        let headersOnly = args.flags.contains("headers-stdout") || !selectedHeaders.isEmpty
+        guard
+            !headersOnly
+                || (!offline && !bodyStdout && !args.quiet && rawOutput == nil && download == nil)
+        else {
+            throw CLIError.usage(
+                "Response header output requires a live request without body output or --quiet.")
+        }
         guard
             !bodyStdout
                 || (!offline && rawOutput == nil && download == nil
@@ -212,6 +225,7 @@ extension RillCLI {
         let session = try sessionOptions?.open()
         let summary: RequestSummary
         var stdoutBody: Data?
+        var stdoutHeaders: [Field]?
         do {
             if let download {
                 let result = try await RequestEngine.download(
@@ -226,9 +240,10 @@ extension RillCLI {
                 let exchange = try await RequestEngine.execute(
                     draft, environment: environment, profiles: profiles, secrets: secrets,
                     tlsProfiles: tlsProfiles, followRedirects: followRedirects,
-                    fileTLS: fileTLS, cookieJar: session?.jar)
+                    fileTLS: fileTLS, cookieJar: session?.jar, headersOnly: headersOnly)
                 if let output = rawOutput { try args.write(exchange.body, to: output) }
                 if bodyStdout { stdoutBody = exchange.body }
+                if headersOnly { stdoutHeaders = exchange.headers }
                 summary = RequestSummary(
                     status: exchange.status, duration: exchange.duration,
                     bodyBytes: exchange.body.count)
@@ -269,6 +284,18 @@ extension RillCLI {
         }
         if let stdoutBody {
             try FileHandle.standardOutput.write(contentsOf: stdoutBody)
+        } else if let stdoutHeaders {
+            let names = Set(selectedHeaders.map { $0.lowercased() })
+            let headers = stdoutHeaders.filter {
+                names.isEmpty || names.contains($0.name.lowercased())
+            }
+            .map { RequestHeaderOutput.Header(name: $0.name, value: $0.value) }
+            let output = RequestHeaderOutput(status: summary.status, headers: headers)
+            if args.flags.contains("json") {
+                try args.json(output)
+            } else {
+                try args.text(output.text)
+            }
         } else if args.flags.contains("json") {
             try args.json(summary)
         } else {
@@ -353,6 +380,33 @@ private struct RequestSummary: Encodable {
     let status: Int
     let duration: Double
     let bodyBytes: Int
+}
+
+private struct RequestHeaderOutput: Encodable {
+    struct Header: Encodable {
+        let name: String
+        let value: String
+    }
+
+    let schemaVersion = 1
+    let status: Int
+    let headers: [Header]
+
+    var text: String {
+        (["HTTP \(status)"] + headers.map { "\(Self.escape($0.name)): \(Self.escape($0.value))" })
+            .joined(separator: "\n")
+    }
+
+    private static func escape(_ text: String) -> String {
+        text.unicodeScalars.map { scalar in
+            switch scalar.properties.generalCategory {
+            case .control, .format, .lineSeparator, .paragraphSeparator:
+                return "\\u{\(String(scalar.value, radix: 16, uppercase: true))}"
+            default:
+                return String(scalar)
+            }
+        }.joined()
+    }
 }
 
 private struct RequestHeaderFile {

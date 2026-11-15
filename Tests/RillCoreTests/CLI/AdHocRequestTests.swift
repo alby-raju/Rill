@@ -455,6 +455,41 @@ import XCTest
         XCTAssertTrue(incompatible.output.isEmpty)
     }
 
+    func testResponseHeaderOutputSelectsFinalHeadersWithoutReadingBody() async throws {
+        let base = try XCTUnwrap(ProcessInfo.processInfo.environment["RILL_TEST_BASE_URL"])
+        let all = try await cli(["request", base + "/echo", "--headers-stdout"])
+        XCTAssertEqual(all.status, 0)
+        let text = String(decoding: all.output, as: UTF8.self).lowercased()
+        XCTAssertTrue(text.hasPrefix("http 200\n"))
+        XCTAssertTrue(text.contains("\ncontent-type: application/json\n"))
+        XCTAssertFalse(text.contains("\"method\""))
+
+        let selected = try await cli([
+            "request", base + "/cookie/redirect", "--no-follow", "--json",
+            "--response-header", "LOCATION", "--response-header", "location",
+            "--response-header", "X-Absent",
+        ])
+        XCTAssertEqual(selected.status, 3)
+        let object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: selected.output) as? [String: Any])
+        let headers = try XCTUnwrap(object["headers"] as? [[String: String]])
+        XCTAssertEqual(object["schemaVersion"] as? Int, 1)
+        XCTAssertEqual(object["status"] as? Int, 302)
+        XCTAssertEqual(headers.count, 1)
+        XCTAssertEqual(headers.first?["name"]?.lowercased(), "location")
+        XCTAssertEqual(headers.first?["value"], "/echo")
+
+        let large = try await cli(["request", base + "/large", "--headers-stdout"])
+        XCTAssertEqual(large.status, 0)
+        XCTAssertTrue(String(decoding: large.output, as: UTF8.self).hasPrefix("HTTP 200\n"))
+
+        for options in [["--offline"], ["--body-stdout"], ["--response-header", "bad:name"]] {
+            let rejected = try await cli(["request", base + "/echo", "--headers-stdout"] + options)
+            XCTAssertEqual(rejected.status, 2)
+            XCTAssertTrue(rejected.output.isEmpty)
+        }
+    }
+
     func testNoFollowReturnsRedirectAndPreservesDownloadDestination() async throws {
         guard let base = ProcessInfo.processInfo.environment["RILL_TEST_BASE_URL"] else {
             throw XCTSkip("Fixture required")
