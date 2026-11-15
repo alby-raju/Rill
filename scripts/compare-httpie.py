@@ -29,9 +29,12 @@ def run(binary, options, directory, input_bytes=b""):
 
 
 def compare(rill, httpie, directory):
+    header_file = directory / "header value.txt"
+    header_file.write_bytes(b"fixture\r\n")
     cases = (
         ("get-query", "GET", "/items?q=a%20b&q=c", [], [], b"", b""),
         ("get-localhost", "", ":8080/items?q=ready", [], [], b"", b""),
+        ("get-bare-host", "", "127.0.0.1:1/items", [], [], b"", b""),
         ("post-localhost", "", ":/items", ["--data", "sample"], ["--raw=sample"], b"sample", b""),
         (
             "get-query-fields",
@@ -64,7 +67,7 @@ def compare(rill, httpie, directory):
         ),
     )
     for name, method, target, rill_body, httpie_body, expected_body, input_bytes in cases:
-        url = target if target.startswith(":") else BASE + target
+        url = BASE + target if target.startswith("/") else target
         operands = [method, url] if method else [url]
         prepared = json.loads(
             run(
@@ -72,10 +75,12 @@ def compare(rill, httpie, directory):
                 [
                     "request",
                     *operands,
+                    "--default-scheme",
+                    "http",
                     "--offline",
                     "--raw-preview",
-                    "--header",
-                    "X-Rill: fixture",
+                    "--header-file",
+                    f"X-Rill={header_file.name}",
                     "--header",
                     "Content-Type: text/plain",
                     *rill_body,
@@ -91,8 +96,9 @@ def compare(rill, httpie, directory):
                 "--offline",
                 "--pretty=none",
                 "--print=HB",
+                "--default-scheme=http",
                 *operands,
-                "X-Rill:fixture",
+                f"X-Rill:@{header_file.name}",
                 "Content-Type:text/plain",
                 *httpie_body,
             ],

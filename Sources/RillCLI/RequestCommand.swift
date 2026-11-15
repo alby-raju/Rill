@@ -8,11 +8,12 @@ extension RillCLI {
             "header", "data", "data-file", "binary-file", "form", "env-var", "output", "download",
             "timeout",
             "color", "workspace", "environment", "auth-profile", "tls", "session",
-            "session-key-file", "query-param", "json-field",
+            "session-key-file", "query-param", "json-field", "header-file", "default-scheme",
+            "response-header",
         ]
         let requestFlags: Set<String> = [
             "json", "quiet", "overwrite", "allow-insecure", "multipart", "offline", "raw-preview",
-            "stdin", "no-follow", "body-stdout",
+            "stdin", "no-follow", "body-stdout", "headers-stdout", "pretty-json", "pretty-xml",
         ]
         let fromStdin = args.flags.contains("stdin")
         let bodyOptions = ["data", "data-file", "binary-file", "form", "json-field"].filter {
@@ -38,7 +39,8 @@ extension RillCLI {
         } else {
             method = hasBody ? .POST : .GET
         }
-        let requestURL = try expandRequestURL(urlOperand)
+        let requestURL = try expandRequestURL(
+            urlOperand, defaultScheme: args.value("default-scheme"))
         let hasFileTLS =
             !tlsValues.isDisjoint(with: args.values.keys)
             || !FileTLSOptions.flags.isDisjoint(with: args.flags)
@@ -76,6 +78,8 @@ extension RillCLI {
             [args.value("data-file"), args.value("binary-file")].compactMap { $0 }
             + form.compactMap(\.file)
         let tlsInputs = FileTLSOptions.inputNames.compactMap { args.value($0) }
+        let headerInputs = try (args.values["header-file"] ?? []).map(RequestHeaderFile.init)
+        let inputPaths = bodyInputs + tlsInputs + headerInputs.map(\.path)
         guard
             args.value("workspace") != nil
                 || ["environment", "auth-profile", "tls"].allSatisfy({ args.value($0) == nil })
@@ -91,14 +95,32 @@ extension RillCLI {
         guard download == nil || (method == .GET && rawOutput == nil) else {
             throw CLIError.usage("--download requires GET and cannot be combined with --output.")
         }
-        let bodyStdout = args.flags.contains("body-stdout")
+        let prettyJSON = args.flags.contains("pretty-json")
+        let prettyXML = args.flags.contains("pretty-xml")
+        let bodyModes = args.flags.intersection(["body-stdout", "pretty-json", "pretty-xml"])
+        guard bodyModes.count <= 1 else {
+            throw CLIError.usage("Choose --pretty-json, --pretty-xml or --body-stdout.")
+        }
+        let bodyStdout = !bodyModes.isEmpty
+        let selectedHeaders = args.values["response-header"] ?? []
+        guard selectedHeaders.allSatisfy(HTTPEncoding.isHeaderName) else {
+            throw CLIError.usage("--response-header expects a valid HTTP header name.")
+        }
+        let headersOnly = args.flags.contains("headers-stdout") || !selectedHeaders.isEmpty
+        guard
+            !headersOnly
+                || (!offline && !bodyStdout && !args.quiet && rawOutput == nil && download == nil)
+        else {
+            throw CLIError.usage(
+                "Response header output requires a live request without body output or --quiet.")
+        }
         guard
             !bodyStdout
                 || (!offline && rawOutput == nil && download == nil
                     && args.flags.isDisjoint(with: ["json", "quiet"]))
         else {
             throw CLIError.usage(
-                "--body-stdout requires a live request without --output, --download, --json or --quiet."
+                "Response body output requires a live request without --output, --download, --json or --quiet."
             )
         }
         let destination = rawOutput ?? download
@@ -108,12 +130,12 @@ extension RillCLI {
         if let output = destination {
             let target = URL(fileURLWithPath: output).resolvingSymlinksInPath()
             guard target != args.workspaceURL.resolvingSymlinksInPath(),
-                !(bodyInputs + tlsInputs).contains(where: {
+                !inputPaths.contains(where: {
                     target == URL(fileURLWithPath: $0).resolvingSymlinksInPath()
                 })
             else {
                 throw CLIError.usage(
-                    "Output cannot replace the workspace, request body or TLS inputs.")
+                    "Output cannot replace the workspace, request body, header or TLS inputs.")
             }
             guard
                 args.flags.contains("overwrite") || !FileManager.default.fileExists(atPath: output)
@@ -124,13 +146,13 @@ extension RillCLI {
         let sessionOptions = try RequestSessionOptions(
             args,
             protected: [args.workspaceURL]
-                + (bodyInputs + tlsInputs + [destination].compactMap { $0 })
+                + (inputPaths + [destination].compactMap { $0 })
                 .map { URL(fileURLWithPath: $0) })
         var draft = RequestDraft()
         draft.name = "Ad-hoc request"
         draft.method = method
         draft.url = requestURL
-        draft.headers = try args.fields("header")
+        draft.headers = try args.fields("header") + headerInputs.map { try $0.field() }
         draft.parameters = try (args.values["query-param"] ?? []).map { argument in
             guard let split = argument.firstIndex(of: "="), split != argument.startIndex else {
                 throw CLIError.usage("--query-param expects NAME=VALUE.")
@@ -209,6 +231,7 @@ extension RillCLI {
         let session = try sessionOptions?.open()
         let summary: RequestSummary
         var stdoutBody: Data?
+        var stdoutHeaders: [Field]?
         do {
             if let download {
                 let result = try await RequestEngine.download(
@@ -223,9 +246,10 @@ extension RillCLI {
                 let exchange = try await RequestEngine.execute(
                     draft, environment: environment, profiles: profiles, secrets: secrets,
                     tlsProfiles: tlsProfiles, followRedirects: followRedirects,
-                    fileTLS: fileTLS, cookieJar: session?.jar)
+                    fileTLS: fileTLS, cookieJar: session?.jar, headersOnly: headersOnly)
                 if let output = rawOutput { try args.write(exchange.body, to: output) }
                 if bodyStdout { stdoutBody = exchange.body }
+                if headersOnly { stdoutHeaders = exchange.headers }
                 summary = RequestSummary(
                     status: exchange.status, duration: exchange.duration,
                     bodyBytes: exchange.body.count)
@@ -265,7 +289,33 @@ extension RillCLI {
                 "Request variable expansion failed or exceeded its limits; input content omitted.")
         }
         if let stdoutBody {
-            try FileHandle.standardOutput.write(contentsOf: stdoutBody)
+            if (prettyJSON || prettyXML), !stdoutBody.isEmpty {
+                let formatter = prettyJSON ? JSONTextFormatter.pretty : XMLTextFormatter.pretty
+                guard let utf8 = String(data: stdoutBody, encoding: .utf8),
+                    let formatted = try? formatter(utf8)
+                else {
+                    let format = prettyJSON ? "JSON" : "XML"
+                    let message =
+                        "Response body could not be formatted as bounded UTF-8 \(format).\n"
+                    try FileHandle.standardError.write(contentsOf: Data(message.utf8))
+                    throw CLIError.runtime
+                }
+                try args.text(formatted)
+            } else {
+                try FileHandle.standardOutput.write(contentsOf: stdoutBody)
+            }
+        } else if let stdoutHeaders {
+            let names = Set(selectedHeaders.map { $0.lowercased() })
+            let headers = stdoutHeaders.filter {
+                names.isEmpty || names.contains($0.name.lowercased())
+            }
+            .map { RequestHeaderOutput.Header(name: $0.name, value: $0.value) }
+            let output = RequestHeaderOutput(status: summary.status, headers: headers)
+            if args.flags.contains("json") {
+                try args.json(output)
+            } else {
+                try args.text(output.text)
+            }
         } else if args.flags.contains("json") {
             try args.json(summary)
         } else {
@@ -276,8 +326,17 @@ extension RillCLI {
         if !(200...299).contains(summary.status) { throw CLIError.runtime }
     }
 
-    private static func expandRequestURL(_ value: String) throws -> String {
-        guard value.hasPrefix(":") else { return value }
+    private static func expandRequestURL(_ input: String, defaultScheme: String?) throws -> String {
+        if let defaultScheme, !["http", "https"].contains(defaultScheme) {
+            throw CLIError.usage("--default-scheme expects http or https.")
+        }
+        let value = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard value.hasPrefix(":") else {
+            guard let defaultScheme,
+                value.range(of: #"^[A-Za-z][A-Za-z0-9+.-]*://"#, options: .regularExpression) == nil
+            else { return input }
+            return "\(defaultScheme)://\(value)"
+        }
         let remainder = value.dropFirst()
         let port = remainder.prefix { !"/?#".contains($0) }
         if !port.isEmpty {
@@ -289,7 +348,7 @@ extension RillCLI {
         }
         let path = remainder.dropFirst(port.count)
         let authority = port.isEmpty ? "localhost" : "localhost:\(port)"
-        return "http://\(authority)\(path.hasPrefix("/") ? "" : "/")\(path)"
+        return "\(defaultScheme ?? "http")://\(authority)\(path.hasPrefix("/") ? "" : "/")\(path)"
     }
 
     private static func previewRequest(
@@ -341,6 +400,71 @@ private struct RequestSummary: Encodable {
     let status: Int
     let duration: Double
     let bodyBytes: Int
+}
+
+private struct RequestHeaderOutput: Encodable {
+    struct Header: Encodable {
+        let name: String
+        let value: String
+    }
+
+    let schemaVersion = 1
+    let status: Int
+    let headers: [Header]
+
+    var text: String {
+        (["HTTP \(status)"] + headers.map { "\(Self.escape($0.name)): \(Self.escape($0.value))" })
+            .joined(separator: "\n")
+    }
+
+    private static func escape(_ text: String) -> String {
+        text.unicodeScalars.map { scalar in
+            switch scalar.properties.generalCategory {
+            case .control, .format, .lineSeparator, .paragraphSeparator:
+                return "\\u{\(String(scalar.value, radix: 16, uppercase: true))}"
+            default:
+                return String(scalar)
+            }
+        }.joined()
+    }
+}
+
+private struct RequestHeaderFile {
+    let name: String
+    let path: String
+
+    init(_ argument: String) throws {
+        guard let delimiter = argument.firstIndex(of: "=") else {
+            throw CLIError.usage("--header-file expects NAME=FILE.")
+        }
+        name = String(argument[..<delimiter])
+        path = String(argument[argument.index(after: delimiter)...])
+        guard HTTPEncoding.isHeaderName(name), !path.isEmpty, path != "-", !path.contains("\0")
+        else {
+            throw CLIError.usage("--header-file requires a header name and explicit local path.")
+        }
+    }
+
+    func field() throws -> Field {
+        let bytes: Data
+        do {
+            bytes = try BoundedFileInput.read(URL(fileURLWithPath: path), limit: 8192)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            throw CLIError.usage(
+                "Could not read a regular header file of at most 8 KiB; path omitted.")
+        }
+        let end =
+            bytes.lastIndex(where: { $0 != 10 && $0 != 13 }).map { $0 + 1 } ?? bytes.startIndex
+        guard let value = String(data: bytes[..<end], encoding: .utf8),
+            value.range(of: "{{", options: .literal) == nil
+        else {
+            throw CLIError.usage(
+                "Header files require valid UTF-8 without template markers; content omitted.")
+        }
+        return Field(name: name, value: value)
+    }
 }
 
 private struct RequestFormField {

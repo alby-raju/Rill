@@ -12,7 +12,9 @@ struct Arguments: Sendable {
         "allow-lan", "overwrite", "show-messages", "help", "version", "insecure",
         "fail-fast", "metadata-only", "strict-headers", "github-annotations", "control-stdin",
         "include-system-roots", "cookies", "script-inventory", "translate-scripts", "dry-run",
-        "multipart", "offline", "raw-preview", "stdin", "no-follow", "body-stdout",
+        "multipart", "offline", "raw-preview", "stdin", "no-follow", "body-stdout", "pretty-json",
+        "pretty-xml",
+        "headers-stdout",
     ]
     static let valueOptions: Set<String> = [
         "color", "workspace", "environment", "tls", "iterations", "delay", "retries",
@@ -20,7 +22,8 @@ struct Arguments: Sendable {
         "endpoint", "query", "query-file", "variables", "header", "metadata", "timeout",
         "proto", "descriptor", "method", "data", "data-file", "count", "concurrency", "ramp",
         "config", "seed", "seed-time", "deadline", "comparison-output", "ignore-json",
-        "ignore-header", "query-param", "json-field",
+        "ignore-header", "query-param", "json-field", "header-file", "default-scheme",
+        "response-header",
         "latency-percent", "latency-floor", "port", "routes", "project", "repo", "message",
         "token-file", "destination", "client-id",
         "client-secret-name", "scope", "save-secret", "plugins-dir", "trust-file", "plugin",
@@ -57,6 +60,7 @@ struct Arguments: Sendable {
                             || [
                                 "header", "metadata", "proto-include", "env-var", "ignore-json",
                                 "ignore-header", "form", "request-id", "query-param", "json-field",
+                                "header-file", "response-header",
                             ].contains(name)
                     else { throw CLIError.usage("Duplicate option.") }
                     values[name, default: []].append(input[index])
@@ -115,8 +119,14 @@ struct Arguments: Sendable {
         if value("request-id") != nil && command != "contract-run" {
             throw CLIError.usage("--request-id requires contract-run.")
         }
-        if flags.contains("body-stdout") && command != "request" {
-            throw CLIError.usage("--body-stdout requires request.")
+        if command != "request",
+            !flags.isDisjoint(with: ["body-stdout", "pretty-json", "pretty-xml"])
+        {
+            throw CLIError.usage("Response body output options require request.")
+        }
+        if command != "request", flags.contains("headers-stdout") || value("response-header") != nil
+        {
+            throw CLIError.usage("--headers-stdout and --response-header require request.")
         }
         if flags.contains("no-follow") && command != "request" {
             throw CLIError.usage("--no-follow requires request.")
@@ -126,6 +136,12 @@ struct Arguments: Sendable {
         }
         if value("query-param") != nil && command != "request" {
             throw CLIError.usage("--query-param requires request.")
+        }
+        if value("header-file") != nil && command != "request" {
+            throw CLIError.usage("--header-file requires request.")
+        }
+        if value("default-scheme") != nil && command != "request" {
+            throw CLIError.usage("--default-scheme requires request.")
         }
         if !["run", "request"].contains(command),
             !FileTLSOptions.values.subtracting(["ssl-client-cert", "ssl-client-key"]).isDisjoint(
@@ -407,13 +423,19 @@ let usage = """
           --latency-percent N --latency-floor MS --json; unknown data cannot prove equality
       request [METHOD] URL         Ad-hoc HTTP request; defaults to GET or POST with a body
           :[PORT][/PATH]            Shortcut for http://localhost
+          --default-scheme http|https  Supply the scheme for a bare host or localhost shortcut
           --offline [--raw-preview]  Preview a buffered request as JSON without sending
           --query-param NAME=VALUE   Append a URL query field (repeatable)
           --stdin                   Read a UTF-8 request body from standard input
           --no-follow               Return the first response without following redirects
           --body-stdout             Write only the raw response body to stdout
+          --pretty-json              Write only the formatted JSON response body to stdout
+          --pretty-xml               Write only the formatted XML response body to stdout
+          --headers-stdout          Print the final HTTP status and response headers
+          --response-header NAME    Print only named response headers (repeatable; --json available)
           --json-field PATH=VALUE   Compose nested JSON fields (repeatable, := for typed JSON)
           -H, --header name:value   Repeatable request headers
+          --header-file NAME=FILE   Read a request header value from a UTF-8 file (repeatable)
           -d, --data TEXT           UTF-8 text body; or --data-file FILE (1 MiB)
           --binary-file FILE       Stream an explicit binary body
           --form NAME=VALUE|NAME@PATH   Repeatable form fields; --multipart forces multipart

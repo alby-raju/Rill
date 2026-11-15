@@ -79,6 +79,91 @@ import XCTest
         }
     }
 
+    func testExplicitDefaultSchemeCompletesBareURLs() async throws {
+        let options = ["request", "--offline", "--raw-preview"]
+        let cases = [
+            (
+                "example.test:8080/health?next=https://example.test", "https",
+                "https://example.test:8080/health?next=https://example.test"
+            ),
+            ("http://example.test/health", "https", "http://example.test/health"),
+            (":8443/health", "https", "https://localhost:8443/health"),
+            ("example.test/health", "http", "http://example.test/health"),
+        ]
+        for (input, scheme, url) in cases {
+            let result = try await cli(options + [input, "--default-scheme", scheme])
+            XCTAssertEqual(result.status, 0)
+            let preview = try XCTUnwrap(
+                JSONSerialization.jsonObject(with: result.output) as? [String: Any])
+            XCTAssertEqual(preview["url"] as? String, url)
+        }
+        for invalid in [
+            ["example.test/health"], ["example.test", "--default-scheme", "ftp"],
+            ["ftp://example.test", "--default-scheme", "https"],
+            ["user:password@example.test", "--default-scheme", "https"],
+        ] {
+            let result = try await cli(options + invalid)
+            XCTAssertEqual(result.status, 2)
+            XCTAssertTrue(result.output.isEmpty)
+        }
+    }
+
+    func testHeaderFilesReachLoopbackAndRemainReadOnly() async throws {
+        let root = try directory()
+        let file = root.appendingPathComponent("private header=fixture.txt")
+        let other = root.appendingPathComponent("empty.txt")
+        let original = Data("private-fixture\r\n\n".utf8)
+        try original.write(to: file)
+        try Data().write(to: other)
+        let headers = [
+            "--header-file", "X-Private=\(file.path)", "--header-file", "X-Empty=\(other.path)",
+        ]
+        let offline = try await cli(["request", ":/echo", "--offline"] + headers)
+        XCTAssertEqual(offline.status, 0)
+        XCTAssertFalse(String(decoding: offline.output, as: UTF8.self).contains("private-fixture"))
+
+        let blocked = try await cli(
+            ["request", ":/echo", "--output", file.path, "--overwrite"] + headers)
+        XCTAssertEqual(blocked.status, 2)
+        XCTAssertEqual(try Data(contentsOf: file), original)
+        let sessionConflict = try await cli(
+            [
+                "request", ":/echo", "--session", file.path, "--session-key-file", other.path,
+            ] + headers)
+        XCTAssertEqual(sessionConflict.status, 2)
+        XCTAssertEqual(try Data(contentsOf: file), original)
+
+        guard let base = ProcessInfo.processInfo.environment["RILL_TEST_BASE_URL"] else {
+            throw XCTSkip("Fixture required")
+        }
+        let sent = try await cli(
+            ["request", base + "/echo", "--body-stdout", "-H", "X-Literal:@raw"] + headers)
+        XCTAssertEqual(sent.status, 0)
+        let echo = try XCTUnwrap(JSONSerialization.jsonObject(with: sent.output) as? [String: Any])
+        let received = try XCTUnwrap(echo["headers"] as? [String: String])
+        XCTAssertEqual(received["X-Private"], "private-fixture")
+        XCTAssertEqual(received["X-Literal"], "@raw")
+    }
+
+    func testHeaderFilesRejectInvalidContentWithoutEchoingIt() async throws {
+        let file = try directory().appendingPathComponent("private-path.txt")
+        let options = ["request", ":/", "--offline", "--header-file", "X-File=\(file.path)"]
+        for invalid in [
+            Data("private-fixture\r\nInjected: value".utf8),
+            Data("{{secret:private-fixture}}".utf8),
+            Data([255]), Data(repeating: 65, count: 8193),
+        ] {
+            try invalid.write(to: file)
+            let result = try await cli(options)
+            XCTAssertEqual(result.status, 2)
+            XCTAssertTrue(result.output.isEmpty)
+            XCTAssertFalse(String(decoding: result.diagnostics, as: UTF8.self).contains("private-"))
+        }
+        try Data("value".utf8).write(to: file)
+        let duplicate = try await cli(options + ["--header", "x-file:duplicate"])
+        XCTAssertEqual(duplicate.status, 2)
+    }
+
     func testQueryFieldsPreserveExistingEncodingOrderAndEmptyValues() async throws {
         let arguments = [
             "request", "GET", "http://127.0.0.1:1/items?existing=%2b#fragment", "--offline",
@@ -368,6 +453,106 @@ import XCTest
         ])
         XCTAssertEqual(incompatible.status, 2)
         XCTAssertTrue(incompatible.output.isEmpty)
+    }
+
+    func testPrettyJSONOutputPreservesStatusAndRejectsInvalidBodies() async throws {
+        let base = try XCTUnwrap(ProcessInfo.processInfo.environment["RILL_TEST_BASE_URL"])
+        let success = try await cli(["request", base + "/script-scalars", "--pretty-json"])
+        XCTAssertEqual(success.status, 0)
+        XCTAssertEqual(
+            String(decoding: success.output, as: UTF8.self),
+            "{\n  \"n\": 42,\n  \"text\": \"42\",\n  \"ok\": true,\n  \"empty\": null,\n  \"zero\": -0\n}\n"
+        )
+
+        let failure = try await cli([
+            "request", "POST", base + "/oauth/token", "--data", "invalid", "--pretty-json",
+        ])
+        XCTAssertEqual(failure.status, 3)
+        let body = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: failure.output) as? [String: String])
+        XCTAssertEqual(body["error"], "invalid_client")
+
+        let empty = try await cli(["request", base + "/download-denied", "--pretty-json"])
+        XCTAssertEqual(empty.status, 3)
+        XCTAssertTrue(empty.output.isEmpty)
+        let invalid = try await cli(["request", base + "/bytes/5", "--pretty-json"])
+        XCTAssertEqual(invalid.status, 3)
+        XCTAssertTrue(invalid.output.isEmpty)
+        XCTAssertTrue(
+            String(decoding: invalid.diagnostics, as: UTF8.self).contains("bounded UTF-8 JSON"))
+
+        for option in ["--offline", "--body-stdout", "--headers-stdout", "--json"] {
+            let rejected = try await cli([
+                "request", base + "/script-scalars", "--pretty-json", option,
+            ])
+            XCTAssertEqual(rejected.status, 2)
+            XCTAssertTrue(rejected.output.isEmpty)
+        }
+    }
+
+    func testPrettyXMLOutputPreservesMixedContentAndRejectsUnsafeInput() async throws {
+        let base = try XCTUnwrap(ProcessInfo.processInfo.environment["RILL_TEST_BASE_URL"])
+        let output = try await cli(["request", base + "/xml-items", "--pretty-xml"])
+        XCTAssertEqual(output.status, 0)
+        let text = String(decoding: output.output, as: UTF8.self)
+        XCTAssertTrue(
+            text.contains("<items>\n    <item id=\"1\">one &amp; two</item>\n    <item/>\n"))
+
+        let mixed = try await cli(["request", base + "/xml-mixed", "--pretty-xml"])
+        XCTAssertEqual(mixed.status, 0)
+        XCTAssertEqual(
+            String(decoding: mixed.output, as: UTF8.self), "<p>Read <b>this</b> first.</p>\n")
+        XCTAssertEqual(
+            try XMLTextFormatter.pretty("<r xml:space=\"preserve\"><a/> <b/></r>"),
+            "<r xml:space=\"preserve\"><a/> <b/></r>")
+
+        for path in ["/xml-invalid", "/xml-dtd"] {
+            let invalid = try await cli(["request", base + path, "--pretty-xml"])
+            XCTAssertEqual(invalid.status, 3)
+            XCTAssertTrue(invalid.output.isEmpty)
+            let diagnostic = String(decoding: invalid.diagnostics, as: UTF8.self)
+            XCTAssertTrue(diagnostic.contains("bounded UTF-8 XML"))
+            XCTAssertFalse(diagnostic.contains("items"))
+        }
+        let conflict = try await cli([
+            "request", base + "/xml-items", "--pretty-xml", "--pretty-json",
+        ])
+        XCTAssertEqual(conflict.status, 2)
+    }
+
+    func testResponseHeaderOutputSelectsFinalHeadersWithoutReadingBody() async throws {
+        let base = try XCTUnwrap(ProcessInfo.processInfo.environment["RILL_TEST_BASE_URL"])
+        let all = try await cli(["request", base + "/echo", "--headers-stdout"])
+        XCTAssertEqual(all.status, 0)
+        let text = String(decoding: all.output, as: UTF8.self).lowercased()
+        XCTAssertTrue(text.hasPrefix("http 200\n"))
+        XCTAssertTrue(text.contains("\ncontent-type: application/json\n"))
+        XCTAssertFalse(text.contains("\"method\""))
+
+        let selected = try await cli([
+            "request", base + "/cookie/redirect", "--no-follow", "--json",
+            "--response-header", "LOCATION", "--response-header", "location",
+            "--response-header", "X-Absent",
+        ])
+        XCTAssertEqual(selected.status, 3)
+        let object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: selected.output) as? [String: Any])
+        let headers = try XCTUnwrap(object["headers"] as? [[String: String]])
+        XCTAssertEqual(object["schemaVersion"] as? Int, 1)
+        XCTAssertEqual(object["status"] as? Int, 302)
+        XCTAssertEqual(headers.count, 1)
+        XCTAssertEqual(headers.first?["name"]?.lowercased(), "location")
+        XCTAssertEqual(headers.first?["value"], "/echo")
+
+        let large = try await cli(["request", base + "/large", "--headers-stdout"])
+        XCTAssertEqual(large.status, 0)
+        XCTAssertTrue(String(decoding: large.output, as: UTF8.self).hasPrefix("HTTP 200\n"))
+
+        for options in [["--offline"], ["--body-stdout"], ["--response-header", "bad:name"]] {
+            let rejected = try await cli(["request", base + "/echo", "--headers-stdout"] + options)
+            XCTAssertEqual(rejected.status, 2)
+            XCTAssertTrue(rejected.output.isEmpty)
+        }
     }
 
     func testNoFollowReturnsRedirectAndPreservesDownloadDestination() async throws {
