@@ -18,16 +18,27 @@ extension RillCLI {
         let bodyOptions = ["data", "data-file", "binary-file", "form", "json-field"].filter {
             args.values[$0] != nil
         }
-        guard args.operands.count == 2,
+        let hasBody = fromStdin || !bodyOptions.isEmpty
+        guard (1...2).contains(args.operands.count),
+            let urlOperand = args.operands.last,
             Set(args.values.keys).isSubset(of: requestValues.union(tlsValues)),
             args.flags.isSubset(of: requestFlags.union(FileTLSOptions.flags)),
-            let method = HTTPMethod(rawValue: args.operands[0].uppercased()),
             bodyOptions.count + (fromStdin ? 1 : 0) <= 1
         else {
             throw CLIError.usage(
-                "Use request METHOD URL with one body option: --data, --data-file, --binary-file, --stdin, --form or --json-field. See help request."
+                "Use request [METHOD] URL with one body option: --data, --data-file, --binary-file, --stdin, --form or --json-field. See help request."
             )
         }
+        let method: HTTPMethod
+        if args.operands.count == 2 {
+            guard let explicitMethod = HTTPMethod(rawValue: args.operands[0].uppercased()) else {
+                throw CLIError.usage("Unsupported HTTP method. See help request.")
+            }
+            method = explicitMethod
+        } else {
+            method = hasBody ? .POST : .GET
+        }
+        let requestURL = try expandRequestURL(urlOperand)
         let hasFileTLS =
             !tlsValues.isDisjoint(with: args.values.keys)
             || !FileTLSOptions.flags.isDisjoint(with: args.flags)
@@ -118,7 +129,7 @@ extension RillCLI {
         var draft = RequestDraft()
         draft.name = "Ad-hoc request"
         draft.method = method
-        draft.url = args.operands[1]
+        draft.url = requestURL
         draft.headers = try args.fields("header")
         draft.parameters = try (args.values["query-param"] ?? []).map { argument in
             guard let split = argument.firstIndex(of: "="), split != argument.startIndex else {
@@ -132,7 +143,7 @@ extension RillCLI {
         guard draft.timeout >= 1 else {
             throw CLIError.usage("--timeout must be between 1 and 300 seconds.")
         }
-        if fromStdin || !bodyOptions.isEmpty {
+        if hasBody {
             guard method != .GET && method != .HEAD else {
                 throw CLIError.usage("GET/HEAD bodies are not supported; no payload was discarded.")
             }
@@ -263,6 +274,22 @@ extension RillCLI {
             )
         }
         if !(200...299).contains(summary.status) { throw CLIError.runtime }
+    }
+
+    private static func expandRequestURL(_ value: String) throws -> String {
+        guard value.hasPrefix(":") else { return value }
+        let remainder = value.dropFirst()
+        let port = remainder.prefix { !"/?#".contains($0) }
+        if !port.isEmpty {
+            guard port.utf8.allSatisfy({ (48...57).contains($0) }),
+                let number = Int(port), (1...65_535).contains(number)
+            else {
+                throw CLIError.usage("Use :[PORT][/PATH] with a port from 1 to 65535.")
+            }
+        }
+        let path = remainder.dropFirst(port.count)
+        let authority = port.isEmpty ? "localhost" : "localhost:\(port)"
+        return "http://\(authority)\(path.hasPrefix("/") ? "" : "/")\(path)"
     }
 
     private static func previewRequest(

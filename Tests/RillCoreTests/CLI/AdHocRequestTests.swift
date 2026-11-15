@@ -53,6 +53,32 @@ import XCTest
         XCTAssertTrue(refused.output.isEmpty)
     }
 
+    func testRequestShortcutsInferMethodAndExpandLocalhost() async throws {
+        let cases: [([String], String, String)] = [
+            ([":"], "GET", "http://localhost/"),
+            ([":?ready=1"], "GET", "http://localhost/?ready=1"),
+            (
+                [":8080/{{path}}", "--env-var", "path=items", "--data", ""],
+                "POST", "http://localhost:8080/items"
+            ),
+            (["patch", ":/items", "--data", "a"], "PATCH", "http://localhost/items"),
+            (["https://example.test/", "--stdin"], "POST", "https://example.test/"),
+        ]
+        for (operands, method, url) in cases {
+            let result = try await cli(["request"] + operands + ["--offline", "--raw-preview"])
+            XCTAssertEqual(result.status, 0)
+            let preview = try XCTUnwrap(
+                JSONSerialization.jsonObject(with: result.output) as? [String: Any])
+            XCTAssertEqual(preview["method"] as? String, method)
+            XCTAssertEqual(preview["url"] as? String, url)
+        }
+        for operands in [[":0/"], [":65536/"], [":80@localhost/"], ["GET", ":/", "-d", "a"]] {
+            let result = try await cli(["request"] + operands + ["--offline"])
+            XCTAssertEqual(result.status, 2)
+            XCTAssertTrue(result.output.isEmpty)
+        }
+    }
+
     func testQueryFieldsPreserveExistingEncodingOrderAndEmptyValues() async throws {
         let arguments = [
             "request", "GET", "http://127.0.0.1:1/items?existing=%2b#fragment", "--offline",
@@ -144,6 +170,20 @@ import XCTest
         XCTAssertEqual((echo["headers"] as? [String: String])?["X-Fixture"], "private-fixture")
         XCTAssertEqual(echo["body"] as? String, Data("private-fixture".utf8).base64EncodedString())
     }
+
+    func testRequestShortcutSendsInferredPostToLoopback() async throws {
+        guard let base = ProcessInfo.processInfo.environment["RILL_TEST_BASE_URL"] else {
+            throw XCTSkip("Fixture required")
+        }
+        let port = try XCTUnwrap(URL(string: base)?.port)
+        let result = try await cli(["request", ":\(port)/echo", "-d", "shortcut", "--body-stdout"])
+        XCTAssertEqual(result.status, 0)
+        let echo = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: result.output) as? [String: Any])
+        XCTAssertEqual(echo["method"] as? String, "POST")
+        XCTAssertEqual(echo["body"] as? String, Data("shortcut".utf8).base64EncodedString())
+    }
+
     func testExplicitWorkspaceEnvironmentOverridesDoNotPersist() async throws {
         guard let base = ProcessInfo.processInfo.environment["RILL_TEST_BASE_URL"] else {
             throw XCTSkip("Fixture required")

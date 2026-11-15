@@ -31,6 +31,8 @@ def run(binary, options, directory, input_bytes=b""):
 def compare(rill, httpie, directory):
     cases = (
         ("get-query", "GET", "/items?q=a%20b&q=c", [], [], b"", b""),
+        ("get-localhost", "", ":8080/items?q=ready", [], [], b"", b""),
+        ("post-localhost", "", ":/items", ["--data", "sample"], ["--raw=sample"], b"sample", b""),
         (
             "get-query-fields",
             "GET",
@@ -62,14 +64,14 @@ def compare(rill, httpie, directory):
         ),
     )
     for name, method, target, rill_body, httpie_body, expected_body, input_bytes in cases:
-        url = BASE + target
+        url = target if target.startswith(":") else BASE + target
+        operands = [method, url] if method else [url]
         prepared = json.loads(
             run(
                 rill,
                 [
                     "request",
-                    method,
-                    url,
+                    *operands,
                     "--offline",
                     "--raw-preview",
                     "--header",
@@ -89,8 +91,7 @@ def compare(rill, httpie, directory):
                 "--offline",
                 "--pretty=none",
                 "--print=HB",
-                method,
-                url,
+                *operands,
                 "X-Rill:fixture",
                 "Content-Type:text/plain",
                 *httpie_body,
@@ -116,6 +117,7 @@ def compare(rill, httpie, directory):
             prepared["sendsRequests"]
             or prepared["method"] != ref_method
             or actual_target != ref_target
+            or actual.netloc != expected["Host"].strip()
             or not bodies_match
             or any(
                 fields.get(key.lower()) != expected[key].strip()
