@@ -7,7 +7,7 @@ struct Arguments: Sendable {
     var command = "help", operands: [String] = [], values: [String: [String]] = [:],
         flags: Set<String> = []
     var referencedRunInputs: [URL] = []
-    static let booleanOptions: Set<String> = [
+    static let booleanOptions: Set<String> = Set([
         "quiet", "detail", "json", "apply", "continue-on-failure", "allow-insecure",
         "allow-lan", "overwrite", "show-messages", "help", "version", "insecure",
         "fail-fast", "metadata-only", "strict-headers", "github-annotations", "control-stdin",
@@ -15,8 +15,8 @@ struct Arguments: Sendable {
         "multipart", "offline", "raw-preview", "stdin", "no-follow", "body-stdout", "pretty-json",
         "pretty-xml",
         "headers-stdout",
-    ]
-    static let valueOptions: Set<String> = [
+    ]).union(RequestTransportOptions.flags)
+    static let valueOptions: Set<String> = Set([
         "color", "workspace", "environment", "tls", "iterations", "delay", "retries",
         "retry-delay", "report", "report-format", "allure", "output", "format", "source",
         "endpoint", "query", "query-file", "variables", "header", "metadata", "timeout",
@@ -33,7 +33,7 @@ struct Arguments: Sendable {
         "ca-cert", "ssl-client-p12", "ssl-passphrase-file", "ssl-client-origin", "ssl-client-map",
         "binary-file", "form", "download", "attachments", "session", "session-key-file",
         "request-id",
-    ]
+    ]).union(RequestTransportOptions.values)
     init(_ input: [String]) throws {
         guard input.count <= 512, input.reduce(0, { $0 + $1.utf8.count }) <= 2 * 1024 * 1024 else {
             throw CLIError.usage("Arguments exceed limits.")
@@ -60,7 +60,8 @@ struct Arguments: Sendable {
                             || [
                                 "header", "metadata", "proto-include", "env-var", "ignore-json",
                                 "ignore-header", "form", "request-id", "query-param", "json-field",
-                                "header-file", "response-header",
+                                "header-file", "response-header", "proxy-bypass",
+                                "session-save-header",
                             ].contains(name)
                     else { throw CLIError.usage("Duplicate option.") }
                     values[name, default: []].append(input[index])
@@ -123,6 +124,12 @@ struct Arguments: Sendable {
             !flags.isDisjoint(with: ["body-stdout", "pretty-json", "pretty-xml"])
         {
             throw CLIError.usage("Response body output options require request.")
+        }
+        if command != "request",
+            !flags.isDisjoint(with: RequestTransportOptions.flags)
+                || !RequestTransportOptions.values.isDisjoint(with: values.keys)
+        {
+            throw CLIError.usage("Ad-hoc transport options require request.")
         }
         if command != "request", flags.contains("headers-stdout") || value("response-header") != nil
         {
@@ -431,6 +438,14 @@ let usage = """
           --body-stdout             Write only the raw response body to stdout
           --pretty-json              Write only the formatted JSON response body to stdout
           --pretty-xml               Write only the formatted XML response body to stdout
+          --stream                  Stream raw response bytes to stdout
+          --proxy URL               Use an HTTP CONNECT, HTTPS CONNECT or SOCKS5 proxy
+          --proxy-ca-cert FILE      Trust a private CA for the HTTPS proxy only
+          --proxy-bypass DOMAIN     Exclude a proxy domain (repeatable)
+          --proxy-user USER --proxy-password-file FILE    Proxy credentials
+          --max-redirects N --show-redirects  Limit and trace redirects
+          --resume-etag ETAG        Resume an existing --download file using a strong ETag
+          --session-save-header NAME | --session-save-auth  Persist selected HTTPS request headers
           --headers-stdout          Print the final HTTP status and response headers
           --response-header NAME    Print only named response headers (repeatable; --json available)
           --json-field PATH=VALUE   Compose nested JSON fields (repeatable, := for typed JSON)

@@ -78,6 +78,42 @@ import XCTest
         XCTAssertEqual(remaining["cookie"], "redirect=fixture")
     }
 
+    func testHTTPSOptInHeadersAndAuthPersistWithoutOverwritingOnOverride() async throws {
+        let variables = ProcessInfo.processInfo.environment
+        let base = try XCTUnwrap(variables["RILL_TEST_TLS_URL"])
+        let ca = URL(fileURLWithPath: try XCTUnwrap(variables["RILL_TEST_TLS_DIR"]))
+            .appendingPathComponent("ca.pem")
+        let root = try directory()
+        let session = root.appendingPathComponent("session.rill")
+        let key = root.appendingPathComponent("key.txt")
+        try self.key(key)
+        let options = [
+            "--session", session.path, "--session-key-file", key.path, "--ca-cert", ca.path,
+        ]
+        let request = ["request", base + "/session-echo"] + options
+        let saved = try await cli(
+            request + [
+                "--header", "Authorization: Bearer private-token", "--session-save-auth",
+                "--header", "X-Favorite: fixture-value", "--session-save-header", "X-Favorite",
+                "--header", "Accept: application/vnd.fixture+json", "--session-save-header",
+                "Accept",
+            ])
+        XCTAssertEqual(saved.status, 0, String(decoding: saved.diagnostics, as: UTF8.self))
+        let encrypted = try Data(contentsOf: session)
+        XCTAssertTrue(encrypted.starts(with: Data("RillCookieSession/2\n".utf8)))
+        XCTAssertNil(encrypted.range(of: Data("private-token".utf8)))
+        let overridden = try await echo(
+            base, path: "/session-echo", root: root,
+            options: options + ["--header", "Authorization: Bearer temporary"])
+        XCTAssertEqual(overridden["authorization"], "Bearer temporary")
+        let replayed = try await echo(base, path: "/session-echo", root: root, options: options)
+        XCTAssertEqual(replayed["authorization"], "Bearer private-token")
+        XCTAssertEqual(replayed["x-favorite"], "fixture-value")
+        XCTAssertEqual(replayed["accept"], "application/vnd.fixture+json")
+        let rejected = try await cli(["request", "https://localhost:18751/session-echo"] + options)
+        XCTAssertEqual(rejected.status, 2)
+    }
+
     func testSessionRejectsWrongKeyOriginUnsafeOptionsAndConcurrentAccess() async throws {
         let base = try XCTUnwrap(ProcessInfo.processInfo.environment["RILL_TEST_BASE_URL"])
         let root = try directory()

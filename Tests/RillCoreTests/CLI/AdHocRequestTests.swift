@@ -593,6 +593,34 @@ import XCTest
         }
     }
 
+    func testTransportControlsAndStrongETagResume() async throws {
+        let base = try XCTUnwrap(ProcessInfo.processInfo.environment["RILL_TEST_BASE_URL"])
+        let request = ["request", base + "/cookie/redirect", "--show-redirects", "--stream"]
+        let followed = try await cli(request + ["--max-redirects", "1"])
+        XCTAssertEqual(followed.status, 0)
+        XCTAssertTrue(
+            String(decoding: followed.diagnostics, as: UTF8.self).contains("302 followed"))
+        XCTAssertTrue(String(decoding: followed.output, as: UTF8.self).contains("/echo"))
+        let stopped = try await cli(request + ["--max-redirects", "0"])
+        XCTAssertEqual(stopped.status, 3)
+        XCTAssertTrue(String(decoding: stopped.diagnostics, as: UTF8.self).contains("302 stopped"))
+
+        let destination = try directory().appendingPathComponent("resume.bin")
+        let prefix = Data("first-".utf8)
+        let completed = Data("first-second".utf8)
+        let options = ["--download", destination.path, "--resume-etag", "\"fixture\"", "--json"]
+        for (fixture, expected, contents) in [
+            ("resume", Int32(0), completed), ("resume-restart", 0, completed),
+            ("resume-invalid", 3, prefix),
+        ] {
+            try prefix.write(to: destination)
+            let result = try await cli(["request", base + "/" + fixture] + options)
+            XCTAssertEqual(
+                result.status, expected, String(decoding: result.diagnostics, as: UTF8.self))
+            XCTAssertEqual(try Data(contentsOf: destination), contents)
+        }
+    }
+
     func testNoFollowReturnsRedirectAndPreservesDownloadDestination() async throws {
         guard let base = ProcessInfo.processInfo.environment["RILL_TEST_BASE_URL"] else {
             throw XCTSkip("Fixture required")

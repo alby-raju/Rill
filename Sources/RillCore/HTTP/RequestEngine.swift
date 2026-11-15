@@ -133,7 +133,7 @@ public enum RequestEngine {
 
     private static func prepare(
         _ input: RequestDraft, environment: Environment?, profiles: [AuthenticationProfile],
-        headerEdits: [RequestHeaderEdit] = [],
+        headerEdits: [RequestHeaderEdit] = [], includeImplicitHeaders: Bool = true,
         resolveSecret: @escaping (String) throws -> String
     ) throws -> URLRequest {
         let draft = try AuthenticationProfiles.applying(to: input, profiles: profiles)
@@ -188,8 +188,7 @@ public enum RequestEngine {
         var request = URLRequest(url: url)
         request.httpMethod = draft.method.rawValue
         request.timeoutInterval = draft.timeout
-        request.setValue("application/json, */*;q=0.5", forHTTPHeaderField: "Accept")
-        request.setValue("Rill/" + RillVersion.number, forHTTPHeaderField: "User-Agent")
+        if includeImplicitHeaders { addImplicitHeaders(to: &request) }
         var headerNames = Set<String>()
         for field in draft.headers where field.enabled && !field.name.isEmpty {
             let name = try expand(field.name)
@@ -300,11 +299,15 @@ public enum RequestEngine {
 
     private static func freeze(
         _ input: RequestDraft, environment: Environment?, profiles: [AuthenticationProfile],
-        secrets: NamedSecretResolver?, headerEdits: [RequestHeaderEdit]
+        secrets: NamedSecretResolver?, headerEdits: [RequestHeaderEdit],
+        includeImplicitHeaders: Bool = true
     ) throws -> PreparedHTTPRequest {
         let draft = try AuthenticationProfiles.applying(to: input, profiles: profiles)
         func prepareHeaders(_ request: RequestDraft) throws -> URLRequest {
-            try prepare(request, environment: environment, profiles: [], headerEdits: headerEdits) {
+            try prepare(
+                request, environment: environment, profiles: [], headerEdits: headerEdits,
+                includeImplicitHeaders: includeImplicitHeaders
+            ) {
                 name in
                 guard let secrets else { throw AuthenticationError.missingSecret }
                 return try secrets.resolve(name)
@@ -331,6 +334,15 @@ public enum RequestEngine {
         }
         return PreparedHTTPRequest(request: request, temporaryBody: upload.url)
     }
+    private static func addImplicitHeaders(to request: inout URLRequest) {
+        if request.value(forHTTPHeaderField: "Accept") == nil {
+            request.setValue("application/json, */*;q=0.5", forHTTPHeaderField: "Accept")
+        }
+        if request.value(forHTTPHeaderField: "User-Agent") == nil {
+            request.setValue("Rill/" + RillVersion.number, forHTTPHeaderField: "User-Agent")
+        }
+    }
+
     private static func hasInvalidHeaderValue(_ value: String) -> Bool {
         value.unicodeScalars.contains { ($0.value < 32 && $0.value != 9) || $0.value == 127 }
     }
@@ -340,13 +352,15 @@ public enum RequestEngine {
         profiles: [AuthenticationProfile] = [], secrets: NamedSecretResolver? = nil,
         tlsProfiles: [TLSProfile] = [], identities: any TLSIdentityProvider = SystemTLSIdentities(),
         definitions: [APIDefinitionSource] = [], followRedirects: Bool = true,
-        fileTLS: FileTLSConfiguration? = nil, cookieJar: CookieJar? = nil, headersOnly: Bool = false
+        fileTLS: FileTLSConfiguration? = nil, cookieJar: CookieJar? = nil,
+        headersOnly: Bool = false,
+        transport: AdHocHTTPTransport = .init()
     ) async throws -> Exchange {
         try await execute(
             draft, environment: environment, budget: budget, profiles: profiles, secrets: secrets,
             tlsProfiles: tlsProfiles, identities: identities, definitions: definitions,
             followRedirects: followRedirects, fileTLS: fileTLS, cookieJar: cookieJar,
-            headerEdits: [], headersOnly: headersOnly)
+            headerEdits: [], headersOnly: headersOnly, transport: transport)
     }
 
     public static func download(
@@ -354,18 +368,20 @@ public enum RequestEngine {
         overwrite: Bool = false, profiles: [AuthenticationProfile] = [],
         secrets: NamedSecretResolver? = nil, tlsProfiles: [TLSProfile] = [],
         followRedirects: Bool = true,
-        fileTLS: FileTLSConfiguration? = nil, cookieJar: CookieJar? = nil
+        fileTLS: FileTLSConfiguration? = nil, cookieJar: CookieJar? = nil,
+        transport: AdHocHTTPTransport = .init(), resumeETag: String? = nil
     ) async throws -> DownloadResult {
         guard draft.method == .GET else { throw RillError.unsupportedBodyMethod }
         try Task.checkCancellation()
-        let sink = try ResponseFileSink(destination: destination, overwrite: overwrite)
+        let sink = try ResponseFileSink(
+            destination: destination, overwrite: overwrite, resumeETag: resumeETag)
         let exchange = try await execute(
             draft, environment: environment,
             budget: ResponseBudget(downloadBytes: 256 * 1024 * 1024),
             profiles: profiles, secrets: secrets, tlsProfiles: tlsProfiles,
             followRedirects: followRedirects, fileTLS: fileTLS,
             cookieJar: cookieJar,
-            headerEdits: [], download: sink)
+            headerEdits: [], download: sink, transport: transport)
         if (200...299).contains(exchange.status) { try sink.commit() }
         return DownloadResult(
             status: exchange.status, duration: exchange.duration,
@@ -379,7 +395,7 @@ public enum RequestEngine {
         definitions: [APIDefinitionSource] = [], followRedirects: Bool = true,
         fileTLS: FileTLSConfiguration? = nil, cookieJar: CookieJar? = nil,
         headerEdits: [RequestHeaderEdit], download: ResponseFileSink? = nil,
-        headersOnly: Bool = false
+        headersOnly: Bool = false, transport: AdHocHTTPTransport = .init()
     ) async throws -> Exchange {
         try Task.checkCancellation()
         let selectedProfile = try TLSProfiles.selected(
@@ -390,11 +406,13 @@ public enum RequestEngine {
         let savedIdentity =
             fileTLS == nil
             ? try selectedProfile?.identityReference.map { try identities.identity(for: $0) } : nil
+        let scopedSession = cookieJar?.hasSessionScope == true
         let frozen = try freeze(
             draft, environment: environment, profiles: profiles, secrets: secrets,
-            headerEdits: headerEdits)
+            headerEdits: headerEdits, includeImplicitHeaders: !scopedSession)
         defer { frozen.removeTemporaryBody() }
-        let request = frozen.request
+        var request = frozen.request
+        try download?.configure(&request)
         let fileCredential = fileTLS?.credential(for: request.url)
         if fileTLS != nil, let selectedProfile,
             selectedProfile.requiresClientIdentity || selectedProfile.identityReference != nil,
@@ -409,17 +427,19 @@ public enum RequestEngine {
                 throw ContractError.requestRejected
             }
         }
-        try cookieJar?.validate(request, insecure: tlsProfile?.mode == .insecure)
+        try cookieJar?.prepare(&request, insecure: tlsProfile?.mode == .insecure)
+        if scopedSession { addImplicitHeaders(to: &request) }
         let delegate = HTTPTransportDelegate(
             prepared: frozen, profile: tlsProfile, identity: identity,
             certificates: fileCredential?.1,
             identityPersistence: fileTLS == nil ? .forSession : .none,
-            followRedirects: followRedirects)
+            followRedirects: followRedirects, transport: transport)
         // Keep challenge state and body replay isolated on the original path. For plain,
         // bodyless HTTP reads, the task delegate still enforces the same redirect policy.
         let pooled: URLSession?
         if let url = request.url, url.scheme == "http", url.user == nil, url.password == nil,
             draft.method == .GET || draft.method == .HEAD, fileTLS == nil, tlsProfile == nil,
+            transport.proxy == nil, transport.stream == nil,
             cookieJar == nil, request.value(forHTTPHeaderField: "Authorization") == nil,
             request.value(forHTTPHeaderField: "Proxy-Authorization") == nil,
             request.value(forHTTPHeaderField: "Cookie") == nil
@@ -434,6 +454,7 @@ public enum RequestEngine {
         } else {
             let configuration = HTTPClientConfiguration.make()
             cookieJar?.configure(configuration)
+            if let proxy = transport.proxy { configuration.proxyConfigurations = [proxy] }
             session = URLSession(
                 configuration: configuration, delegate: delegate, delegateQueue: nil)
         }
@@ -444,6 +465,16 @@ public enum RequestEngine {
             throw error
         }
         let start = ProcessInfo.processInfo.systemUptime
+        if let stream = delegate.stream {
+            do {
+                let (http, count) = try await stream.receive(in: session, request: request)
+                return Exchange(
+                    requestID: draft.id, requestName: draft.name, method: draft.method,
+                    url: http.url?.absoluteString ?? "", status: http.statusCode,
+                    duration: ProcessInfo.processInfo.systemUptime - start,
+                    headers: [], body: Data(), checks: [], originalBodyBytes: count)
+            } catch { try transportFailure(error) }
+        }
         let received: (URLSession.AsyncBytes, URLResponse)
         do {
             received = try await session.bytes(
@@ -461,7 +492,8 @@ public enum RequestEngine {
                 guard response.expectedContentLength <= Int64(maximum) else {
                     throw RillError.responseTooLarge
                 }
-                do { count = try await download.stream(bytes, limit: maximum) } catch {
+                let prefix = try download.prepareResponse(http, limit: maximum)
+                do { count = try await download.stream(bytes, limit: maximum - prefix) } catch {
                     try transportFailure(error)
                 }
                 let encoding = http.value(forHTTPHeaderField: "Content-Encoding")?.lowercased()
@@ -471,6 +503,8 @@ public enum RequestEngine {
                 {
                     throw URLError(.networkConnectionLost)
                 }
+                try download.validateCompletion(received: count)
+                count += prefix
             }
             return Exchange(
                 requestID: draft.id, requestName: draft.name, method: draft.method,
@@ -552,7 +586,7 @@ public enum RequestEngine {
     }
 }
 
-final class HTTPTransportDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+final class HTTPTransportDelegate: NSObject, URLSessionDataDelegate, @unchecked Sendable {
     private let rejectionLock = NSLock()
     private var rejection: URLError.Code?
     var tlsRejection: URLError.Code? { rejectionLock.withLock { rejection } }
@@ -565,11 +599,15 @@ final class HTTPTransportDelegate: NSObject, URLSessionTaskDelegate, @unchecked 
     let certificates: [SecCertificate]?
     let identityPersistence: URLCredential.Persistence
     let followRedirects: Bool
+    let transport: AdHocHTTPTransport
+    let stream: HTTPResponseStream?
+    private let redirectLock = NSLock()
+    private var redirectCount = 0
     init(
         prepared: PreparedHTTPRequest, profile: TLSProfile?, identity: SecIdentity?,
         certificates: [SecCertificate]? = nil,
         identityPersistence: URLCredential.Persistence = .forSession,
-        followRedirects: Bool = true
+        followRedirects: Bool = true, transport: AdHocHTTPTransport = .init()
     ) {
         self.prepared = prepared
         self.profile = profile
@@ -577,7 +615,25 @@ final class HTTPTransportDelegate: NSObject, URLSessionTaskDelegate, @unchecked 
         self.certificates = certificates
         self.identityPersistence = identityPersistence
         self.followRedirects = followRedirects
+        self.transport = transport
+        stream = transport.stream.map(HTTPResponseStream.init)
     }
+    func urlSession(
+        _ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse,
+        completionHandler: @escaping @Sendable (URLSession.ResponseDisposition) -> Void
+    ) {
+        completionHandler(stream?.received(response) == false ? .cancel : .allow)
+    }
+
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+        stream?.received(data, task: dataTask)
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?)
+    {
+        stream?.complete(error)
+    }
+
     func urlSession(
         _ session: URLSession, task: URLSessionTask,
         didReceive challenge: URLAuthenticationChallenge,
@@ -639,8 +695,22 @@ final class HTTPTransportDelegate: NSObject, URLSessionTaskDelegate, @unchecked 
             else { return nil }
             return "\(scheme)://\(host):\(url.port ?? (scheme == "https" ? 443 : 80))"
         }
-        // Do not forward custom credential headers or replay bodies to another origin.
-        completionHandler(
-            followRedirects && origin(request.url) == origin(prepared.request.url) ? request : nil)
+        let number = redirectLock.withLock {
+            redirectCount += 1
+            return redirectCount
+        }
+        let decision: HTTPRedirectHop.Decision
+        if !followRedirects {
+            decision = .disabled
+        } else if origin(request.url) != origin(prepared.request.url) {
+            decision = .crossOrigin
+        } else if number > (transport.maximumRedirects ?? Int.max) {
+            decision = .limit
+        } else {
+            decision = .followed
+        }
+        transport.traceRedirect?(
+            HTTPRedirectHop(status: response.statusCode, number: number, decision: decision))
+        completionHandler(decision == .followed ? request : nil)
     }
 }

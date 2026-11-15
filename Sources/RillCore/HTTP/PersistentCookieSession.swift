@@ -4,7 +4,8 @@ import Foundation
 import Synchronization
 
 public enum CookieSessionError: Error {
-    case invalid, busy, originMismatch, insecureTransport, explicitCookieHeader, writeFailed
+    case invalid, busy, originMismatch, insecureTransport, explicitCookieHeader, writeFailed,
+        invalidHeaders
 }
 
 struct CookieSessionOrigin: Codable, Equatable, Sendable {
@@ -42,11 +43,38 @@ struct CookieSessionOrigin: Codable, Equatable, Sendable {
 final class CookieSessionScope: Sendable {
     private let bound: Mutex<CookieSessionOrigin?>
 
-    init(_ origin: CookieSessionOrigin?) { bound = Mutex(origin) }
+    private let headers: Mutex<[String: String]>
+    private let persist: Set<String>
+
+    init(_ origin: CookieSessionOrigin?, headers: [String: String], persist: Set<String>) {
+        bound = Mutex(origin)
+        self.headers = Mutex(headers)
+        self.persist = persist
+    }
+
+    var storedHeaders: [String: String] { headers.withLock { $0 } }
+
+    static func validHeader(_ name: String) -> Bool {
+        let blocked: Set<String> = [
+            "host", "cookie", "set-cookie", "connection", "keep-alive", "te", "trailer",
+            "transfer-encoding", "upgrade", "expect", "range", "if-range", "accept-encoding",
+        ]
+        return HTTPEncoding.isHeaderName(name) && name == name.lowercased()
+            && name.utf8.count <= 128 && !blocked.contains(name)
+            && !name.hasPrefix("content-") && !name.hasPrefix("proxy-")
+    }
+
+    static func validHeaders(_ headers: [String: String]) -> Bool {
+        headers.count <= 32
+            && headers.allSatisfy { name, value in
+                validHeader(name) && value.utf8.count <= 8192
+                    && !value.utf8.contains { $0 < 32 || $0 == 127 }
+            }
+    }
 
     var origin: CookieSessionOrigin? { bound.withLock { $0 } }
 
-    func validate(_ request: URLRequest, insecure: Bool) throws {
+    func prepare(_ request: inout URLRequest, insecure: Bool) throws {
         guard !insecure else { throw CookieSessionError.insecureTransport }
         guard request.value(forHTTPHeaderField: "Cookie") == nil else {
             throw CookieSessionError.explicitCookieHeader
@@ -59,6 +87,21 @@ final class CookieSessionScope: Sendable {
                 throw CookieSessionError.originMismatch
             }
             current = origin
+        }
+        try headers.withLock { saved in
+            guard origin.scheme == "https" || (saved.isEmpty && persist.isEmpty) else {
+                throw CookieSessionError.invalidHeaders
+            }
+            for (name, value) in saved where request.value(forHTTPHeaderField: name) == nil {
+                request.setValue(value, forHTTPHeaderField: name)
+            }
+            for name in persist {
+                guard let value = request.value(forHTTPHeaderField: name) else {
+                    throw CookieSessionError.invalidHeaders
+                }
+                saved[name] = value
+            }
+            guard Self.validHeaders(saved) else { throw CookieSessionError.invalidHeaders }
         }
     }
 }
@@ -110,9 +153,11 @@ public final class PersistentCookieSession {
     private struct Snapshot: Codable {
         let origin: CookieSessionOrigin
         let cookies: [StoredCookie]
+        let headers: [String: String]?
     }
 
     private static let magic = Data("RillCookieSession/1\n".utf8)
+    private static let headersMagic = Data("RillCookieSession/2\n".utf8)
     private static let maximumBytes = 256 * 1024
     private static let maximumCookies = 128
 
@@ -123,8 +168,10 @@ public final class PersistentCookieSession {
     private let scope: CookieSessionScope
     private let descriptor: Int32
 
-    public init(file url: URL, keyFile: URL) throws {
+    public init(file url: URL, keyFile: URL, persistHeaders: Set<String> = []) throws {
         try Task.checkCancellation()
+        guard persistHeaders.count <= 32, persistHeaders.allSatisfy(CookieSessionScope.validHeader)
+        else { throw CookieSessionError.invalidHeaders }
         let key = try Self.readKey(keyFile)
         let descriptor = Darwin.open(
             url.appendingPathExtension("lock").path,
@@ -143,12 +190,18 @@ public final class PersistentCookieSession {
         let snapshot: Snapshot?
         if let original {
             do {
-                guard original.starts(with: Self.magic) else { throw CookieSessionError.invalid }
-                let box = try AES.GCM.SealedBox(combined: original.dropFirst(Self.magic.count))
-                let clear = try AES.GCM.open(box, using: key, authenticating: Self.magic)
+                let magic =
+                    original.starts(with: Self.headersMagic) ? Self.headersMagic : Self.magic
+                guard original.starts(with: magic) else { throw CookieSessionError.invalid }
+                let box = try AES.GCM.SealedBox(combined: original.dropFirst(magic.count))
+                let clear = try AES.GCM.open(box, using: key, authenticating: magic)
                 try WorkspaceFile.checkJSONBounds(clear)
                 let decoded = try JSONDecoder().decode(Snapshot.self, from: clear)
-                guard decoded.origin.isValid, decoded.cookies.count <= Self.maximumCookies else {
+                guard decoded.origin.isValid, decoded.cookies.count <= Self.maximumCookies,
+                    CookieSessionScope.validHeaders(decoded.headers ?? [:]),
+                    decoded.headers?.isEmpty != false
+                        || (magic == Self.headersMagic && decoded.origin.scheme == "https")
+                else {
                     throw CookieSessionError.invalid
                 }
                 snapshot = decoded
@@ -158,7 +211,8 @@ public final class PersistentCookieSession {
         } else {
             snapshot = nil
         }
-        let scope = CookieSessionScope(snapshot?.origin)
+        let scope = CookieSessionScope(
+            snapshot?.origin, headers: snapshot?.headers ?? [:], persist: persistHeaders)
         let jar = CookieJar(scope: scope)
         if let snapshot {
             let now = Date()
@@ -188,19 +242,23 @@ public final class PersistentCookieSession {
         }
         guard cookies.count <= Self.maximumCookies else { throw CookieSessionError.writeFailed }
         do {
-            let snapshot = Snapshot(origin: origin, cookies: cookies.map(StoredCookie.init))
+            let headers = scope.storedHeaders
+            let magic = headers.isEmpty ? Self.magic : Self.headersMagic
+            let snapshot = Snapshot(
+                origin: origin, cookies: cookies.map(StoredCookie.init),
+                headers: headers.isEmpty ? nil : headers)
             // Verify that every record we write can be reopened with the same validation rules.
             let now = Date()
             for record in snapshot.cookies { _ = try record.restore(for: origin, now: now) }
             let data = try JSONEncoder().encode(snapshot)
             guard
-                let sealed = try AES.GCM.seal(data, using: key, authenticating: Self.magic)
+                let sealed = try AES.GCM.seal(data, using: key, authenticating: magic)
                     .combined,
-                sealed.count <= Self.maximumBytes - Self.magic.count,
+                sealed.count <= Self.maximumBytes - magic.count,
                 try BoundedFileInput.readPrivate(url, limit: Self.maximumBytes) == original
             else { throw CookieSessionError.writeFailed }
             try Task.checkCancellation()
-            let next = Self.magic + sealed
+            let next = magic + sealed
             try WorkspaceFile.atomicWrite(next, to: url, replaceExisting: original != nil)
             original = next
         } catch is CancellationError {
