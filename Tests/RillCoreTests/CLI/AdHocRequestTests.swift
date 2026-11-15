@@ -305,6 +305,26 @@ import XCTest
         XCTAssertEqual(try Data(contentsOf: phrase), Data("rill-fixture\n".utf8))
     }
 
+    func testNoFollowReturnsRedirectAndPreservesDownloadDestination() async throws {
+        guard let base = ProcessInfo.processInfo.environment["RILL_TEST_BASE_URL"] else {
+            throw XCTSkip("Fixture required")
+        }
+        let args = ["request", "GET", base + "/cookie/redirect", "--json"]
+        let followed = try await cli(args)
+        XCTAssertEqual(followed.status, 0)
+        let file = try directory().appendingPathComponent("download")
+        let previous = Data("previous download".utf8)
+        try previous.write(to: file)
+        for options in [[], ["--download", file.path, "--overwrite"]] {
+            let stopped = try await cli(args + ["--no-follow"] + options)
+            XCTAssertEqual(stopped.status, 3)
+            let summary = try XCTUnwrap(
+                JSONSerialization.jsonObject(with: stopped.output) as? [String: Any])
+            XCTAssertEqual(summary["status"] as? Int, 302)
+        }
+        XCTAssertEqual(try Data(contentsOf: file), previous)
+    }
+
     func testDownloadStreamsBeyondPreviewLimitAndKeepsOldFileOnFailure() async throws {
         let base = try XCTUnwrap(ProcessInfo.processInfo.environment["RILL_TEST_BASE_URL"])
         let root = try directory()

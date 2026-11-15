@@ -12,7 +12,7 @@ extension RillCLI {
         ]
         let requestFlags: Set<String> = [
             "json", "quiet", "overwrite", "allow-insecure", "multipart", "offline", "raw-preview",
-            "stdin",
+            "stdin", "no-follow",
         ]
         let fromStdin = args.flags.contains("stdin")
         let bodyOptions = ["data", "data-file", "binary-file", "form", "json-field"].filter {
@@ -31,8 +31,12 @@ extension RillCLI {
         let hasFileTLS =
             !tlsValues.isDisjoint(with: args.values.keys)
             || !FileTLSOptions.flags.isDisjoint(with: args.flags)
+        let followRedirects = !args.flags.contains("no-follow")
         let offline = args.flags.contains("offline")
         let rawPreview = args.flags.contains("raw-preview")
+        guard !offline || followRedirects else {
+            throw CLIError.usage("--no-follow applies only to live requests.")
+        }
         guard !rawPreview || offline else {
             throw CLIError.usage("--raw-preview requires --offline.")
         }
@@ -189,13 +193,15 @@ extension RillCLI {
                     draft, environment: environment, to: URL(fileURLWithPath: download),
                     overwrite: args.flags.contains("overwrite"), profiles: profiles,
                     secrets: secrets,
-                    tlsProfiles: tlsProfiles, fileTLS: fileTLS, cookieJar: session?.jar)
+                    tlsProfiles: tlsProfiles, followRedirects: followRedirects,
+                    fileTLS: fileTLS, cookieJar: session?.jar)
                 summary = RequestSummary(
                     status: result.status, duration: result.duration, bodyBytes: result.bodyBytes)
             } else {
                 let exchange = try await RequestEngine.execute(
                     draft, environment: environment, profiles: profiles, secrets: secrets,
-                    tlsProfiles: tlsProfiles, fileTLS: fileTLS, cookieJar: session?.jar)
+                    tlsProfiles: tlsProfiles, followRedirects: followRedirects,
+                    fileTLS: fileTLS, cookieJar: session?.jar)
                 if let output = rawOutput { try args.write(exchange.body, to: output) }
                 summary = RequestSummary(
                     status: exchange.status, duration: exchange.duration,

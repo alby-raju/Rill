@@ -352,6 +352,7 @@ public enum RequestEngine {
         _ draft: RequestDraft, environment: Environment?, to destination: URL,
         overwrite: Bool = false, profiles: [AuthenticationProfile] = [],
         secrets: NamedSecretResolver? = nil, tlsProfiles: [TLSProfile] = [],
+        followRedirects: Bool = true,
         fileTLS: FileTLSConfiguration? = nil, cookieJar: CookieJar? = nil
     ) async throws -> DownloadResult {
         guard draft.method == .GET else { throw RillError.unsupportedBodyMethod }
@@ -360,7 +361,8 @@ public enum RequestEngine {
         let exchange = try await execute(
             draft, environment: environment,
             budget: ResponseBudget(downloadBytes: 256 * 1024 * 1024),
-            profiles: profiles, secrets: secrets, tlsProfiles: tlsProfiles, fileTLS: fileTLS,
+            profiles: profiles, secrets: secrets, tlsProfiles: tlsProfiles,
+            followRedirects: followRedirects, fileTLS: fileTLS,
             cookieJar: cookieJar,
             headerEdits: [], download: sink)
         if (200...299).contains(exchange.status) { try sink.commit() }
