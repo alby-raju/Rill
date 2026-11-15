@@ -405,7 +405,8 @@ let usage = """
       report-diff BEFORE AFTER     Compare versioned reports/raw snapshots; --metadata-only
           --ignore-json POINTER --ignore-header NAME (repeatable) --strict-headers
           --latency-percent N --latency-floor MS --json; unknown data cannot prove equality
-      request METHOD URL           Ad-hoc HTTP request; no workspace required
+      request [METHOD] URL         Ad-hoc HTTP request; defaults to GET or POST with a body
+          :[PORT][/PATH]            Shortcut for http://localhost
           --offline [--raw-preview]  Preview a buffered request as JSON without sending
           --query-param NAME=VALUE   Append a URL query field (repeatable)
           --stdin                   Read a UTF-8 request body from standard input
