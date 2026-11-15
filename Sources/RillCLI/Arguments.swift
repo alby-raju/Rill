@@ -12,7 +12,7 @@ struct Arguments: Sendable {
         "allow-lan", "overwrite", "show-messages", "help", "version", "insecure",
         "fail-fast", "metadata-only", "strict-headers", "github-annotations", "control-stdin",
         "include-system-roots", "cookies", "script-inventory", "translate-scripts", "dry-run",
-        "multipart",
+        "multipart", "offline", "raw-preview",
     ]
     static let valueOptions: Set<String> = [
         "color", "workspace", "environment", "tls", "iterations", "delay", "retries",
@@ -137,10 +137,10 @@ struct Arguments: Sendable {
                 "--script-inventory is supported only by offline Postman preflight.")
         }
         if command != "request",
-            flags.contains("multipart")
+            !flags.isDisjoint(with: ["multipart", "offline", "raw-preview"])
                 || !Set(["binary-file", "form", "download"]).isDisjoint(with: values.keys)
         {
-            throw CLIError.usage("Upload and download options require request.")
+            throw CLIError.usage("Preview, upload and download options require request.")
         }
         if command != "request", value("session") != nil || value("session-key-file") != nil {
             throw CLIError.usage("Persistent cookie sessions require request.")
@@ -394,6 +394,7 @@ let usage = """
           --ignore-json POINTER --ignore-header NAME (repeatable) --strict-headers
           --latency-percent N --latency-floor MS --json; unknown data cannot prove equality
       request METHOD URL           Ad-hoc HTTP request; no workspace required
+          --offline [--raw-preview]  Preview a buffered request as JSON without sending
           -H, --header name:value   Repeatable request headers
           -d, --data TEXT           UTF-8 text body; or --data-file FILE (1 MiB)
           --binary-file FILE       Stream an explicit binary body

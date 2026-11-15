@@ -16,6 +16,42 @@ import XCTest
         addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
         return directory
     }
+    func testOfflinePreviewUsesRequestPreparationAndRedactsByDefault() async throws {
+        let arguments = [
+            "request", "POST", "http://127.0.0.1:1/{{route}}", "--offline",
+            "--env-var", "route=private-route", "--header", "X-Private: fixture",
+            "--data", "private-body",
+        ]
+        let safe = try await cli(arguments)
+        XCTAssertEqual(safe.status, 0)
+        let summary = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: safe.output) as? [String: Any])
+        XCTAssertEqual(summary["sendsRequests"] as? Bool, false)
+        XCTAssertEqual(summary["bodyBytes"] as? Int, 12)
+        XCTAssertFalse(
+            String(decoding: safe.output, as: UTF8.self).lowercased().contains("private"))
+        let raw = try await cli(arguments + ["--raw-preview"])
+        XCTAssertEqual(raw.status, 0)
+        let prepared = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: raw.output) as? [String: Any])
+        XCTAssertEqual(prepared["url"] as? String, "http://127.0.0.1:1/private-route")
+        XCTAssertEqual(
+            prepared["bodyBase64"] as? String, Data("private-body".utf8).base64EncodedString())
+
+        let secret = [
+            "request", "GET", "http://127.0.0.1:1/", "--offline",
+            "--header", "Authorization: Bearer {{secret:preview-token}}",
+        ]
+        let deferred = try await cli(secret)
+        XCTAssertEqual(deferred.status, 0)
+        let metadata = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: deferred.output) as? [String: Any])
+        XCTAssertEqual(metadata["deferredCredentials"] as? Bool, true)
+        let refused = try await cli(secret + ["--raw-preview"])
+        XCTAssertEqual(refused.status, 2)
+        XCTAssertTrue(refused.output.isEmpty)
+    }
+
     func testAdHocPOSTUsesSharedExpansionAndExplicitRawOutput() async throws {
         guard let base = ProcessInfo.processInfo.environment["RILL_TEST_BASE_URL"] else {
             throw XCTSkip("Fixture required")

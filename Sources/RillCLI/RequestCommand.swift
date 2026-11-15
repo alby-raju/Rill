@@ -11,7 +11,7 @@ extension RillCLI {
             "session-key-file",
         ]
         let requestFlags: Set<String> = [
-            "json", "quiet", "overwrite", "allow-insecure", "multipart",
+            "json", "quiet", "overwrite", "allow-insecure", "multipart", "offline", "raw-preview",
         ]
         guard args.operands.count == 2,
             Set(args.values.keys).isSubset(of: requestValues.union(tlsValues)),
@@ -27,10 +27,29 @@ extension RillCLI {
         let hasFileTLS =
             !tlsValues.isDisjoint(with: args.values.keys)
             || !FileTLSOptions.flags.isDisjoint(with: args.flags)
+        let offline = args.flags.contains("offline")
+        let rawPreview = args.flags.contains("raw-preview")
+        guard !rawPreview || offline else {
+            throw CLIError.usage("--raw-preview requires --offline.")
+        }
+        guard
+            !offline
+                || (!hasFileTLS
+                    && ["output", "download", "session", "session-key-file", "binary-file", "tls"]
+                        .allSatisfy({ args.value($0) == nil })
+                    && !args.flags.contains("multipart"))
+        else {
+            throw CLIError.usage(
+                "Offline preview supports in-memory bodies without TLS, sessions, or response destinations."
+            )
+        }
         guard args.value("tls") == nil || !hasFileTLS else {
             throw CLIError.usage("Choose a saved TLS profile or explicit file TLS options.")
         }
         let form = try (args.values["form"] ?? []).map(RequestFormField.init)
+        guard !offline || form.allSatisfy({ $0.file == nil }) else {
+            throw CLIError.usage("Offline preview cannot open multipart file fields.")
+        }
         guard !args.flags.contains("multipart") || !form.isEmpty else {
             throw CLIError.usage("--multipart requires at least one --form field.")
         }
@@ -133,6 +152,12 @@ extension RillCLI {
             Field(name: $0, value: overrides[$0] ?? "")
         }
         draft = try args.transport(draft, workspace: workspace)
+        if offline {
+            try previewRequest(
+                draft, environment: environment, profiles: workspace.authProfiles ?? [],
+                raw: rawPreview, arguments: args)
+            return
+        }
         let fileTLS = try FileTLSOptions(args).load(args)
         let profiles = workspace.authProfiles ?? []
         let secrets = NamedSecretResolver(catalog: workspace.namedSecrets ?? [])
@@ -199,6 +224,49 @@ extension RillCLI {
             )
         }
         if !(200...299).contains(summary.status) { throw CLIError.runtime }
+    }
+
+    private static func previewRequest(
+        _ draft: RequestDraft, environment: Environment, profiles: [AuthenticationProfile],
+        raw: Bool, arguments: Arguments
+    ) throws {
+        struct Preview: Encodable {
+            let schemaVersion = 1
+            let sendsRequests = false
+            let method: String
+            let deferredCredentials: Bool
+            var bodyBytes: Int? = nil
+            var url: String? = nil
+            var headers: [String: String]? = nil
+            var bodyBase64: String? = nil
+        }
+        var preview = Preview(method: draft.method.rawValue, deferredCredentials: false)
+        do {
+            do {
+                let request = try RequestEngine.prepare(
+                    draft, environment: environment, profiles: profiles)
+                preview.bodyBytes = request.httpBody?.count ?? 0
+                if raw {
+                    preview.url = request.url?.absoluteString
+                    preview.headers = request.allHTTPHeaderFields ?? [:]
+                    preview.bodyBase64 = request.httpBody?.base64EncodedString()
+                }
+            } catch AuthenticationError.missingSecret {
+                let deferred = try RequestEngine.prepareForPlanning(
+                    draft, environment: environment, profiles: profiles)
+                preview = Preview(method: draft.method.rawValue, deferredCredentials: deferred)
+            }
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            throw CLIError.usage(
+                "Invalid offline request. Check the URL, headers, body and variables.")
+        }
+        if raw && preview.deferredCredentials {
+            throw CLIError.usage(
+                "Raw offline preview requires a request without named secret references.")
+        }
+        try arguments.json(preview)
     }
 }
 

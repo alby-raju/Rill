@@ -269,6 +269,8 @@ rill request GET '{{base}}/health' --workspace ./workspace.json \
 
 `request METHOD URL` uses the shared HTTP engine without creating a request or reading the desktop workspace. It accepts GET, POST, PUT, PATCH, DELETE, HEAD and OPTIONS (case-insensitive). Saved environments/authentication/TLS profiles require an explicit `--workspace`; only metadata is loaded, with named credentials resolved by the existing credential provider when needed. Nothing is saved back.
 
+Add `--offline` to preview preparation for a buffered request without sending it. The JSON summary shows the method, body size when known, and whether named credentials defer validation. Add `--raw-preview` to include the prepared URL, headers and base64 body. Raw preview can expose inline secrets and rejects requests that need named credentials. It represents the prepared request before transport adds its own headers. Offline mode supports inline, text-file and URL-encoded form bodies. Streaming uploads, sessions, explicit TLS options and response destinations require a live request.
+
 Use repeatable `-H`/`--header name:value`, `-d`/`--data TEXT` or `--data-file FILE` (UTF-8, at most 1 MiB). Development source also supports explicit binary and form uploads:
 
 ```sh
