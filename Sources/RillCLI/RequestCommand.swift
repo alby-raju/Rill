@@ -300,7 +300,8 @@ extension RillCLI {
                     try FileHandle.standardError.write(contentsOf: Data(message.utf8))
                     throw CLIError.runtime
                 }
-                try args.text(formatted)
+                try args.text(
+                    args.color ? RequestTerminalColor.body(formatted, json: prettyJSON) : formatted)
             } else {
                 try FileHandle.standardOutput.write(contentsOf: stdoutBody)
             }
@@ -314,13 +315,14 @@ extension RillCLI {
             if args.flags.contains("json") {
                 try args.json(output)
             } else {
-                try args.text(output.text)
+                try args.text(output.text(color: args.color))
             }
         } else if args.flags.contains("json") {
             try args.json(summary)
         } else {
+            let status = RequestTerminalColor.status(summary.status, enabled: args.color)
             try args.text(
-                "HTTP \(summary.status) · \(summary.bodyBytes) response bytes · \(String(format: "%.3f", summary.duration)) s"
+                "\(status) · \(summary.bodyBytes) response bytes · \(String(format: "%.3f", summary.duration)) s"
             )
         }
         if !(200...299).contains(summary.status) { throw CLIError.runtime }
@@ -412,20 +414,14 @@ private struct RequestHeaderOutput: Encodable {
     let status: Int
     let headers: [Header]
 
-    var text: String {
-        (["HTTP \(status)"] + headers.map { "\(Self.escape($0.name)): \(Self.escape($0.value))" })
-            .joined(separator: "\n")
-    }
-
-    private static func escape(_ text: String) -> String {
-        text.unicodeScalars.map { scalar in
-            switch scalar.properties.generalCategory {
-            case .control, .format, .lineSeparator, .paragraphSeparator:
-                return "\\u{\(String(scalar.value, radix: 16, uppercase: true))}"
-            default:
-                return String(scalar)
-            }
-        }.joined()
+    func text(color: Bool) -> String {
+        let lines = headers.map { header in
+            let name = RequestTerminalColor.paint(
+                RequestTerminalColor.escape(header.name), code: 36, enabled: color)
+            return "\(name): \(RequestTerminalColor.escape(header.value))"
+        }
+        return ([RequestTerminalColor.status(status, enabled: color)] + lines).joined(
+            separator: "\n")
     }
 }
 

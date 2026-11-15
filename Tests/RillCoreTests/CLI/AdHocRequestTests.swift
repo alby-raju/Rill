@@ -520,6 +520,44 @@ import XCTest
         XCTAssertEqual(conflict.status, 2)
     }
 
+    func testRequestColorPreservesPlainAndMachineOutputModes() async throws {
+        let base = try XCTUnwrap(ProcessInfo.processInfo.environment["RILL_TEST_BASE_URL"])
+        let reset = "\u{1B}[0m"
+        let forced = ["--color", "always"]
+        let summary = try await cli(["request", base + "/"] + forced)
+        XCTAssertTrue(
+            String(decoding: summary.output, as: UTF8.self).hasPrefix("\u{1B}[32mHTTP 200\(reset)"))
+
+        let headers = try await cli(
+            ["request", base + "/", "--response-header", "Content-Type"] + forced)
+        let headerText = String(decoding: headers.output, as: UTF8.self).lowercased()
+        XCTAssertTrue(headerText.contains("\u{1B}[36mcontent-type\(reset): application/json"))
+
+        for (path, option, highlight) in [
+            ("/script-scalars", "--pretty-json", "\u{1B}[36m\"n\"\(reset): \u{1B}[33m42\(reset)"),
+            ("/xml-items", "--pretty-xml", "\u{1B}[36m<items>\(reset)"),
+        ] {
+            let arguments = ["request", base + path, option]
+            let styled = try await cli(arguments + forced)
+            XCTAssertEqual(styled.status, 0)
+            let text = String(decoding: styled.output, as: UTF8.self)
+            XCTAssertTrue(text.contains(highlight))
+            let plain = try await cli(arguments + ["--color", "never"])
+            XCTAssertEqual(
+                text.replacingOccurrences(
+                    of: "\\u001b\\[[0-9]+m", with: "", options: .regularExpression),
+                String(decoding: plain.output, as: UTF8.self))
+            let automatic = try await cli(arguments)
+            XCTAssertEqual(automatic.output, plain.output)
+        }
+
+        for options in [["--body-stdout"], ["--json"], ["--headers-stdout", "--json"]] {
+            let output = try await cli(["request", base + "/"] + options + forced)
+            XCTAssertEqual(output.status, 0)
+            XCTAssertFalse(output.output.contains(27))
+        }
+    }
+
     func testResponseHeaderOutputSelectsFinalHeadersWithoutReadingBody() async throws {
         let base = try XCTUnwrap(ProcessInfo.processInfo.environment["RILL_TEST_BASE_URL"])
         let all = try await cli(["request", base + "/echo", "--headers-stdout"])
