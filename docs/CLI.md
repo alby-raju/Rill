@@ -261,13 +261,14 @@ Use sanitized fixtures and explicitly supplied protected environment files for C
 
 ```sh
 rill request GET https://example.test/health --json
+rill request :8080/health --json
 rill request POST 'https://example.test/items' -H 'Content-Type: application/json' \
   -d '{"name":"{{name}}"}' --env-var name=fixture --output ./response.json
 rill request GET '{{base}}/health' --workspace ./workspace.json \
   --environment Local --auth-profile Service --tls Corporate
 ```
 
-`request METHOD URL` uses the shared HTTP engine without creating a request or reading the desktop workspace. It accepts GET, POST, PUT, PATCH, DELETE, HEAD and OPTIONS (case-insensitive). Saved environments/authentication/TLS profiles require an explicit `--workspace`; only metadata is loaded, with named credentials resolved by the existing credential provider when needed. Nothing is saved back.
+`request [METHOD] URL` uses the shared HTTP engine without creating a request or reading the desktop workspace. It accepts GET, POST, PUT, PATCH, DELETE, HEAD and OPTIONS (case-insensitive). Omit the method for GET, or POST when a body option is supplied, including an empty body. `:`, `:/health` and `:8080/health` expand to HTTP URLs on `localhost`. Use a full `http://` or `https://` URL for other hosts. Saved environments/authentication/TLS profiles require an explicit `--workspace`; only metadata is loaded, with named credentials resolved by the existing credential provider when needed. Nothing is saved back.
 
 Add `--offline` to preview preparation for a buffered request without sending it. The JSON summary shows the method, body size when known, and whether named credentials defer validation. Add `--raw-preview` to include the prepared URL, headers and base64 body. Raw preview can expose inline secrets and rejects requests that need named credentials. It represents the prepared request before transport adds its own headers. Offline mode supports inline, text-file and URL-encoded form bodies. Streaming uploads, sessions, explicit TLS options and response destinations require a live request.
 
