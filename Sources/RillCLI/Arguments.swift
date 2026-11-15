@@ -20,7 +20,7 @@ struct Arguments: Sendable {
         "endpoint", "query", "query-file", "variables", "header", "metadata", "timeout",
         "proto", "descriptor", "method", "data", "data-file", "count", "concurrency", "ramp",
         "config", "seed", "seed-time", "deadline", "comparison-output", "ignore-json",
-        "ignore-header", "query-param", "json-field", "header-file",
+        "ignore-header", "query-param", "json-field", "header-file", "default-scheme",
         "latency-percent", "latency-floor", "port", "routes", "project", "repo", "message",
         "token-file", "destination", "client-id",
         "client-secret-name", "scope", "save-secret", "plugins-dir", "trust-file", "plugin",
@@ -130,6 +130,9 @@ struct Arguments: Sendable {
         }
         if value("header-file") != nil && command != "request" {
             throw CLIError.usage("--header-file requires request.")
+        }
+        if value("default-scheme") != nil && command != "request" {
+            throw CLIError.usage("--default-scheme requires request.")
         }
         if !["run", "request"].contains(command),
             !FileTLSOptions.values.subtracting(["ssl-client-cert", "ssl-client-key"]).isDisjoint(
@@ -411,6 +414,7 @@ let usage = """
           --latency-percent N --latency-floor MS --json; unknown data cannot prove equality
       request [METHOD] URL         Ad-hoc HTTP request; defaults to GET or POST with a body
           :[PORT][/PATH]            Shortcut for http://localhost
+          --default-scheme http|https  Supply the scheme for a bare host or localhost shortcut
           --offline [--raw-preview]  Preview a buffered request as JSON without sending
           --query-param NAME=VALUE   Append a URL query field (repeatable)
           --stdin                   Read a UTF-8 request body from standard input
