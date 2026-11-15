@@ -5,7 +5,8 @@ import RillCore
 
 struct RequestTransportOptions {
     static let values: Set<String> = [
-        "proxy", "proxy-user", "proxy-password-file", "proxy-bypass", "max-redirects",
+        "proxy", "proxy-user", "proxy-password-file", "proxy-bypass", "proxy-ca-cert",
+        "max-redirects",
         "resume-etag", "session-save-header",
     ]
     static let flags: Set<String> = ["stream", "show-redirects", "session-save-auth"]
@@ -22,8 +23,10 @@ struct RequestTransportOptions {
             transport.maximumRedirects = count
         }
         if args.flags.contains("show-redirects") {
-            transport.traceRedirect = { status, followed in
-                let line = "Redirect HTTP \(status) \(followed ? "followed" : "stopped")\n"
+            transport.traceRedirect = { hop in
+                let decision = hop.decision == .followed ? "followed" : "stopped"
+                let line =
+                    "Redirect HTTP \(hop.status) \(decision) hop=\(hop.number) reason=\(hop.decision.rawValue)\n"
                 try? FileHandle.standardError.write(contentsOf: Data(line.utf8))
             }
         }
@@ -61,8 +64,9 @@ struct RequestTransportOptions {
         let user = args.value("proxy-user")
         let file = args.value("proxy-password-file")
         let bypass = args.values["proxy-bypass"] ?? []
+        let ca = args.value("proxy-ca-cert")
         guard let value = args.value("proxy") else {
-            guard user == nil, file == nil, bypass.isEmpty else {
+            guard user == nil, file == nil, bypass.isEmpty, ca == nil else {
                 throw CLIError.usage("Proxy credentials and bypass domains require --proxy.")
             }
             return nil
@@ -72,6 +76,7 @@ struct RequestTransportOptions {
             let host = url.host, !host.isEmpty,
             let port = UInt16(
                 exactly: url.port ?? (scheme == "socks5" ? 1080 : scheme == "https" ? 443 : 80)),
+            ca == nil || scheme == "https",
             port != 0, let endpointPort = NWEndpoint.Port(rawValue: port),
             url.user == nil, url.password == nil, url.query == nil, url.fragment == nil,
             url.path.isEmpty || url.path == "/", (user == nil) == (file == nil),
@@ -88,11 +93,25 @@ struct RequestTransportOptions {
                 "Use --proxy with an HTTP, HTTPS or SOCKS5 proxy URL without userinfo.")
         }
         let endpoint = NWEndpoint.hostPort(host: NWEndpoint.Host(host), port: endpointPort)
+        let tls: NWProtocolTLS.Options?
+        do {
+            if scheme == "https" {
+                let anchors = try ca.map {
+                    try BoundedFileInput.read(URL(fileURLWithPath: $0), limit: 1024 * 1024)
+                }
+                tls = try AdHocHTTPTransport.proxyTLS(host: host, anchors: anchors)
+            } else {
+                tls = nil
+            }
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            throw CLIError.usage("Could not read a valid HTTPS proxy CA bundle.")
+        }
         var proxy =
             scheme == "socks5"
             ? ProxyConfiguration(socksv5Proxy: endpoint)
-            : ProxyConfiguration(
-                httpCONNECTProxy: endpoint, tlsOptions: scheme == "https" ? .init() : nil)
+            : ProxyConfiguration(httpCONNECTProxy: endpoint, tlsOptions: tls)
         proxy.allowFailover = false
         proxy.excludedDomains = bypass
         if let user, let file {

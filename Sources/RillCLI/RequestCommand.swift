@@ -92,7 +92,7 @@ extension RillCLI {
         let headerInputs = try (args.values["header-file"] ?? []).map(RequestHeaderFile.init)
         let inputPaths =
             bodyInputs + tlsInputs + headerInputs.map(\.path)
-            + [args.value("proxy-password-file")].compactMap { $0 }
+            + ["proxy-password-file", "proxy-ca-cert"].compactMap { args.value($0) }
         guard
             args.value("workspace") != nil
                 || ["environment", "auth-profile", "tls"].allSatisfy({ args.value($0) == nil })

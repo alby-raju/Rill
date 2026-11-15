@@ -1,14 +1,45 @@
 import Foundation
 import Network
+import Security
+
+public struct HTTPRedirectHop: Sendable {
+    public enum Decision: String, Sendable {
+        case followed, disabled, crossOrigin = "cross-origin", limit
+    }
+
+    public let status: Int
+    public let number: Int
+    public let decision: Decision
+}
 
 public struct AdHocHTTPTransport: Sendable {
     public var proxy: ProxyConfiguration?
     public var maximumRedirects: Int?
-    public var traceRedirect: (@Sendable (Int, Bool) -> Void)?
+    public var traceRedirect: (@Sendable (HTTPRedirectHop) -> Void)?
     public typealias StreamWriter = @Sendable (Data, @Sendable () -> Bool) throws -> Void
     public var stream: StreamWriter?
 
     public init() {}
+
+    public static func proxyTLS(host: String, anchors: Data?) throws -> NWProtocolTLS.Options {
+        let options = NWProtocolTLS.Options()
+        sec_protocol_options_set_min_tls_protocol_version(options.securityProtocolOptions, .TLSv12)
+        if let anchors {
+            var profile = TLSProfile()
+            profile.mode = .custom
+            profile.includeSystemRoots = false
+            profile.anchors = try FileTLSConfiguration.certificates(anchors).map {
+                SecCertificateCopyData($0) as Data
+            }
+            sec_protocol_options_set_verify_block(
+                options.securityProtocolOptions,
+                { [profile] _, trust, finish in
+                    let reference = sec_trust_copy_ref(trust).takeRetainedValue()
+                    finish(TLSProfiles.evaluate(reference, host: host, profile: profile))
+                }, DispatchQueue(label: "org.rill.proxy-trust"))
+        }
+        return options
+    }
 }
 
 final class HTTPResponseStream: @unchecked Sendable {

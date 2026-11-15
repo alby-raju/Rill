@@ -5,6 +5,26 @@ To compare offline request preparation with a separately installed HTTPie 3.2.4,
 The initial synthetic cases compare method, target, explicit headers and body bytes.
 The harness isolates HTTPie config and uses offline modes with disposable inputs.
 
+To run the live terminal comparisons, supply the same pinned client to the fixture suite:
+
+```sh
+RILL_TEST_HTTPIE_PATH=/path/to/http bash scripts/test.sh
+```
+
+The live harness checks early stdout delivery and exact bytes, range resume and full-response
+restart, session header and auth replay, temporary overrides, and cross-origin redirects.
+On the changed-ETag fixture Rill leaves the original partial file in place, while HTTPie
+3.2.4 appends the returned range. In the two-origin redirect fixture, HTTPie strips
+Authorization but forwards the synthetic custom API-key header. Rill stops the redirect
+and prints the hop number and decision without printing the destination or header values.
+A future opt-in cross-origin mode should build a fresh GET or HEAD request with no inherited
+headers, cookies, body, or client identity and reject HTTPS downgrades.
+
+The transport checks also exercise an authenticated TLS-wrapped CONNECT proxy using a
+disposable CA scoped to the proxy. They verify success with the matching hostname and
+rejection without the CA or with a mismatched hostname. The fixture leaves the user trust
+store untouched. System-trusted enterprise proxies need separate deployment evidence.
+
 Use full Xcode, not command-line tools alone, for XCTest and packaging:
 
 ```sh

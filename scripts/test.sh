@@ -195,5 +195,9 @@ while time.monotonic() < deadline:
 else:
     sys.exit("The TLS fixture did not become ready within 30 seconds.")
 PY_TLS_READY
-python3 scripts/test-ad-hoc-transport.py "$RILL_TEST_CLI_PATH" "$RILL_TEST_BASE_URL"
+python3 scripts/test-ad-hoc-transport.py "$RILL_TEST_CLI_PATH" "$RILL_TEST_BASE_URL" --tls-directory "$RILL_TEST_TLS_DIR"
+if [[ -n "${RILL_TEST_HTTPIE_PATH:-}" ]]; then
+  python3 scripts/compare-httpie-terminal.py "$RILL_TEST_CLI_PATH" "$RILL_TEST_HTTPIE_PATH" \
+    "$RILL_TEST_BASE_URL" "$RILL_TEST_TLS_URL" "$RILL_TEST_TLS_DIR/ca.pem"
+fi
 swift test "$@"
