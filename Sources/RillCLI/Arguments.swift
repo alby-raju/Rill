@@ -20,7 +20,7 @@ struct Arguments: Sendable {
         "endpoint", "query", "query-file", "variables", "header", "metadata", "timeout",
         "proto", "descriptor", "method", "data", "data-file", "count", "concurrency", "ramp",
         "config", "seed", "seed-time", "deadline", "comparison-output", "ignore-json",
-        "ignore-header", "query-param", "json-field",
+        "ignore-header", "query-param", "json-field", "header-file",
         "latency-percent", "latency-floor", "port", "routes", "project", "repo", "message",
         "token-file", "destination", "client-id",
         "client-secret-name", "scope", "save-secret", "plugins-dir", "trust-file", "plugin",
@@ -57,6 +57,7 @@ struct Arguments: Sendable {
                             || [
                                 "header", "metadata", "proto-include", "env-var", "ignore-json",
                                 "ignore-header", "form", "request-id", "query-param", "json-field",
+                                "header-file",
                             ].contains(name)
                     else { throw CLIError.usage("Duplicate option.") }
                     values[name, default: []].append(input[index])
@@ -126,6 +127,9 @@ struct Arguments: Sendable {
         }
         if value("query-param") != nil && command != "request" {
             throw CLIError.usage("--query-param requires request.")
+        }
+        if value("header-file") != nil && command != "request" {
+            throw CLIError.usage("--header-file requires request.")
         }
         if !["run", "request"].contains(command),
             !FileTLSOptions.values.subtracting(["ssl-client-cert", "ssl-client-key"]).isDisjoint(
@@ -414,6 +418,7 @@ let usage = """
           --body-stdout             Write only the raw response body to stdout
           --json-field PATH=VALUE   Compose nested JSON fields (repeatable, := for typed JSON)
           -H, --header name:value   Repeatable request headers
+          --header-file NAME=FILE   Read a request header value from a UTF-8 file (repeatable)
           -d, --data TEXT           UTF-8 text body; or --data-file FILE (1 MiB)
           --binary-file FILE       Stream an explicit binary body
           --form NAME=VALUE|NAME@PATH   Repeatable form fields; --multipart forces multipart

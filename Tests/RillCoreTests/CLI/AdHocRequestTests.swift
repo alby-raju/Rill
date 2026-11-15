@@ -79,6 +79,62 @@ import XCTest
         }
     }
 
+    func testHeaderFilesReachLoopbackAndRemainReadOnly() async throws {
+        let root = try directory()
+        let file = root.appendingPathComponent("private header=fixture.txt")
+        let other = root.appendingPathComponent("empty.txt")
+        let original = Data("private-fixture\r\n\n".utf8)
+        try original.write(to: file)
+        try Data().write(to: other)
+        let headers = [
+            "--header-file", "X-Private=\(file.path)", "--header-file", "X-Empty=\(other.path)",
+        ]
+        let offline = try await cli(["request", ":/echo", "--offline"] + headers)
+        XCTAssertEqual(offline.status, 0)
+        XCTAssertFalse(String(decoding: offline.output, as: UTF8.self).contains("private-fixture"))
+
+        let blocked = try await cli(
+            ["request", ":/echo", "--output", file.path, "--overwrite"] + headers)
+        XCTAssertEqual(blocked.status, 2)
+        XCTAssertEqual(try Data(contentsOf: file), original)
+        let sessionConflict = try await cli(
+            [
+                "request", ":/echo", "--session", file.path, "--session-key-file", other.path,
+            ] + headers)
+        XCTAssertEqual(sessionConflict.status, 2)
+        XCTAssertEqual(try Data(contentsOf: file), original)
+
+        guard let base = ProcessInfo.processInfo.environment["RILL_TEST_BASE_URL"] else {
+            throw XCTSkip("Fixture required")
+        }
+        let sent = try await cli(
+            ["request", base + "/echo", "--body-stdout", "-H", "X-Literal:@raw"] + headers)
+        XCTAssertEqual(sent.status, 0)
+        let echo = try XCTUnwrap(JSONSerialization.jsonObject(with: sent.output) as? [String: Any])
+        let received = try XCTUnwrap(echo["headers"] as? [String: String])
+        XCTAssertEqual(received["X-Private"], "private-fixture")
+        XCTAssertEqual(received["X-Literal"], "@raw")
+    }
+
+    func testHeaderFilesRejectInvalidContentWithoutEchoingIt() async throws {
+        let file = try directory().appendingPathComponent("private-path.txt")
+        let options = ["request", ":/", "--offline", "--header-file", "X-File=\(file.path)"]
+        for invalid in [
+            Data("private-fixture\r\nInjected: value".utf8),
+            Data("{{secret:private-fixture}}".utf8),
+            Data([255]), Data(repeating: 65, count: 8193),
+        ] {
+            try invalid.write(to: file)
+            let result = try await cli(options)
+            XCTAssertEqual(result.status, 2)
+            XCTAssertTrue(result.output.isEmpty)
+            XCTAssertFalse(String(decoding: result.diagnostics, as: UTF8.self).contains("private-"))
+        }
+        try Data("value".utf8).write(to: file)
+        let duplicate = try await cli(options + ["--header", "x-file:duplicate"])
+        XCTAssertEqual(duplicate.status, 2)
+    }
+
     func testQueryFieldsPreserveExistingEncodingOrderAndEmptyValues() async throws {
         let arguments = [
             "request", "GET", "http://127.0.0.1:1/items?existing=%2b#fragment", "--offline",

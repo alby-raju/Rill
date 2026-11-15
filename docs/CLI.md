@@ -274,6 +274,8 @@ Add `--offline` to preview preparation for a buffered request without sending it
 
 Repeat `--query-param NAME=VALUE` to append query fields to a live request or offline preview. Split each field at the first equals sign. Empty values and repeated names are allowed. The engine expands variables and percent-encodes the new fields while preserving the existing URL query.
 
+Repeat `--header-file NAME=FILE` to read individual header values from local files in live requests and offline previews. Each file must be a regular UTF-8 file of at most 8 KiB. Trailing CR and LF bytes are stripped. Embedded line breaks and template markers (`{{`) are rejected. Response destinations and cookie session paths must be distinct from these inputs. If you use `--raw-preview`, the preview includes the file-backed header values.
+
 Repeat `--json-field PATH=TEXT` or `--json-field PATH:=JSON` to compose a JSON object. For example, use `--json-field 'user[name]=Ada'` and `--json-field 'user[active]:=true'`. In array paths, `[]` appends and `[0]` addresses an index. Indices start at zero and cannot leave gaps. Quote bracket paths for your shell. Duplicate assignments and conflicting paths fail before sending. Values are literal, and typed values keep their JSON types. Use this option as the sole body source for a request, including offline previews.
 
 Use `--body-stdout` to pipe the raw response body into another command. Stdout contains only the buffered body bytes, including for HTTP error responses. Diagnostics stay on stderr, and the HTTP exit status is unchanged. This explicit raw output can contain sensitive data. Choose it as the sole response output mode.

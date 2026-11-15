@@ -8,7 +8,7 @@ extension RillCLI {
             "header", "data", "data-file", "binary-file", "form", "env-var", "output", "download",
             "timeout",
             "color", "workspace", "environment", "auth-profile", "tls", "session",
-            "session-key-file", "query-param", "json-field",
+            "session-key-file", "query-param", "json-field", "header-file",
         ]
         let requestFlags: Set<String> = [
             "json", "quiet", "overwrite", "allow-insecure", "multipart", "offline", "raw-preview",
@@ -76,6 +76,8 @@ extension RillCLI {
             [args.value("data-file"), args.value("binary-file")].compactMap { $0 }
             + form.compactMap(\.file)
         let tlsInputs = FileTLSOptions.inputNames.compactMap { args.value($0) }
+        let headerInputs = try (args.values["header-file"] ?? []).map(RequestHeaderFile.init)
+        let inputPaths = bodyInputs + tlsInputs + headerInputs.map(\.path)
         guard
             args.value("workspace") != nil
                 || ["environment", "auth-profile", "tls"].allSatisfy({ args.value($0) == nil })
@@ -108,12 +110,12 @@ extension RillCLI {
         if let output = destination {
             let target = URL(fileURLWithPath: output).resolvingSymlinksInPath()
             guard target != args.workspaceURL.resolvingSymlinksInPath(),
-                !(bodyInputs + tlsInputs).contains(where: {
+                !inputPaths.contains(where: {
                     target == URL(fileURLWithPath: $0).resolvingSymlinksInPath()
                 })
             else {
                 throw CLIError.usage(
-                    "Output cannot replace the workspace, request body or TLS inputs.")
+                    "Output cannot replace the workspace, request body, header or TLS inputs.")
             }
             guard
                 args.flags.contains("overwrite") || !FileManager.default.fileExists(atPath: output)
@@ -124,13 +126,13 @@ extension RillCLI {
         let sessionOptions = try RequestSessionOptions(
             args,
             protected: [args.workspaceURL]
-                + (bodyInputs + tlsInputs + [destination].compactMap { $0 })
+                + (inputPaths + [destination].compactMap { $0 })
                 .map { URL(fileURLWithPath: $0) })
         var draft = RequestDraft()
         draft.name = "Ad-hoc request"
         draft.method = method
         draft.url = requestURL
-        draft.headers = try args.fields("header")
+        draft.headers = try args.fields("header") + headerInputs.map { try $0.field() }
         draft.parameters = try (args.values["query-param"] ?? []).map { argument in
             guard let split = argument.firstIndex(of: "="), split != argument.startIndex else {
                 throw CLIError.usage("--query-param expects NAME=VALUE.")
@@ -341,6 +343,44 @@ private struct RequestSummary: Encodable {
     let status: Int
     let duration: Double
     let bodyBytes: Int
+}
+
+private struct RequestHeaderFile {
+    let name: String
+    let path: String
+
+    init(_ argument: String) throws {
+        guard let delimiter = argument.firstIndex(of: "=") else {
+            throw CLIError.usage("--header-file expects NAME=FILE.")
+        }
+        name = String(argument[..<delimiter])
+        path = String(argument[argument.index(after: delimiter)...])
+        guard HTTPEncoding.isHeaderName(name), !path.isEmpty, path != "-", !path.contains("\0")
+        else {
+            throw CLIError.usage("--header-file requires a header name and explicit local path.")
+        }
+    }
+
+    func field() throws -> Field {
+        let bytes: Data
+        do {
+            bytes = try BoundedFileInput.read(URL(fileURLWithPath: path), limit: 8192)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            throw CLIError.usage(
+                "Could not read a regular header file of at most 8 KiB; path omitted.")
+        }
+        let end =
+            bytes.lastIndex(where: { $0 != 10 && $0 != 13 }).map { $0 + 1 } ?? bytes.startIndex
+        guard let value = String(data: bytes[..<end], encoding: .utf8),
+            value.range(of: "{{", options: .literal) == nil
+        else {
+            throw CLIError.usage(
+                "Header files require valid UTF-8 without template markers; content omitted.")
+        }
+        return Field(name: name, value: value)
+    }
 }
 
 private struct RequestFormField {

@@ -29,6 +29,8 @@ def run(binary, options, directory, input_bytes=b""):
 
 
 def compare(rill, httpie, directory):
+    header_file = directory / "header value.txt"
+    header_file.write_bytes(b"fixture\r\n")
     cases = (
         ("get-query", "GET", "/items?q=a%20b&q=c", [], [], b"", b""),
         ("get-localhost", "", ":8080/items?q=ready", [], [], b"", b""),
@@ -74,8 +76,8 @@ def compare(rill, httpie, directory):
                     *operands,
                     "--offline",
                     "--raw-preview",
-                    "--header",
-                    "X-Rill: fixture",
+                    "--header-file",
+                    f"X-Rill={header_file.name}",
                     "--header",
                     "Content-Type: text/plain",
                     *rill_body,
@@ -92,7 +94,7 @@ def compare(rill, httpie, directory):
                 "--pretty=none",
                 "--print=HB",
                 *operands,
-                "X-Rill:fixture",
+                f"X-Rill:@{header_file.name}",
                 "Content-Type:text/plain",
                 *httpie_body,
             ],
