@@ -13,6 +13,7 @@ struct Arguments: Sendable {
         "fail-fast", "metadata-only", "strict-headers", "github-annotations", "control-stdin",
         "include-system-roots", "cookies", "script-inventory", "translate-scripts", "dry-run",
         "multipart", "offline", "raw-preview", "stdin", "no-follow", "body-stdout", "pretty-json",
+        "pretty-xml",
         "headers-stdout",
     ]
     static let valueOptions: Set<String> = [
@@ -118,7 +119,9 @@ struct Arguments: Sendable {
         if value("request-id") != nil && command != "contract-run" {
             throw CLIError.usage("--request-id requires contract-run.")
         }
-        if command != "request", !flags.isDisjoint(with: ["body-stdout", "pretty-json"]) {
+        if command != "request",
+            !flags.isDisjoint(with: ["body-stdout", "pretty-json", "pretty-xml"])
+        {
             throw CLIError.usage("Response body output options require request.")
         }
         if command != "request", flags.contains("headers-stdout") || value("response-header") != nil
@@ -427,6 +430,7 @@ let usage = """
           --no-follow               Return the first response without following redirects
           --body-stdout             Write only the raw response body to stdout
           --pretty-json              Write only the formatted JSON response body to stdout
+          --pretty-xml               Write only the formatted XML response body to stdout
           --headers-stdout          Print the final HTTP status and response headers
           --response-header NAME    Print only named response headers (repeatable; --json available)
           --json-field PATH=VALUE   Compose nested JSON fields (repeatable, := for typed JSON)
