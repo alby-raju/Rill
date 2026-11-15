@@ -1,161 +1,65 @@
 # Roadmap: CLI-first API testing
 
-Updated 10 November 2026. **This is a proposed delivery plan, not a list of shipped features or promised dates.** Current behavior is documented in [features and limits](docs/FEATURES.md) and the [CLI guide](docs/CLI.md).
-
-Rill has reached an MVP development milestone. The next goal is a fast, local API testing workflow that moves from a collection file to a trustworthy CI result with minimal setup. Prioritize reproducibility, useful failure explanations and smooth migration over accumulating protocol names.
+Updated 15 November 2026. This roadmap lists pending implementation and acceptance work. See [features and limits](docs/FEATURES.md) and the [CLI guide](docs/CLI.md) for current behavior, and the [capability audit](docs/1.0-CAPABILITY-AUDIT.md) for implementation history.
 
 ## 1.0 scope and release-critical sequence
 
-The owner selected **local API development and CI first** on 29 October 2026. Hosted team collaboration and Linux/Windows desktop applications are outside this first release target. The existing desktop/CLI is macOS-only; portable CLI support requires its own proof before Linux or Windows CI can be advertised. Do not call this unrestricted parity with every Postman/HTTPie product surface.
+Prioritize local API development and CI on macOS. Hosted team collaboration and Linux/Windows desktop apps are outside the 1.0 scope.
 
-The [capability audit](docs/1.0-CAPABILITY-AUDIT.md) and its [122-row inventory](docs/1.0-capability-audit.csv) separate implementation starting points from unclosed acceptance. The preserved baseline remains 3 verified, 118 partial and 1 governance deviation; partial is not a count of absent features.
-
-Deliver focused PRs in this order, reusing the shared engines:
-
-| Gate | Concrete outcome | Evidence required before closing |
-| --- | --- | --- |
-| G0 — Daily-workbench reliability | Contained selectors, stable panes, reliable drafts/imports and keyboard flow | Compact/wide light/dark native checks, persisted choices, Escape/click-away, recovery/upgrade and owner accessibility acceptance. Fix regressions before adding more protocols. |
-| G1 — File-based execution | `run collection.json` without desktop setup; explicit unsupported-feature diagnostics | Ordered/nested Postman v2 requests, collection/environment/override precedence, scripts blocked before traffic, no source/workspace/Keychain mutation, cancellation and reports. Native v1 inputs and exact selection are implemented; complete independent/installed acceptance remains. Reference roadmap CLI-01/02/05 and original CLI/RUN/IO IDs. |
-| G2 — Reproducible headless inputs | Iteration data, process secrets and file-based TLS usable in documented CI environments | JSON/CSV and empty/disabled variable cases, reproducible order, mTLS/custom CA/redirect boundaries, redaction and paths with spaces. Existing RILL_SECRET_ support is reused. CLI-02/03 and AUTH/TLS acceptance apply. |
-| G3 — Workflow compatibility | A published supported script/variable/assertion/chaining subset that behaves as documented | COMPAT-02 architecture decision before a foreign runtime; worker resource/host-access limits if selected; pinned differential corpus for order, mutations, requests and exit status. Unsupported behavior cannot look successful. |
-| G4 — HTTP session and investigation depth | Explicit cookie/login chains, useful offline reports and repeatable comparisons | Domain/path/secure/expiry/isolation tests and no ambient cookie leakage; escaped hostile-content HTML reports; baseline/run drift scenarios; preserve existing reports. The Workbench now has a session-only cookie jar. File runs now support explicit `--cookies` with an isolated run-local jar; broader independent login-chain acceptance remains open. |
-| G5 — Acceptance and distribution | Installable, reproducible 1.0 artifacts with an honest capability matrix | Review all original rows with behavior evidence or explicitly approved scope deviations, independent real-service cases, measured 600/5,000-request baselines, installed macOS/CPU coverage, exact-source security gates, provenance and explicit signing status. No version-only promotion. |
-
-Mock discoverability/lifecycle follows the first reliable file-run/compatibility increments, reusing the existing server. Existing GraphQL/gRPC/broker capabilities remain supported acceptance work; this scope does not remove their criteria or promote synthetic fixtures into interoperability evidence. WorkbenchStore decomposition remains a measured maintenance task, not a prerequisite for each user-visible fix.
-
-Development source now implements the first **G1 conservative direct Postman v2 file-run** increment with whole-input preparation, explicit HTTP 2xx checks, transient secrets, environments/overrides, reports and cancellation. Scripts and unsupported inputs block before traffic. Exact nested Postman folder selection now preserves source order and inherited checks in both run and preflight. Native v1 file runs now support explicit collection/environment selection and shared workflows with process-only secrets. G1 remains open for complete acceptance; JSON/CSV iteration data is now implemented with row isolation and shared budgets; file-based CA/PEM/PKCS#12 TLS supports multiple exact HTTPS origins; compatibility depth and independent acceptance follow. The gates above add a release order to the milestone details below; they do not mark their unchecked tasks shipped. A PR, passing CI and documented behavior establish an increment; release evidence closes shipping status.
-
-## At a glance
-
-| Order | Milestone | User outcome | Status |
-| --- | --- | --- | --- |
-| 1 | CLI file runner and migration diagnostics | Run collection/environment files without importing into a desktop workspace | In progress: Postman/native file runs and exact selection |
-| 2 | Workflow compatibility and trustworthy reports | Understand which scripts work and why a run passed or failed | In progress: bounded scripts and first offline reports |
-| 3 | First-class mock workbench | Find, edit and run local mocks directly from the app or CLI | In progress: [saved workbench PR](https://github.com/alby-raju/Rill/pull/73) |
-| 4 | Performance and failure investigation | Keep large workspaces responsive and compare repeatable runs | In progress: initial CLI baselines |
-| 5 | Linux CLI and CI distribution | Run HTTP suites and mocks in Linux CI without a Mac | Discovery required |
-| 6 | Windows CLI and desktop portability decision | Native Windows automation, followed by an evidence-based GUI decision | Discovery required |
-
-Milestones are delivery groups, not a promise to fit each into one PR. Use independently reviewable PRs within each group. Mark work in progress only after an implementation PR exists; mark it shipped only with tests, documentation and release evidence. Keep this file authoritative; the Wiki and roadmap discussion link here rather than duplicating its task list.
+| Gate | Remaining acceptance |
+| --- | --- |
+| G0 — Daily-workbench reliability | Verify selectors, keyboard and dismissal behavior, layouts in light/dark and compact/wide windows, persisted choices, draft recovery, upgrades and owner accessibility. |
+| G1 — File-based execution | Run the independent installed suite for Postman and native files. Verify selection, precedence, fail-closed preflight, cancellation and reports without mutating inputs, the desktop workspace or Keychain. |
+| G2 — Reproducible headless inputs | Verify the owner-suite workflow from paths with spaces using JSON/CSV data, empty and disabled variables, four temporary overrides, real-service mTLS/custom CA, redaction and simultaneous terminal/JSON reporting. |
+| G3 — Workflow compatibility | Extend the pinned Newman comparison and independently verify script order, variable mutation, request order and exit status. |
+| G4 — Session and investigation | Independently verify realistic login chains, cookie isolation and expiry, hostile-content report escaping, baseline drift diagnosis and reproducible CI runs with scoped inputs and deadlines. |
+| G5 — Acceptance and distribution | Close the original acceptance criteria with behavior evidence or approved deviations. Verify fresh installs, upgrades, recovery, real services, performance baselines, architecture-specific packaging and provenance, and exact-source security gates. |
 
 ## 1. CLI file runner and migration diagnostics
 
-- [ ] **CLI-01 — Direct file runs.** Add `rill run collection.json` for supported Postman and native formats, with an isolated temporary workspace. No writes to the desktop workspace and no mandatory GUI setup. Support explicit collection/folder selection and preserve nested folder order.
-- [ ] **CLI-02 — Environment and data inputs.** Add `--environment-file`, repeatable `--env-var key=value`, globals, JSON/CSV iteration data and optional final-environment export. Document deterministic precedence, disabled values, empty values, missing-variable errors and opt-in secret export. Preserve existing saved-workspace commands.
-- [ ] **CLI-03 — Headless TLS.** Add client certificate/key/PKCS#12, passphrase-file, custom CA and explicit insecure options. Validate matched identities; support certificate selection per destination and define redirect/hostname behavior. File runs must not require importing identities into a personal Keychain. Never print private keys or passphrases.
-- [ ] **CLI-04 — CLI installation and discoverability.** Development source now includes read-only doctor, parser-derived Bash/zsh/fish completions, focused primary-command help, permanent install guidance and CLI-only macOS packaging. Installed acceptance on both architectures and Homebrew evaluation remain open. Shell completion, permanent install guidance, `doctor`, useful per-command help, actionable errors and CI-friendly exit codes. Provide a CLI-only macOS archive; evaluate Homebrew after reproducible standalone packaging works.
-- [ ] **CLI-05 — Explain before sending.** Add a validation/dry-run mode that reports unsupported imports/scripts, unresolved inputs, selected environment and redacted execution plan without sending requests. Unsupported behavior must not produce a misleading success.
-
-Ad-hoc development-source increment: `rill request METHOD URL` sends a single request through the shared HTTP engine, with temporary variable overrides and explicit optional saved profile selection. Development source adds URL-encoded and multipart forms, binary uploads, explicit file mTLS, atomic streaming downloads and origin-scoped encrypted cookie sessions for one-off calls.
-
-First CLI-01/02 increment: development source provides conservative Postman v2 `run` with environment files, overrides, whole-input preparation, explicit HTTP 2xx checks, reports and cancellation. Postman binary and multipart bodies now support explicit [attachment bindings](docs/CLI.md#bind-postman-file-attachments). Foreign scripts block unless the bounded translation subset is selected. Exact nested Postman folder selection works in run/preflight. Native v1 file runs support collection/environment selection and shared workflows with process-only secrets. Bounded JSON/CSV data rows now drive either file format with explicit precedence and per-row isolation; explicit Postman globals are now supported with matching offline preflight; explicit final-environment export now captures committed effective variables without resolving named secrets. CLI-02 still needs independent acceptance.
-
-CLI-03 development source: both file formats accept bounded CA roots, clear or encrypted PKCS#8 PEM and PKCS#12 client identities, passphrase files and explicit insecure mode. A versioned map selects up to 16 client identities by exact HTTPS origin. Native identity requirements can use files without Keychain lookup. Synthetic fixtures cover trust and hostname rejection, destination selection with RSA and EC identities, redirect isolation, intermediate chains, redaction and input protection. An extracted Apple Silicon CLI archive passed the [600-request synthetic installed check](docs/TESTING.md#installed-cli-tls-acceptance). Intel and independent service or owner-suite acceptance remain open. See the [CLI guide](docs/CLI.md).
-
-CLI-05 development source: [`run --dry-run`](docs/CLI.md#preview-a-file-run-offline) builds redacted ordered plans for Postman and native files, including selection, iteration data, validation deferrals and structural source pointers. It sends no traffic and writes no run outputs. Postman `preflight` retains script inventory and optional unencrypted PEM pairing/expiry inspection. Independent acceptance remains open.
-
-Acceptance: a sanitized suite shaped like the owner's 600-request collection runs from collection/environment files with four temporary variable overrides, mTLS and a simultaneous terminal/JSON report. Test from paths with spaces, without the desktop app running, and verify input files and personal workspace remain unchanged. Never publish the owner's collection, internal endpoints, environment or certificates as fixtures.
-
-### File-run command shape (development source)
-
-```sh
-rill run ./collection.json   --environment-file ./environment.json   --ssl-client-cert ./client.crt   --ssl-client-key ./client.key   --ssl-client-origin https://api.example.test   --ca-cert ./ca.pem   --env-var runLinks=true   --env-var runDelivery=true   --env-var runManagementExtras=true   --env-var runCleanup=true   --detail   --report ./results.json --report-format json
-```
-
-This runs only the documented supported subset. A file runner is not sufficient for Newman equivalence: the suite's scripting and execution semantics must also satisfy milestone 2.
+- [ ] **CLI-04 — CLI installation.** Verify standalone installation and shell integration on both macOS architectures and evaluate Homebrew distribution.
 
 ## 2. Workflow compatibility and trustworthy reports
 
-- [ ] **COMPAT-01 — Published compatibility inventory.** Development-source `preflight --script-inventory` now enumerates inherited event blocks, original locations, selected-descendant counts and bounded lexical hints with source coordinates; [the published inventory](docs/COMPATIBILITY.md) blocks foreign source by default and classifies validated translated blocks with explicit `--translate-scripts`. Grammar-aware construct coverage and independent acceptance remain open. Detect collection/folder/request script inheritance; report every supported, translated and unsupported construct with its location. Current foreign scripts are retained as source, not executed as Postman JavaScript.
-- [x] **COMPAT-02 — Explicit execution strategy.** [ADR 0001](docs/adr/0001-collection-script-compatibility.md) selects bounded translation into native operations for the first opt-in subset, with whole-plan rejection and pinned differential acceptance before enabling it. No foreign runtime is selected or enabled. Evaluate bounded translation to native workflows versus an optional isolated JavaScript worker. Publish an ADR covering portability, dependency size, runtime limits and failure semantics before choosing. No unrestricted evaluation inside the app process.
-- [ ] **COMPAT-03 — Priority suite semantics.** Explicit development-source `--translate-scripts` now compiles and runs [subset v1](docs/SCRIPT-SUBSET.md): separate string-variable scopes, inherited phase order, grouped status, header and typed scalar assertions, bounded response JSON aliases, pre-request header edits, header/JSON-string extraction, conditional skip and literal branches/stop. Unsupported selected source rejects before traffic. Broader syntax/type semantics and independent suite acceptance remain open. Scope the supported subset around variable scopes and mutation, pre-request/test ordering, assertions, extraction, conditional skip/branching and request chaining. Async requests, external libraries and arbitrary Node APIs are separate compatibility decisions, not implicit promises.
-- [ ] **COMPAT-04 — Differential conformance.** Seven synthetic workflows plus two fail-closed cases passed with pinned stock Newman 6.2.3; [the recorded reference corpus](scripts/script-conformance/README.md) documents exact coverage, exit normalization and the retirement of its npm dependency graph. Broader corpus/independent acceptance remains open. Compare synthetic suites against a pinned Newman version using the same local server. Match request order/count, enabled/disabled requests, variable resolution, skipped cases, assertion outcomes and exit status. Unsupported scripts fail validation by default; explicit omissions remain visible in reports and cannot be described as full compatibility.
-- [ ] **REPORT-01 — Better failure investigation.** Development source now versions JSON/NDJSON, records safe failure kinds and original structural source pointers, and retains retry histories/timings. Detailed arbitrary expected/actual values remain redacted; [investigation limits](docs/RUN-INVESTIGATION.md) distinguish machine evidence from exact reproduction. Stable machine report schema with versioning; failure-only detail, source location, expected/actual values with redaction, retry history, timings and copyable reproduction commands. Add NDJSON events and retain existing JSON/JUnit/Markdown/Allure exports.
-- [ ] **REPORT-02 — Shareable local HTML report.** A first redacted, self-contained HTML export now provides request-ID/state filters, per-attempt checks and timing bars with a hash-pinned local script; development source now adds structural source-group navigation and failure kinds. Companion run comparison handles normalized payload drift; payload-value diffs remain outside shared redacted HTML. Offline report with suite/folder navigation, filters, timing charts and response diffs. Escape all server-controlled content; bound retained data and make payload inclusion explicit.
-- [ ] **REPORT-03 — Reproducible CI runs.** Development source implements [versioned configs, scoped deterministic templates, execution deadlines and safe CI annotations](docs/RUN-INVESTIGATION.md), with a reusable CI example; independent acceptance remains open. Config files, deterministic seeds, total/request/script deadlines, cancellation, fail-fast/continue policies, explicit update/overwrite behavior, GitHub Actions annotations and reusable CI examples. Credentials and input files must work without interactive prompts.
-
-Acceptance: a run with unsupported scripts cannot look green; intentional assertion, transport, timeout and configuration failures remain distinguishable. Verify reports with hostile HTML/control characters and secrets. Do not publish a Newman compatibility percentage without a defined corpus and denominator.
+- [ ] **COMPAT-01 — Construct-level diagnostics.** Use grammar-aware classification for supported, translated and unsupported script constructs, with source coordinates. Verify the inventory independently.
+- [ ] **COMPAT-04 — Differential conformance.** Expand the pinned Newman corpus and compare independent workflows on matched fixtures, including scripts that must block before traffic.
+- [ ] **REPORT-01 — Failure investigation.** Add safe expected/actual details where redaction permits and copyable reproduction commands for supported failures.
+- [ ] **REPORT-02 — Shareable local HTML report.** Add explicit, bounded and safely escaped response diffs to the offline report.
 
 ## 3. First-class mock workbench
 
-**Entry points:** app menu **Workspace tools → Sessions and testing → Local Mocks** (development source), the Mocks tab in API Definitions and Tools, and CLI `mock-serve --routes FILE` / `--project FILE`. Development source now adds a dedicated Local Mocks destination, saved projects, route forms/JSON drafts, editor-independent listeners, predicates, scenarios, faults, a bounded call journal and a common versioned CLI project format. The published preview still has the earlier JSON-only editor. This milestone improves discoverability and capability; it does not add a second mock engine.
-
-- [ ] **MOCK-01 — Dedicated navigation.** Add a visible Mocks entry, persistent saved mock projects, an empty-state walkthrough, route forms with JSON editing, start/stop controls, running status and copyable base URL/cURL.
-- [ ] **MOCK-02 — Predictable lifecycle.** Keep a mock running when its editor closes; stop on explicit action or app termination. Surface port conflicts, running servers and unsaved changes. No implicit background daemon or automatic exposure to LAN.
-- [ ] **MOCK-03 — Useful responses.** Request matching by method/path/query/header/body; ordered scenarios, seeded examples, latency/error injection and bounded request journals. Define unmatched-route behavior and deterministic reset. Bound concurrent connections, journal retention and payload sizes.
-- [ ] **MOCK-04 — Contracts and fixtures.** Generate routes from supported OpenAPI examples and saved responses, validate fixture structure, and replay sanitized recordings. Record provenance and redact credentials before saving; interactive examples are not proof of full schema conformance.
-- [ ] **MOCK-05 — One app/CLI format.** Export/version the same route/project definition; CLI readiness output, ephemeral port discovery, CI teardown and reset controls. Request matching and scenario results must agree across app and CLI.
-
-Development-source details and limits are in [Local mocks](docs/wiki/Local-Mocks.md). The CLI can now generate versioned mock projects from local definitions with seeded schema fallbacks and explicit example precedence. Saved response fixtures are structural templates with every scalar replaced; arbitrary captured recordings and independent acceptance remain open.
-
-Acceptance: create and run a mock without discovering a hidden submenu, close its editor while requests continue, inspect calls, reset a scenario, export it and reproduce the same behavior with the CLI. Exercise port collisions, cancellation, oversized requests and process termination.
+- [ ] **MOCK-04 — Sanitized recording replay.** Validate and replay recorded fixtures with provenance and credential redaction.
+- [ ] **Independent mock acceptance.** Verify installed-app discovery, editor-independent lifecycle, port conflicts, oversized requests, scenario reset, and equivalent replay from an exported project in the CLI.
 
 ## 4. Performance and features that earn repeat use
 
-- [ ] **PERF-01 — Establish baselines first.** [The reproducible CLI harness](docs/PERFORMANCE.md) covers metadata, search, offline validation, translated script execution and report export at 600/5,000/10,000 requests. It records wall time, peak CLI memory, connections and output sizes for the loopback runs. Native interaction, many-tab workloads, script-heavy native workflows and independent reference measurements remain open.
-- [ ] **PERF-02 — Responsive desktop.** Profile main-thread work; use incremental indexing, lazy editor/response construction, batched state updates and bounded history. Regressions must cover the previously slow Close All Tabs action and the installed-resource launch crash.
-- [ ] **PERF-03 — Efficient runner.** Eligible plain HTTP reads in file runs reuse one origin's connections per run. Versioned JSON reports encode directly from redacted outcomes. Broader connection reuse and streaming report output remain open. Bound concurrency and preserve sequential workflows by default. Parallel execution requires explicit isolation and deterministic reporting.
-- [ ] **PERF-04 — CI/build speed.** Measure critical paths, cache toolchains/dependencies using explicit keys, cancel stale PR runs and separate docs checks from native compilation. Preserve exact-source release tests, installed GUI checks, vulnerability scans and deep release analysis.
-- [ ] **DIFF-01 — Run comparison.** Development-source `report-diff` now compares versioned reports or explicit raw snapshots, including original positional Postman identity, normalized JSON/header/type-shape changes, status/check/retry drift, timing thresholds and missing-data states. See [scope and identity limits](docs/RUN-INVESTIGATION.md). Baseline versus current run: status/assertion changes, schema drift, normalized JSON/header diffs and latency changes. Configurable ignore rules and clear treatment of missing data.
-- [ ] **FLOW-01 — API change workflow.** Development source adds [offline change review](docs/CLI.md#offline-openapi-change-review-development-source) with impacted linked request IDs, separate definition and refresh states, and optional operation paths. OpenAPI change review → impacted requests → generated examples/mocks → contract run → local report. Reuse current definition, contract and mock support rather than replacing it.
-- [ ] **FLOW-02 — Better migration and reproducibility.** Portable text-oriented project files, semantic diffs, read-only discovery, import previews and exact file/line diagnostics. Evaluate HTTPie interoperability against documented exports; do not claim to reproduce its complete app behavior.
+- [ ] **PERF-01 — Remaining baselines.** Measure native interaction, many-tab and script-heavy workloads, and compare matched workloads against independent reference measurements.
+- [ ] **PERF-02 — Responsive desktop.** Profile and address main-thread bottlenecks in collection indexing, editor/response construction and history updates. Cover Close All Tabs and installed-resource launch in regression checks.
+- [ ] **PERF-03 — Efficient runner.** Extend connection reuse and stream the remaining buffered report formats. Evaluate bounded concurrency with isolation and deterministic reporting.
+- [ ] **FLOW-01 — API change workflow.** Connect reviewed OpenAPI changes and impacted requests to generated examples and mocks, then verify the linked contract-run and report workflow.
+- [ ] **FLOW-02 — Migration and reproducibility.** Extend text-oriented project files, semantic diffs, read-only discovery and exact file/line diagnostics.
 
-Development source adds [saved contract batches](docs/CLI.md#run-a-saved-contract-batch) for all linked requests or an explicit list of reviewed request IDs. The batch runs shared request and response checks and writes redacted local reports.
-
-Development-source CLI writes [NDJSON run reports](docs/RUN-INVESTIGATION.md) in bounded chunks and publishes complete files atomically at the end of a run. Other export formats still use buffered output.
-
-Initial performance targets are hypotheses to calibrate after PERF-01: p95 warm metadata listing under 200 ms for 600 requests; p95 search/close-all interaction under 100 ms of main-thread work; no more than 20% regression in stable reference benchmarks. Publish workload, throughput, latency and memory together. Do not claim to beat Postman/Newman/HTTPie until comparable public benchmarks substantiate it.
+Calibrate the initial performance targets against the remaining baselines. Measure p95 warm metadata listing at 600 requests against 200 ms, p95 search and Close All Tabs interaction against 100 ms of main-thread work, and stable benchmark regressions against 20%. Publish workload, throughput, latency and memory together.
 
 ## 5–6. Linux and Windows: CLI first, desktop separately
 
-Swift supports Linux and Windows, but today's Rill core is not portable: it imports Darwin, Security, Network and CryptoKit, uses macOS Keychain identities and an Apple Transport Services gRPC transport, and links the CLI to a broad protocol dependency graph. The desktop also uses SwiftUI/AppKit. Changing `Package.swift` alone will not port it.
-
-- [ ] **PORT-01 — Time-boxed spike and architecture decision.** Spend 3–5 engineer-days identifying target/dependency blockers and proving an HTTP request, TLS verification, local mock and filesystem operation on Ubuntu and Windows. Choose initial supported OS/CPU versions and measured distribution costs.
-- [ ] **PORT-02 — Portable HTTP/runner foundation.** Split portable models, importers, runner, reporting and CLI from Apple adapters and optional brokers/gRPC. Abstract process/filesystem/signals, credential providers and transport capabilities. Select portable networking/crypto deliberately; preserve TLS behavior and redaction.
-- [ ] **PORT-03 — Linux CLI preview.** Start with Ubuntu x86_64 HTTP collection runs, supported scripts, reports, mTLS and local mocks; then arm64 and an OCI image. Automated Linux conformance tests, artifacts, provenance and installation guidance are required before claiming support.
-- [ ] **PORT-04 — Native Windows CLI preview.** Windows x86_64 executable, PowerShell quoting/UTF-8/paths, cancellation, proxy/CA/mTLS behavior and CI. WSL is a useful Linux delivery option, not native Windows support.
-- [ ] **PORT-05 — Desktop decision after CLI evidence.** Compare a shared web UI over a local engine, a maintained cross-platform toolkit, and native shells. Prototype editor performance, accessibility, packaging, updates and secure IPC. Keep the native Mac experience while evaluating; do not promise a SwiftUI recompile for Linux/Windows.
-
-### Planning estimates, not delivery commitments
-
-Assume one experienced full-time engineer, existing Swift tests reused, supported HTTP workflow subset first, normal review/QA/docs included, no cloud collaboration or wholesale protocol parity. These are engineering judgments with roughly ±50% uncertainty until PORT-01; parallel contributors do not reduce calendar time linearly.
-
-| Work | Incremental effort |
-| --- | --- |
-| Shared portability foundation | 4–6 engineer-weeks |
-| Linux HTTP CLI preview after foundation | 3–5 engineer-weeks |
-| Native Windows HTTP CLI preview after foundation | 4–7 engineer-weeks |
-| Both CLI previews, shared foundation counted once | **11–18 engineer-weeks total** |
-| Broader broker/gRPC/credential-provider parity across both OSes | Additional 8–16 engineer-weeks; dependency feasibility unproven |
-| Desktop apps on both OSes after CLI foundation | Additional 24–40 engineer-weeks for shared UI, integration and platform QA; re-estimate after UI prototype |
-
-Recommended sequence: strengthen the Mac CLI → Linux CI runner → Windows CLI → decide whether user demand justifies cross-platform desktop work. Portability discovery can overlap the early CLI work; GUI implementation should not delay a reliable command-line runner.
-
-## What would make users choose Rill?
-
-1. **Lower migration effort:** file-based runs with explicit compatibility diagnostics instead of finding silent omissions after CI goes green.
-2. **Local, reproducible work:** app, CLI, mocks and reports share one engine and portable inputs, without requiring an account or hosted workspace.
-3. **Faster investigation:** failures explain location and cause, and runs can be compared or reproduced from a report.
-4. **Measured responsiveness:** large workspaces remain usable and the CLI adds little overhead; publish evidence rather than performance slogans.
-5. **Focused scope:** improve these workflows before pursuing hosted collaboration, AI-generated tests, plugin marketplaces or more protocol breadth. Reassess those from demonstrated demand.
-
-These are proposed advantages to prove, not claims that competing tools lack local storage, CLI runners or mocks. Newman already supports file/environment/certificate/report flags; HTTPie documents local storage and collection variables. See [Newman options](https://learning.postman.com/docs/collections/using-newman-cli/newman-options), [HTTPie desktop documentation](https://httpie.io/docs/desktop), and [Swift platform support](https://www.swift.org/platform-support/).
+- [ ] **PORT-01 — Portability spike.** Identify framework and dependency blockers and prove HTTP, TLS verification, local mocks and filesystem operations on Ubuntu and Windows. Choose initial OS and CPU targets.
+- [ ] **PORT-02 — Portable HTTP/runner foundation.** Separate portable models, importers, runner, reporting and CLI from Apple adapters and optional protocols. Choose portable networking, crypto, credential, filesystem and signal adapters.
+- [ ] **PORT-03 — Linux CLI preview.** Deliver Ubuntu x86_64 HTTP collection runs, supported scripts, reports, mTLS and local mocks, then arm64 and an OCI image. Add conformance tests, provenance and install guidance.
+- [ ] **PORT-04 — Native Windows CLI preview.** Deliver Windows x86_64 builds with PowerShell quoting, UTF-8 and path handling, cancellation, proxy/CA/mTLS support and CI verification.
+- [ ] **PORT-05 — Desktop portability decision.** After CLI evidence, compare a shared web UI, a cross-platform toolkit and native shells. Prototype editor performance, accessibility, packaging, updates and secure IPC.
 
 ## HTTPie comparison plan
 
-Added 10 November 2026. Use HTTPie Terminal 3.2.4 and the documented HTTPie Web and Desktop workflows as the initial reference. Compare user tasks, observable results and safeguards. The current delivery scope remains macOS and local CI. Broader distribution and services are later scope decisions. [HTTPie Terminal](https://httpie.io/docs/cli/usage) · [HTTPie Web and Desktop](https://httpie.io/docs/desktop)
+Use HTTPie Terminal 3.2.4 and documented desktop workflows as the references. [HTTPie Terminal](https://httpie.io/docs/cli/usage) · [HTTPie Web and Desktop](https://httpie.io/docs/desktop)
 
-| Order | Work | Evidence |
+| Order | Pending work | Evidence |
 | --- | --- | --- |
-| 1. Terminal requests | Finish request composition and offline preview first. Extend nested JSON input, method and URL shortcuts, stdin, output formatting, proxies, redirect controls, resumable downloads and encrypted sessions. | Run both clients against the same disposable loopback server. Compare request bytes, output, exit status and saved state. Test credential isolation separately. |
-| 2. Desktop workflows | Add live request preview, selective import and export, HTTPie workspace round-trips and better variable navigation. Improve keyboard flow, accessibility and large-response inspection. | Compare task completion time and errors for workspace import, environment changes, request composition and failure diagnosis in installed apps. Record OS, architecture and build versions. |
-| 3. Repeatable API testing | Promote an ad-hoc request to a test, route reviewed OpenAPI requests to a generated mock, and compare contract runs against a baseline. Reuse the existing runner, mock generator and redacted reports. | Exercise the whole workflow through CI and verify that a reproducible failure report identifies the changed request or response. |
-| 4. Distribution and ecosystem | Prove the portable CLI on Linux and Windows first. Evaluate FreeBSD, cross-platform desktop, browser access, optional sync and extensions as separate follow-up work. | Verify fresh installs, upgrades and the same workflow suite on each supported platform. |
-
-The first checkpoint is a focused request-composition and offline-preview PR paired with a pinned HTTPie comparison harness. Record exact versions and fixtures with the results. Use matched workloads and repeated samples for performance comparisons.
+| 1. Terminal requests | Define scheme-less remote URLs. Add headers from files, response header selection and formatting, incremental stdout streaming, explicit proxy configuration, richer redirect controls and hop display, resumable downloads and optional persistence of session headers and auth. | Compare request bytes, output, exit status and saved state against the same loopback fixtures. Verify transport and credential isolation independently. |
+| 2. Desktop workflows | Add live request preview, selective HTTPie import/export and broader workspace round-trips. Improve variable navigation, keyboard flow, accessibility and large-response inspection. | Compare task completion and errors in installed apps, with exact OS, CPU and build versions. |
+| 3. Repeatable API testing | Promote an ad-hoc request to a test and verify a continuous workflow from reviewed OpenAPI requests to generated mocks, contract runs and baseline comparison. | Reproduce a request or response change in CI and locate it from the failure report. |
+| 4. Distribution and ecosystem | Prove Linux and Windows CLI install and upgrade workflows. Evaluate FreeBSD, cross-platform desktop, browser access, optional sync and extensions separately. | Run the same workflow suite on each supported platform. |
 
 ## Delivery and acceptance policy
 
-Continue fresh-install/upgrade/recovery, Keychain, real-provider interoperability, keyboard/VoiceOver and supported-window acceptance alongside these milestones. Keep per-architecture macOS packaging/provenance and the relocated release-app launch regression gate. Paid Developer ID signing/notarization remains deferred at the owner's request.
-
-Preserve the [122 original capability criteria](docs/CAPABILITIES.csv); this roadmap does not change partial/verified/deviation states into sign-off. Each enhancement needs an issue or PR referencing its ID, fixtures, relevant performance evidence, help/documentation updates and explicit limitations. Roadmap checkboxes describe shipped enhancements only after review, CI and release evidence. Feature requests can be proposed in [Discussions](https://github.com/alby-raju/Rill/discussions); implementation bugs belong in [Issues](https://github.com/alby-raju/Rill/issues).
+Use focused PRs with fixtures, relevant performance evidence, and help and documentation updates. Preserve the [122 original capability criteria](docs/CAPABILITIES.csv) and their independent acceptance states. Verify both macOS architectures, relocated app launch and provenance at release. Keep the owner's workspace and credentials out of published fixtures.
