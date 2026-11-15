@@ -271,6 +271,8 @@ rill request GET '{{base}}/health' --workspace ./workspace.json \
 
 Add `--offline` to preview preparation for a buffered request without sending it. The JSON summary shows the method, body size when known, and whether named credentials defer validation. Add `--raw-preview` to include the prepared URL, headers and base64 body. Raw preview can expose inline secrets and rejects requests that need named credentials. It represents the prepared request before transport adds its own headers. Offline mode supports inline, text-file and URL-encoded form bodies. Streaming uploads, sessions, explicit TLS options and response destinations require a live request.
 
+Repeat `--query-param NAME=VALUE` to append query fields to a live request or offline preview. Split each field at the first equals sign. Empty values and repeated names are allowed. The engine expands variables and percent-encodes the new fields while preserving the existing URL query.
+
 Use repeatable `-H`/`--header name:value`, `-d`/`--data TEXT` or `--data-file FILE` (UTF-8, at most 1 MiB). Development source also supports explicit binary and form uploads:
 
 ```sh

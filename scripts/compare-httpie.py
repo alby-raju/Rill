@@ -31,6 +31,14 @@ def run(binary, options, directory):
 def compare(rill, httpie, directory):
     cases = (
         ("get-query", "GET", "/items?q=a%20b&q=c", [], [], b""),
+        (
+            "get-query-fields",
+            "GET",
+            "/items?existing=%2B",
+            ["--query-param", "tag=a+b", "--query-param", "tag="],
+            ["tag==a+b", "tag=="],
+            b"",
+        ),
         ("post-text", "POST", "/items", ["--data", "sample"], ["--raw=sample"], b"sample"),
     )
     for name, method, target, rill_body, httpie_body, expected_body in cases:

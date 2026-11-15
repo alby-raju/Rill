@@ -8,7 +8,7 @@ extension RillCLI {
             "header", "data", "data-file", "binary-file", "form", "env-var", "output", "download",
             "timeout",
             "color", "workspace", "environment", "auth-profile", "tls", "session",
-            "session-key-file",
+            "session-key-file", "query-param",
         ]
         let requestFlags: Set<String> = [
             "json", "quiet", "overwrite", "allow-insecure", "multipart", "offline", "raw-preview",
@@ -102,6 +102,14 @@ extension RillCLI {
         draft.method = method
         draft.url = args.operands[1]
         draft.headers = try args.fields("header")
+        draft.parameters = try (args.values["query-param"] ?? []).map { argument in
+            guard let split = argument.firstIndex(of: "="), split != argument.startIndex else {
+                throw CLIError.usage("--query-param expects NAME=VALUE.")
+            }
+            return Field(
+                name: String(argument[..<split]),
+                value: String(argument[argument.index(after: split)...]))
+        }
         draft.timeout = try args.seconds()
         guard draft.timeout >= 1 else {
             throw CLIError.usage("--timeout must be between 1 and 300 seconds.")
