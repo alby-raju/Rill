@@ -12,7 +12,7 @@ extension RillCLI {
         ]
         let requestFlags: Set<String> = [
             "json", "quiet", "overwrite", "allow-insecure", "multipart", "offline", "raw-preview",
-            "stdin", "no-follow",
+            "stdin", "no-follow", "body-stdout",
         ]
         let fromStdin = args.flags.contains("stdin")
         let bodyOptions = ["data", "data-file", "binary-file", "form", "json-field"].filter {
@@ -79,6 +79,16 @@ extension RillCLI {
         let rawOutput = args.value("output")
         guard download == nil || (method == .GET && rawOutput == nil) else {
             throw CLIError.usage("--download requires GET and cannot be combined with --output.")
+        }
+        let bodyStdout = args.flags.contains("body-stdout")
+        guard
+            !bodyStdout
+                || (!offline && rawOutput == nil && download == nil
+                    && args.flags.isDisjoint(with: ["json", "quiet"]))
+        else {
+            throw CLIError.usage(
+                "--body-stdout requires a live request without --output, --download, --json or --quiet."
+            )
         }
         let destination = rawOutput ?? download
         guard !args.flags.contains("overwrite") || destination != nil else {
@@ -187,6 +197,7 @@ extension RillCLI {
         let tlsProfiles = workspace.tlsProfiles ?? []
         let session = try sessionOptions?.open()
         let summary: RequestSummary
+        var stdoutBody: Data?
         do {
             if let download {
                 let result = try await RequestEngine.download(
@@ -203,6 +214,7 @@ extension RillCLI {
                     tlsProfiles: tlsProfiles, followRedirects: followRedirects,
                     fileTLS: fileTLS, cookieJar: session?.jar)
                 if let output = rawOutput { try args.write(exchange.body, to: output) }
+                if bodyStdout { stdoutBody = exchange.body }
                 summary = RequestSummary(
                     status: exchange.status, duration: exchange.duration,
                     bodyBytes: exchange.body.count)
@@ -241,7 +253,9 @@ extension RillCLI {
             throw CLIError.usage(
                 "Request variable expansion failed or exceeded its limits; input content omitted.")
         }
-        if args.flags.contains("json") {
+        if let stdoutBody {
+            try FileHandle.standardOutput.write(contentsOf: stdoutBody)
+        } else if args.flags.contains("json") {
             try args.json(summary)
         } else {
             try args.text(

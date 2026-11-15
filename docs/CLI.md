@@ -275,6 +275,8 @@ Repeat `--query-param NAME=VALUE` to append query fields to a live request or of
 
 Repeat `--json-field PATH=TEXT` or `--json-field PATH:=JSON` to compose a JSON object. For example, use `--json-field 'user[name]=Ada'` and `--json-field 'user[active]:=true'`. In array paths, `[]` appends and `[0]` addresses an index. Indices start at zero and cannot leave gaps. Quote bracket paths for your shell. Duplicate assignments and conflicting paths fail before sending. Values are literal, and typed values keep their JSON types. Use this option as the sole body source for a request, including offline previews.
 
+Use `--body-stdout` to pipe the raw response body into another command. Stdout contains only the buffered body bytes, including for HTTP error responses. Diagnostics stay on stderr, and the HTTP exit status is unchanged. This explicit raw output can contain sensitive data. Choose it as the sole response output mode.
+
 Use `--no-follow` to return the first response for a live request or download. By default, Rill follows same-origin redirects. A stopped redirect retains its HTTP status and uses the existing non-2xx exit code. Downloads install a file only after a successful response.
 
 Use `--stdin` to read a UTF-8 body from a pipe or redirected file. It is an explicit alternative to `--data`, `--data-file`, `--binary-file` and `--form`. Input is capped at 1 MiB, read until EOF and subject to the request's `--timeout` as a separate input deadline. The body uses the same template expansion as inline text and works with offline preview.
