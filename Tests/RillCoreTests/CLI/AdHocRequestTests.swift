@@ -455,6 +455,41 @@ import XCTest
         XCTAssertTrue(incompatible.output.isEmpty)
     }
 
+    func testPrettyJSONOutputPreservesStatusAndRejectsInvalidBodies() async throws {
+        let base = try XCTUnwrap(ProcessInfo.processInfo.environment["RILL_TEST_BASE_URL"])
+        let success = try await cli(["request", base + "/script-scalars", "--pretty-json"])
+        XCTAssertEqual(success.status, 0)
+        XCTAssertEqual(
+            String(decoding: success.output, as: UTF8.self),
+            "{\n  \"n\": 42,\n  \"text\": \"42\",\n  \"ok\": true,\n  \"empty\": null,\n  \"zero\": -0\n}\n"
+        )
+
+        let failure = try await cli([
+            "request", "POST", base + "/oauth/token", "--data", "invalid", "--pretty-json",
+        ])
+        XCTAssertEqual(failure.status, 3)
+        let body = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: failure.output) as? [String: String])
+        XCTAssertEqual(body["error"], "invalid_client")
+
+        let empty = try await cli(["request", base + "/download-denied", "--pretty-json"])
+        XCTAssertEqual(empty.status, 3)
+        XCTAssertTrue(empty.output.isEmpty)
+        let invalid = try await cli(["request", base + "/bytes/5", "--pretty-json"])
+        XCTAssertEqual(invalid.status, 3)
+        XCTAssertTrue(invalid.output.isEmpty)
+        XCTAssertTrue(
+            String(decoding: invalid.diagnostics, as: UTF8.self).contains("bounded UTF-8 JSON"))
+
+        for option in ["--offline", "--body-stdout", "--headers-stdout", "--json"] {
+            let rejected = try await cli([
+                "request", base + "/script-scalars", "--pretty-json", option,
+            ])
+            XCTAssertEqual(rejected.status, 2)
+            XCTAssertTrue(rejected.output.isEmpty)
+        }
+    }
+
     func testResponseHeaderOutputSelectsFinalHeadersWithoutReadingBody() async throws {
         let base = try XCTUnwrap(ProcessInfo.processInfo.environment["RILL_TEST_BASE_URL"])
         let all = try await cli(["request", base + "/echo", "--headers-stdout"])

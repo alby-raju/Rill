@@ -280,6 +280,8 @@ Repeat `--json-field PATH=TEXT` or `--json-field PATH:=JSON` to compose a JSON o
 
 Use `--body-stdout` to pipe the raw response body into another command. Stdout contains only the buffered body bytes, including for HTTP error responses. Diagnostics stay on stderr, and the HTTP exit status is unchanged. This explicit raw output can contain sensitive data. Choose it as the sole response output mode.
 
+Use `--pretty-json` to print only the UTF-8 JSON response body with two-space indentation. It preserves key order, duplicate keys, number spellings, and string escapes. It formats valid JSON regardless of the response media type. Empty bodies produce no output. Malformed, non-UTF-8, or oversized JSON exits 3 with a diagnostic on stderr and no body on stdout. The formatter accepts up to 8 MiB of input and applies the shared JSON depth and output limits. Valid JSON from non-2xx responses is still printed with exit 3. Choose this as the sole response output mode.
+
 Use `--no-follow` to return the first response for a live request or download. By default, Rill follows same-origin redirects. A stopped redirect retains its HTTP status and uses the existing non-2xx exit code. Downloads install a file only after a successful response.
 
 Use `--stdin` to read a UTF-8 body from a pipe or redirected file. It is an explicit alternative to `--data`, `--data-file`, `--binary-file` and `--form`. Input is capped at 1 MiB, read until EOF and subject to the request's `--timeout` as a separate input deadline. The body uses the same template expansion as inline text and works with offline preview.
