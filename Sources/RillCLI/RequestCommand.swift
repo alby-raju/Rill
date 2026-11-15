@@ -8,14 +8,14 @@ extension RillCLI {
             "header", "data", "data-file", "binary-file", "form", "env-var", "output", "download",
             "timeout",
             "color", "workspace", "environment", "auth-profile", "tls", "session",
-            "session-key-file", "query-param",
+            "session-key-file", "query-param", "json-field",
         ]
         let requestFlags: Set<String> = [
             "json", "quiet", "overwrite", "allow-insecure", "multipart", "offline", "raw-preview",
             "stdin",
         ]
         let fromStdin = args.flags.contains("stdin")
-        let bodyOptions = ["data", "data-file", "binary-file", "form"].filter {
+        let bodyOptions = ["data", "data-file", "binary-file", "form", "json-field"].filter {
             args.values[$0] != nil
         }
         guard args.operands.count == 2,
@@ -25,7 +25,7 @@ extension RillCLI {
             bodyOptions.count + (fromStdin ? 1 : 0) <= 1
         else {
             throw CLIError.usage(
-                "Use request METHOD URL with one body option: --data, --data-file, --binary-file, --stdin or repeatable --form. See help request."
+                "Use request METHOD URL with one body option: --data, --data-file, --binary-file, --stdin, --form or --json-field. See help request."
             )
         }
         let hasFileTLS =
@@ -123,7 +123,10 @@ extension RillCLI {
                 throw CLIError.usage("GET/HEAD bodies are not supported; no payload was discarded.")
             }
             do {
-                if fromStdin {
+                if let fields = args.values["json-field"] {
+                    draft.bodyMode = .text
+                    draft.body = try JSONRequestFields.body(fields)
+                } else if fromStdin {
                     draft.bodyMode = .text
                     draft.body = try await RequestStandardInput.read(timeout: draft.timeout)
                 } else if let path = args.value("binary-file") {

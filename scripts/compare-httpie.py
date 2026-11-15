@@ -42,6 +42,24 @@ def compare(rill, httpie, directory):
         ),
         ("post-text", "POST", "/items", ["--data", "sample"], ["--raw=sample"], b"sample", b""),
         ("post-stdin", "POST", "/items", ["--stdin"], [], b"piped text", b"piped text"),
+        (
+            "post-nested-json",
+            "POST",
+            "/items",
+            [
+                "--json-field",
+                "user[name]=Ada",
+                "--json-field",
+                "user[active]:=true",
+                "--json-field",
+                "ids[]:=7",
+                "--json-field",
+                "ids[]:=8",
+            ],
+            ["user[name]=Ada", "user[active]:=true", "ids[]:=7", "ids[]:=8"],
+            b'{"user":{"name":"Ada","active":true},"ids":[7,8]}',
+            b"",
+        ),
     )
     for name, method, target, rill_body, httpie_body, expected_body, input_bytes in cases:
         url = BASE + target
@@ -89,12 +107,16 @@ def compare(rill, httpie, directory):
         actual_target = actual.path + ("?" + actual.query if actual.query else "")
         expected = dict(line.split(":", 1) for line in headers)
         fields = {key.lower(): value for key, value in prepared["headers"].items()}
+        actual_body = base64.b64decode(prepared.get("bodyBase64", ""))
+        if name == "post-nested-json":
+            bodies_match = json.loads(actual_body) == json.loads(body) == json.loads(expected_body)
+        else:
+            bodies_match = actual_body == body == expected_body
         if (
             prepared["sendsRequests"]
             or prepared["method"] != ref_method
             or actual_target != ref_target
-            or base64.b64decode(prepared.get("bodyBase64", "")) != body
-            or body != expected_body
+            or not bodies_match
             or any(
                 fields.get(key.lower()) != expected[key].strip()
                 for key in ("X-Rill", "Content-Type")

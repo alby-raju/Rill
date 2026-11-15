@@ -71,6 +71,37 @@ import XCTest
         XCTAssertTrue(invalid.output.isEmpty)
     }
 
+    func testNestedJSONFieldsPreserveTypesAndRejectConflictingPaths() async throws {
+        let args = ["request", "POST", "http://127.0.0.1:1/", "--offline", "--raw-preview"]
+        let result = try await cli(
+            args + [
+                "--json-field", "user[name]=Ada", "--json-field", "user[active]:=true",
+                "--json-field", "items[0][id]:=9007199254740993",
+                "--json-field", "items[][id]:=null",
+                "--json-field", "note={{unset}}",
+            ])
+        XCTAssertEqual(result.status, 0)
+        let preview = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: result.output) as? [String: Any])
+        let base64 = try XCTUnwrap(preview["bodyBase64"] as? String)
+        let bytes = try XCTUnwrap(Data(base64Encoded: base64))
+        XCTAssertTrue(String(decoding: bytes, as: UTF8.self).contains("9007199254740993"))
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: bytes) as? [String: Any])
+        XCTAssertEqual(object["note"] as? String, "{{unset}}")
+        XCTAssertEqual((object["user"] as? [String: Any])?["active"] as? Bool, true)
+        XCTAssertEqual((object["items"] as? [[String: Any]])?.count, 2)
+        for fields in [
+            ["--json-field", "user=x", "--json-field", "user[name]=Ada"],
+            ["--json-field", "items[2]=gap"],
+            ["--json-field", "value:=bad-json"],
+            ["--json-field", "value=x", "--data", "other"],
+        ] {
+            let invalid = try await cli(args + fields)
+            XCTAssertEqual(invalid.status, 2)
+            XCTAssertTrue(invalid.output.isEmpty)
+        }
+    }
+
     func testStandardInputUsesBufferedBodyPreparation() async throws {
         let url = "http://127.0.0.1:1/"
         let arguments = ["request", "POST", url, "--stdin", "--offline"]
