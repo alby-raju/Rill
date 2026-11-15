@@ -195,4 +195,5 @@ while time.monotonic() < deadline:
 else:
     sys.exit("The TLS fixture did not become ready within 30 seconds.")
 PY_TLS_READY
+python3 scripts/test-ad-hoc-transport.py "$RILL_TEST_CLI_PATH" "$RILL_TEST_BASE_URL"
 swift test "$@"

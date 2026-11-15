@@ -1,5 +1,6 @@
 """Generate disposable local TLS/mTLS fixtures. Never uses a personal Keychain."""
 
+import json
 import os
 import ssl
 import subprocess
@@ -256,7 +257,10 @@ class Handler(BaseHTTPRequestHandler):
             subject = dict(pair for group in (peer or {}).get("subject", ()) for pair in group)
             if subject.get("commonName") != expected_client:
                 status = 403
-        body = b'{"message":"TLS fixture"}'
+        if self.path == "/session-echo":
+            body = json.dumps({"headers": dict(self.headers)}).encode()
+        else:
+            body = b'{"message":"TLS fixture"}'
         self.send_response(status)
         self.send_header("X-Fixture", "RillTLS")
         self.send_header("Content-Type", "application/json")

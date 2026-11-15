@@ -4,6 +4,7 @@ import base64
 import gzip
 import hashlib
 import json
+import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from socketserver import TCPServer
@@ -19,6 +20,8 @@ class LoopbackServer(ThreadingHTTPServer):
 
 
 class Handler(BaseHTTPRequestHandler):
+    resume_started = threading.Event()
+
     def do_echo(self):
         length = int(self.headers.get("Content-Length", "0"))
         if length > 1024 * 1024:
@@ -140,6 +143,7 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == "/slow-chunks":
             self.protocol_version = "HTTP/1.1"
             self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
             self.send_header("Transfer-Encoding", "chunked")
             self.end_headers()
             try:
@@ -193,6 +197,48 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             if self.path == "/download-truncated":
                 self.wfile.write(b"x" * (70 * 1024))
+            return
+        if self.path == "/resume-ready":
+            ready = self.resume_started.wait(timeout=3)
+            body = b"ready" if ready else b"not ready"
+            self.send_response(200 if ready else 503)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        if self.path == "/resume-slow":
+            if (
+                self.headers.get("Range") != "bytes=6-"
+                or self.headers.get("If-Range") != '"fixture"'
+            ):
+                self.send_error(400)
+                return
+            self.send_response(206)
+            self.send_header("ETag", '"fixture"')
+            self.send_header("Content-Range", "bytes 6-11/12")
+            self.send_header("Content-Length", "6")
+            self.end_headers()
+            self.resume_started.set()
+            time.sleep(6)
+            try:
+                self.wfile.write(b"second")
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+            return
+        if self.path in ("/resume", "/resume-restart", "/resume-invalid"):
+            full = b"first-second"
+            partial = self.path != "/resume-restart" and self.headers.get("Range") == "bytes=6-"
+            body = full[6:] if partial else full
+            self.send_response(206 if partial else 200)
+            self.send_header("ETag", '"other"' if self.path == "/resume-invalid" else '"fixture"')
+            if partial:
+                self.send_header("Content-Range", "bytes 6-11/12")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            try:
+                self.wfile.write(body)
+            except (BrokenPipeError, ConnectionResetError):
+                pass
             return
         if self.path == "/large":
             self.send_response(200)
