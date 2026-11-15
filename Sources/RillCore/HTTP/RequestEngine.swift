@@ -695,13 +695,22 @@ final class HTTPTransportDelegate: NSObject, URLSessionDataDelegate, @unchecked 
             else { return nil }
             return "\(scheme)://\(host):\(url.port ?? (scheme == "https" ? 443 : 80))"
         }
-        let allowed = redirectLock.withLock {
+        let number = redirectLock.withLock {
             redirectCount += 1
-            return followRedirects
-                && redirectCount <= (transport.maximumRedirects ?? Int.max)
-                && origin(request.url) == origin(prepared.request.url)
+            return redirectCount
         }
-        transport.traceRedirect?(response.statusCode, allowed)
-        completionHandler(allowed ? request : nil)
+        let decision: HTTPRedirectHop.Decision
+        if !followRedirects {
+            decision = .disabled
+        } else if origin(request.url) != origin(prepared.request.url) {
+            decision = .crossOrigin
+        } else if number > (transport.maximumRedirects ?? Int.max) {
+            decision = .limit
+        } else {
+            decision = .followed
+        }
+        transport.traceRedirect?(
+            HTTPRedirectHop(status: response.statusCode, number: number, decision: decision))
+        completionHandler(decision == .followed ? request : nil)
     }
 }

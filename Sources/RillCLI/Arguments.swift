@@ -440,6 +440,7 @@ let usage = """
           --pretty-xml               Write only the formatted XML response body to stdout
           --stream                  Stream raw response bytes to stdout
           --proxy URL               Use an HTTP CONNECT, HTTPS CONNECT or SOCKS5 proxy
+          --proxy-ca-cert FILE      Trust a private CA for the HTTPS proxy only
           --proxy-bypass DOMAIN     Exclude a proxy domain (repeatable)
           --proxy-user USER --proxy-password-file FILE    Proxy credentials
           --max-redirects N --show-redirects  Limit and trace redirects

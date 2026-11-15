@@ -8,6 +8,7 @@ import os
 import select
 import signal
 import socket
+import ssl
 import subprocess
 import tempfile
 import threading
@@ -83,7 +84,7 @@ def check_resume_cancellation(cli, base):
                     child.kill()
 
 
-def check_proxy(cli, base):
+def check_proxy(cli, base, tls_directory=None):
     origin = urlsplit(base)
     proxy_credential = "Basic " + base64.b64encode(b"fixture:private-proxy-password").decode()
     tunneled = threading.Event()
@@ -139,6 +140,16 @@ def check_proxy(cli, base):
         ThreadingHTTPServer(("127.0.0.1", 0), Proxy) as server,
         tempfile.TemporaryDirectory() as directory,
     ):
+        if tls_directory:
+            context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            context.minimum_version = ssl.TLSVersion.TLSv1_2
+            context.load_cert_chain(tls_directory / "server.pem", tls_directory / "server.key")
+            server.socket = context.wrap_socket(server.socket, server_side=True)
+        proxy = (
+            f"https://localhost:{server.server_port}"
+            if tls_directory
+            else f"http://127.0.0.1:{server.server_port}"
+        )
         worker = threading.Thread(target=server.serve_forever, daemon=True)
         worker.start()
         try:
@@ -149,7 +160,7 @@ def check_proxy(cli, base):
                 "request",
                 f"http://origin.invalid:{origin.port}/cookie/redirect",
                 "--proxy",
-                f"http://127.0.0.1:{server.server_port}",
+                proxy,
                 "--proxy-user",
                 "fixture",
                 "--proxy-password-file",
@@ -161,6 +172,15 @@ def check_proxy(cli, base):
                 "--timeout",
                 "5",
             ]
+            if tls_directory:
+                untrusted = subprocess.run(command, capture_output=True, timeout=12)
+                assert untrusted.returncode == 3 and not tunneled.is_set()
+                command += ["--proxy-ca-cert", tls_directory / "ca.pem"]
+                wrong_host = [
+                    str(arg).replace("https://localhost:", "https://127.0.0.1:") for arg in command
+                ]
+                mismatch = subprocess.run(wrong_host, capture_output=True, timeout=12)
+                assert mismatch.returncode == 3 and not tunneled.is_set()
             response = subprocess.run(command, capture_output=True, timeout=12)
             assert response.returncode == 0, response.stderr
             assert tunneled.is_set(), "proxy was bypassed"
@@ -229,10 +249,13 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("cli")
     parser.add_argument("base")
+    parser.add_argument("--tls-directory", type=Path)
     args = parser.parse_args()
     check_stream(args.cli, args.base)
     check_resume_cancellation(args.cli, args.base)
     check_proxy(args.cli, args.base)
+    if args.tls_directory:
+        check_proxy(args.cli, args.base, args.tls_directory)
     check_socks(args.cli)
     print("Ad-hoc HTTP transport interactions passed")
 

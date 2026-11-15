@@ -55,7 +55,7 @@ Use HTTPie Terminal 3.2.4 and documented desktop workflows as the references. [H
 
 | Order | Pending work | Evidence |
 | --- | --- | --- |
-| 1. Terminal requests | Evaluate opt-in cross-origin redirects and richer hop details. Verify TLS-wrapped proxies with a trusted external service and compare long-lived streams, resumable downloads and encrypted session behavior with an independent terminal workflow suite. | Compare request bytes, output, exit status and saved state against the same loopback fixtures. Verify transport and credential isolation independently. |
+| 1. Terminal requests | Decide whether to expose opt-in cross-origin redirects with fresh credential-free requests. Extend terminal verification to external system-trusted proxies and installed long-lived workflows. | Compare request bytes, output, exit status and saved state against the same loopback fixtures. Verify transport and credential isolation independently. |
 | 2. Desktop workflows | Add live request preview, selective HTTPie import/export and broader workspace round-trips. Improve variable navigation, keyboard flow, accessibility and large-response inspection. | Compare task completion and errors in installed apps, with exact OS, CPU and build versions. |
 | 3. Repeatable API testing | Promote an ad-hoc request to a test and verify a continuous workflow from reviewed OpenAPI requests to generated mocks, contract runs and baseline comparison. | Reproduce a request or response change in CI and locate it from the failure report. |
 | 4. Distribution and ecosystem | Prove Linux and Windows CLI install and upgrade workflows. Evaluate FreeBSD, cross-platform desktop, browser access, optional sync and extensions separately. | Run the same workflow suite on each supported platform. |
