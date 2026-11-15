@@ -1,5 +1,10 @@
 # Testing and validation
 
+To compare offline request preparation with a separately installed HTTPie 3.2.4, run
+`python3 scripts/compare-httpie.py --rill "$(swift build --show-bin-path)/RillCLI" --httpie /path/to/http`.
+The initial synthetic cases compare method, target, explicit headers and body bytes.
+The harness isolates HTTPie config and uses offline modes with disposable inputs.
+
 Use full Xcode, not command-line tools alone, for XCTest and packaging:
 
 ```sh

@@ -108,7 +108,7 @@ public enum RequestEngine {
 
     // Validate concrete inputs without asking any credential provider for a value.
     // A placeholder can change URL/header validity, so such a step remains deferred.
-    static func prepareForPlanning(
+    public static func prepareForPlanning(
         _ input: RequestDraft, environment: Environment?, profiles: [AuthenticationProfile] = []
     ) throws -> Bool {
         var deferred = false
