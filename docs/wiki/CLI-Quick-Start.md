@@ -1,6 +1,6 @@
 # CLI quick start
 
-The installed macOS app includes the CLI at `/Applications/Rill.app/Contents/Helpers/rill`. No separate download is needed.
+The installed macOS app includes the CLI at `/Applications/Rill.app/Contents/Helpers/rill`. The [0.4.6 preview](https://github.com/alby-raju/Rill/releases/tag/v0.4.6-dev.1) also offers a standalone macOS CLI archive for Apple Silicon and Intel.
 
 ## Enable the command in every zsh terminal
 
@@ -14,7 +14,7 @@ rill --version
 rill --help
 ```
 
-This alias is for interactive zsh sessions. In scripts and CI, use the explicit executable path or install a CLI binary on PATH from the standalone macOS ZIP built by the 0.4.6 source. The published 0.4.5-dev.1 preview includes the bundled CLI. Adjust the app path if installed elsewhere.
+This alias is for interactive zsh sessions. In scripts and CI, use the explicit executable path or install a CLI binary on PATH from the standalone macOS ZIP. Adjust the app path if installed elsewhere.
 
 ## Find saved collections and run one
 
@@ -48,7 +48,7 @@ rill run ./collection.json --environment-file ./environment.json \
 
 Postman v2 file runs support exact nested folder selection, explicit globals, JSON/CSV iteration data, and file-based TLS. For a native workspace file, use `rill run ./workspace.json --format native --collection "Smoke"`. Native runs support saved Rill workflow checks; the Postman file path checks for HTTP 2xx and blocks foreign scripts before sending traffic. Use the [CLI reference](https://github.com/alby-raju/Rill/blob/main/docs/CLI.md) for syntax, precedence, TLS scope, and unsupported inputs.
 
-## Inspect and stream a request from 0.4.6 source
+## Inspect and stream a request
 
 ```sh
 rill request :8080/health --offline

@@ -1,6 +1,6 @@
 # Reproducible runs and investigation
 
-These features are available in the 0.4.6 source. The published v0.4.5-dev.1 preview predates them. They share the native runner; no JavaScript runtime, hosted report service or cross-platform support is added.
+These features are available in the 0.4.6 development preview. They share the native runner; no JavaScript runtime, hosted report service or cross-platform support is added.
 
 ## One reviewed configuration
 

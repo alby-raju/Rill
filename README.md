@@ -12,13 +12,13 @@ Compose requests, inspect responses, run API workflows, and explore live protoco
 
 ## Published macOS preview
 
-[Download Rill 0.4.5-dev.1](https://github.com/alby-raju/Rill/releases/tag/v0.4.5-dev.1) for **macOS 15+**. Choose the `arm64` installer for Apple Silicon or the `x86_64` installer for Intel. The preview includes the native app, CLI, and a separate verification kit.
+[Download Rill 0.4.6-dev.1](https://github.com/alby-raju/Rill/releases/tag/v0.4.6-dev.1) for **macOS 15+**. Choose the `arm64` installer for Apple Silicon or the `x86_64` installer for Intel. The preview includes the native app, a standalone CLI archive for each architecture, and a verification kit.
 
 Development installers are ad-hoc signed. Paid Developer ID signing and notarization are deferred. See [installation and release notes](docs/RELEASE.md) for the exact distribution status and remaining acceptance gates.
 
 ## Current source and roadmap
 
-The repository source is **0.4.6, build 13**. Its standalone CLI, streaming responses, proxy controls, resumable downloads, encrypted HTTPS header sessions, and updated workflow and mock tools are available when building from source. See the [changelog](CHANGELOG.md) and [CLI guide](docs/CLI.md). The 0.4.6 preview is awaiting publication.
+The **0.4.6 preview** adds streaming responses, proxy controls, resumable downloads, encrypted HTTPS header sessions, and updated workflow and mock tools. See the [changelog](CHANGELOG.md) and [CLI guide](docs/CLI.md).
 
 The [roadmap](ROADMAP.md) tracks remaining release acceptance, workflow compatibility, native performance, and Linux and Windows CLI portability.
 
