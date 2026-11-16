@@ -22,7 +22,7 @@ Default bounds include a 32 MiB workspace, 16 MiB HTTP response, 512 KiB preview
 
 ## Ad-hoc CLI requests
 
-Rill 0.4.5 supports `rill request METHOD URL` with no workspace setup, repeated header options, UTF-8 body text/files, temporary variable overrides, and explicit raw response export. Saved environments/auth/TLS profiles require an explicit workspace. The shared HTTP engine retains TLS verification, redirect rules, response bounds and unsupported GET/HEAD-body/repeated-header checks. Summaries omit payloads and credentials. See the [CLI guide](CLI.md).
+The published 0.4.5 preview supports explicit `rill request METHOD URL` calls, basic header and text body inputs, and raw response file export. The 0.4.6 source adds method inference, localhost shortcuts, offline preview, query and nested JSON fields, file-backed headers, stdout streaming, JSON/XML formatting, explicit CONNECT and SOCKS5 proxies, redirect limits, strong-ETag download resume, and encrypted HTTPS sessions for selected headers and authorization. Cross-origin redirects stay blocked. Saved environments, auth and TLS profiles require an explicit workspace. See the [CLI guide](CLI.md#ad-hoc-http-requests-development-source).
 
 ## Direct collection-file execution
 

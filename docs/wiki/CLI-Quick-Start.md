@@ -14,7 +14,7 @@ rill --version
 rill --help
 ```
 
-This alias is for interactive zsh sessions. In scripts and CI, use the explicit executable path or install a CLI binary on PATH when standalone distribution becomes available. Adjust the app path if installed elsewhere.
+This alias is for interactive zsh sessions. In scripts and CI, use the explicit executable path or install a CLI binary on PATH from the standalone macOS ZIP built by the 0.4.6 source. The published 0.4.5-dev.1 preview includes the bundled CLI. Adjust the app path if installed elsewhere.
 
 ## Find saved collections and run one
 
@@ -36,7 +36,7 @@ rill run-collection "Smoke" \
 
 The environment is a saved name/ID, not an environment-file path. Report files are exclusive unless `--overwrite` is supplied. Ctrl+C cancels a run. Exit statuses include 0 success, 2 configuration/input, 3 runtime, 4 checks failed and 130 cancellation.
 
-## Run a collection file in 0.4.5
+## Run a collection file
 
 Run offline preflight first, then send requests if the file is supported.
 
@@ -47,3 +47,12 @@ rill run ./collection.json --environment-file ./environment.json \
 ```
 
 Postman v2 file runs support exact nested folder selection, explicit globals, JSON/CSV iteration data, and file-based TLS. For a native workspace file, use `rill run ./workspace.json --format native --collection "Smoke"`. Native runs support saved Rill workflow checks; the Postman file path checks for HTTP 2xx and blocks foreign scripts before sending traffic. Use the [CLI reference](https://github.com/alby-raju/Rill/blob/main/docs/CLI.md) for syntax, precedence, TLS scope, and unsupported inputs.
+
+## Inspect and stream a request from 0.4.6 source
+
+```sh
+rill request :8080/health --offline
+rill request :8080/events --stream
+```
+
+The offline example prepares the request without sending it. The streaming example sends a request to your local server. The [CLI reference](https://github.com/alby-raju/Rill/blob/main/docs/CLI.md#ad-hoc-http-requests-development-source) also covers proxy CA trust, redirect tracing, resumable downloads, and encrypted HTTPS sessions.

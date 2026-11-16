@@ -4,6 +4,8 @@
 
 Paid Developer ID signing/notarization are **deferred at the owner's request**. Do not describe an ad-hoc development package as a notarized public release. No membership purchase is needed to build/test locally, and publication is a deliberate maintainer step after successful CI and review.
 
+**Current source candidate:** 0.4.6, build 13. The intended tag is `v0.4.6-dev.1`. The [changelog](../CHANGELOG.md) lists source changes awaiting publication.
+
 ## Build and verify
 
 ```sh
@@ -39,14 +41,14 @@ Use the [manual kit](../verification/README.md) and [testing guide](TESTING.md),
 
 ## GitHub development prereleases
 
-Run **Development release** manually on `main`, supplying a new tag matching the source version, such as `v0.4.5-dev.2` for another 0.4.5 preview. Run the **Security** workflow manually on the intended main revision and wait for deep Swift analysis before starting release preparation (the nightly run also qualifies if it analyzed that exact revision). The release workflow rejects other branches, mismatched/reused tags and revisions without successful build, dependency scan and both CodeQL checks. Routine PR security checks do not substitute for deep Swift analysis. It tests and packages on separate Apple Silicon and Intel runners, audits dependencies, verifies notices, and attests each DMG and CLI-only ZIP using GitHub OIDC (no stored signing key).
+Run **Development release** manually on `main`, supplying a new tag matching the source version, such as `v0.4.6-dev.1` for the current 0.4.6 candidate. Run the **Security** workflow manually on the intended main revision and wait for deep Swift analysis before starting release preparation (the nightly run also qualifies if it analyzed that exact revision). The release workflow rejects other branches, mismatched/reused tags and revisions without successful build, dependency scan and both CodeQL checks. Routine PR security checks do not substitute for deep Swift analysis. It tests and packages on separate Apple Silicon and Intel runners, audits dependencies, verifies notices, and attests each DMG and CLI-only ZIP using GitHub OIDC (no stored signing key).
 
 Before attestation, each runner verifies its exact CLI ZIP with the [600-request installed mTLS check](TESTING.md#installed-cli-tls-acceptance). The workflow retains the evidence JSON alongside the build artifacts for review. Fresh-machine and independent service acceptance remain separate release evidence.
 
 Only after both builds pass does it create a **draft prerelease** containing both installers, checksums, provenance, verification kit, MIT license, third-party notices and dependency pins. A failed build creates no release. A failed draft upload may leave an incomplete draft: inspect/delete that unpublished draft before retrying; never replace a published tag. Review all assets and replace the notes' maintainer placeholder with highlights, limitations and actual acceptance results, then publish explicitly:
 
 ```sh
-gh release edit v0.4.5-dev.2 --draft=false --prerelease --repo alby-raju/Rill
+gh release edit v0.4.6-dev.1 --draft=false --prerelease --repo alby-raju/Rill
 ```
 
 Repository release immutability freezes published assets and their tag. Do not publish until every intended asset is attached. Use a new version/tag to correct a published release. This is a development preview, not a stable/notarized distribution claim.

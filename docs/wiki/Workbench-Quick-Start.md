@@ -1,6 +1,6 @@
 # Workbench quick start
 
-Open [Rill 0.4.5](https://github.com/alby-raju/Rill/releases/tag/v0.4.5-dev.1), choose **New request**, enter a URL, and click **Send**. Open the chevron beside **New request** for templates. Use the response tabs to inspect the body, headers, and checks.
+Open the installed [Rill preview](https://github.com/alby-raju/Rill/releases), choose **New request**, enter a URL, and click **Send**. Open the chevron beside **New request** for templates. Use the response tabs to inspect the body, headers, and checks.
 
 ## Organize requests
 

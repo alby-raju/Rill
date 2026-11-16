@@ -10,15 +10,17 @@ Compose requests, inspect responses, run API workflows, and explore live protoco
 
 ![Rill workbench with a request and validated JSON response](docs/images/workbench-dark.png)
 
-## Rill 0.4.5 development preview
+## Published macOS preview
 
-[Download Rill 0.4.5](https://github.com/alby-raju/Rill/releases/tag/v0.4.5-dev.1) for **macOS 15+**. Choose the `arm64` installer for Apple Silicon or the `x86_64` installer for Intel. The preview includes the native app, CLI, and a separate verification kit.
+[Download Rill 0.4.5-dev.1](https://github.com/alby-raju/Rill/releases/tag/v0.4.5-dev.1) for **macOS 15+**. Choose the `arm64` installer for Apple Silicon or the `x86_64` installer for Intel. The preview includes the native app, CLI, and a separate verification kit.
 
 Development installers are ad-hoc signed. Paid Developer ID signing and notarization are deferred. See [installation and release notes](docs/RELEASE.md) for the exact distribution status and remaining acceptance gates.
 
-## Where Rill is heading
+## Current source and roadmap
 
-Direct collection-file execution is available in this preview. Development source since this preview adds final-environment export, opt-in runner cookies, offline HTML reports, doctor/completions, CLI-only packaging, an explicit [bounded script workflow subset](docs/SCRIPT-SUBSET.md), a [saved mock workbench](docs/wiki/Local-Mocks.md) shared with the CLI, and [versioned run configs, snapshots and comparison](docs/RUN-INVESTIGATION.md); these additions are not in the linked installer yet. Broader compatibility and independent acceptance remain active work. Initial CLI performance baselines are recorded; broader performance acceptance and Linux/Windows portability remain on the [prioritized roadmap](ROADMAP.md).
+The repository source is **0.4.6, build 13**. Its standalone CLI, streaming responses, proxy controls, resumable downloads, encrypted HTTPS header sessions, and updated workflow and mock tools are available when building from source. See the [changelog](CHANGELOG.md) and [CLI guide](docs/CLI.md). The 0.4.6 preview is awaiting publication.
+
+The [roadmap](ROADMAP.md) tracks remaining release acceptance, workflow compatibility, native performance, and Linux and Windows CLI portability.
 
 ## What you can do
 

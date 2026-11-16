@@ -11,7 +11,7 @@ Keep the full app installation if using its bundled CLI. For a permanent persona
 exec /Applications/Rill.app/Contents/Helpers/rill "$@"
 ```
 
-Development source also builds a CLI-only `RillCLI-VERSION-ARCH-development.zip` through `bash scripts/release-artifacts.sh` (or `python3 scripts/package-cli.py` after packaging the app). This is a macOS archive, not Linux/Windows support. Extract it to a permanent directory and add its `bin` directory to `PATH`. Keep `Resources` and `Frameworks` beside `bin`; copying only the executable loses optional compiler/runtime resources. Packaging checks the signature, relocates the tree to a path with spaces, compiles a well-known protobuf import and performs a loopback HTTP request. The currently published 0.4.5-dev.1 release predates this standalone archive. Homebrew remains a later distribution decision.
+The 0.4.6 source also builds a CLI-only `RillCLI-VERSION-ARCH-development.zip` through `bash scripts/release-artifacts.sh` (or `python3 scripts/package-cli.py` after packaging the app). This is a macOS archive, not Linux/Windows support. Extract it to a permanent directory and add its `bin` directory to `PATH`. Keep `Resources` and `Frameworks` beside `bin`; copying only the executable loses optional compiler/runtime resources. Packaging checks the signature, relocates the tree to a path with spaces, compiles a well-known protobuf import and performs a loopback HTTP request. The currently published 0.4.5-dev.1 release predates this standalone archive. Homebrew remains a later distribution decision.
 
 ```sh
 rill doctor --json
@@ -258,6 +258,8 @@ products="$(swift build --show-bin-path)"
 Use sanitized fixtures and explicitly supplied protected environment files for CI credentials. This example requires macOS; it does not establish Linux/Windows support.
 
 ## Ad-hoc HTTP requests (development source)
+
+The examples below document the 0.4.6 source. See the [release guide](RELEASE.md) for the published preview.
 
 ```sh
 rill request GET https://example.test/health --json

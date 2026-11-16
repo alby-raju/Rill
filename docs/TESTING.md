@@ -34,7 +34,7 @@ bash scripts/test.sh
 
 The wrapper builds the native CLI and selected protobuf compiler, starts loopback HTTP/TLS/live/MQTT/AMQP fixtures, waits for readiness, runs tests and stops its fixtures. It uses ports 18749–18757; stop optional manual TLS fixtures first if they conflict. Required endpoint cases must not be skipped in CI. A bare `swift test` without fixture variables is only a partial run.
 
-The current suite has **296 tests**, covering persistence/recovery, request fidelity, credentials/TLS, imports/bounds, assertions/hooks/runners, schemas, native protocol sessions, CLI behavior, privacy and bulk-tab safety. Tests are grouped under `Tests/RillCoreTests` by behavior domain. The native Kafka mock bridge is test-only and is not independent production-broker acceptance.
+The fixture-backed suite covers persistence/recovery, request fidelity, credentials/TLS, imports/bounds, assertions/hooks/runners, schemas, native protocol sessions, CLI behavior, privacy and bulk-tab safety. Tests are grouped under `Tests/RillCoreTests` by behavior domain. The native Kafka mock bridge is test-only and is not independent production-broker acceptance.
 
 ## Focus a regression
 
@@ -75,7 +75,7 @@ Build the development artifacts from a clean checkout, then quit Rill and pass t
 
 ```sh
 bash scripts/release-artifacts.sh
-python3 scripts/verify-installed-cli-tls.py "dist/RillCLI-0.4.5-$(uname -m)-development.zip"
+python3 scripts/verify-installed-cli-tls.py "dist/RillCLI-0.4.6-$(uname -m)-development.zip"
 ```
 
 The verifier extracts the signed CLI into a temporary path with spaces. It generates a 600-request Postman collection, environment file and disposable certificates. Two loopback HTTPS servers require different client identities and check request order, four variable overrides and the client certificate on every request. The verifier checks terminal and JSON reports for success and credential redaction, compares input hashes, and checks the default workspace metadata before and after. It prints a JSON evidence record with the source commit, archive hash, OS, architecture and TLS provider.
