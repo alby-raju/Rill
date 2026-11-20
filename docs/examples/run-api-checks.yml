@@ -1,5 +1,5 @@
 # Copy into your own .github/workflows after providing the referenced native workspace/config.
-# Uses development-source features newer than the published v0.4.5-dev.1 installer.
+# Requires Rill CLI 0.4.6 or newer.
 name: API checks with Rill
 on:
   workflow_dispatch:

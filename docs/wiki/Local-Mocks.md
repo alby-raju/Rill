@@ -1,6 +1,6 @@
 # Local mock servers
 
-Development source provides **Workspace tools → Sessions and testing → Local Mocks**. The Mocks tab inside API Definitions and Tools uses the same workbench. These additions are not in the published v0.4.5-dev.1 preview.
+The 0.4.6 preview provides **Workspace tools → Sessions and testing → Local Mocks**. The Mocks tab inside API Definitions and Tools uses the same workbench.
 
 Create a project, add routes and choose **Start**. Port 0 selects an available loopback port. Copy its base URL or a route's cURL example. Servers keep running when their editor closes; **Stop**, project deletion or app termination stops them. Nothing starts automatically on launch or import. Up to four listeners can run concurrently. A changed route or port requires **Restart**; the running listener continues serving its previous snapshot until then.
 

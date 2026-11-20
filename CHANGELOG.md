@@ -1,6 +1,8 @@
 # Changelog
 
-## 0.4.6 development preview (unreleased)
+## 0.4.6 development preview — 2026-11-16
+
+[Release and installers](https://github.com/alby-raju/Rill/releases/tag/v0.4.6-dev.1)
 
 - Compose ad-hoc requests with inferred methods, localhost shortcuts, file-backed headers, stdin and nested JSON. Inspect prepared requests offline.
 - Select response headers, format JSON or XML, color terminal output and stream response bytes to stdout.

@@ -175,7 +175,7 @@ jobs:
           python3 -m venv "$RUNNER_TEMP/client-python"
           "$RUNNER_TEMP/client-python/bin/pip" install requests==2.34.2 httpx==0.28.1
           npm install --prefix "$RUNNER_TEMP/client-node" --ignore-scripts --no-save axios@1.20.0
-          mvn -q -f scripts/client-validation-pom.xml dependency:build-classpath -Dmdep.outputFile="$RUNNER_TEMP/client-classpath"
+          mvn -B -q -f scripts/client-validation-pom.xml org.apache.maven.plugins:maven-dependency-plugin:3.9.0:build-classpath -Dmdep.outputFile="$RUNNER_TEMP/client-classpath"
       - name: Compile and execute synthetic requests on loopback
         run: |
           export RILL_CLIENT_PYTHON="$RUNNER_TEMP/client-python/bin/python"
