@@ -9,7 +9,7 @@ Rill's original code is MIT licensed. Third-party libraries, vendored components
 | [Yams](https://github.com/jpsim/Yams) | 6.2.2 | YAML plus bundled libyaml; MIT |
 | [ZIPFoundation](https://github.com/weichsel/ZIPFoundation) | 0.9.20 | Bounded archive adapter; MIT, privacy manifest retained |
 | [gRPC Swift](https://github.com/grpc/grpc-swift-2) | 2.4.4 | Native gRPC; Apache-2.0 |
-| [gRPC NIO transport](https://github.com/grpc/grpc-swift-nio-transport) | 2.12.0 | Native transport; Apache-2.0 and transitive notices |
+| [gRPC NIO transport](https://github.com/grpc/grpc-swift-nio-transport) | 2.13.0 | Native transport; Apache-2.0 and transitive notices |
 | [SwiftProtobuf](https://github.com/apple/swift-protobuf) | 1.40.0 | Models/compiler; Apache-2.0 with runtime exception |
 | [Swift Kafka client](https://github.com/swift-server/swift-kafka-client) | 1.0.0 | Native librdkafka wrapper; retain its graph's native/TLS/compression notices |
 | [Swift Log](https://github.com/apple/swift-log) | 1.17.2 | Logging interface; Apache-2.0 |
@@ -28,6 +28,8 @@ SwiftPM resolves 26 pinned packages. Not every transitive source component is li
 The [dated dependency audit](dependency-audit.json) records published advisory-database matches by exact public revision as of its review date. It is not a continuing monitoring service or proof of vulnerability absence; vendored components need separate review.
 
 [SwiftProtobuf 1.40.0](https://github.com/apple/swift-protobuf/releases/tag/1.40.0) was reviewed on 15 November 2026 at revision `c7d117246c8cd5f93daa873a68659cfe23c93a1e`. The release drops Swift 6.1 support and bounds `Any` recursion when transcoding to JSON and TextFormat. The local Swift dependency pins outside SwiftProtobuf and the collected license texts are unchanged.
+
+[gRPC NIO transport 2.13.0](https://github.com/grpc/grpc-swift-nio-transport/releases/tag/2.13.0) was reviewed on 23 November 2026 at revision `ab9fd93b1352f0cb720573ac03acf3ba997df017`. The release adds listener address reporting and POSIX peer credentials for Unix-domain and virtual sockets. Regenerated notices accompany the exact pin.
 
 [Swift Log 1.17.2](https://github.com/apple/swift-log/releases/tag/1.17.2) was reviewed on 23 November 2026 at revision `c7413d967b97aae67c46452bf7645bdb7b200e8e`. The patch fixes replacement of an initializer metadata provider through the multiplex handler setter. Regenerated notices accompany the exact pin.
 
