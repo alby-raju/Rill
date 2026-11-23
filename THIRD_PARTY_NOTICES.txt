@@ -4534,9 +4534,9 @@ FindZstd.cmake: git@github.com:facebook/folly.git 87f1a403b49552dae75ae94c8610dd
 
 
 ========================================================================
-swift-log 1.17.0
+swift-log 1.17.2
 https://github.com/apple/swift-log.git
-Pinned revision: e3da04078777e6a1b72ce19981fbd6539b0847d8
+Pinned revision: c7413d967b97aae67c46452bf7645bdb7b200e8e
 
 --- LICENSE.txt · SHA256 cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30 ---
 
