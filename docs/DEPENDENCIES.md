@@ -12,7 +12,7 @@ Rill's original code is MIT licensed. Third-party libraries, vendored components
 | [gRPC NIO transport](https://github.com/grpc/grpc-swift-nio-transport) | 2.12.0 | Native transport; Apache-2.0 and transitive notices |
 | [SwiftProtobuf](https://github.com/apple/swift-protobuf) | 1.41.0 | Models/compiler; Apache-2.0 with runtime exception |
 | [Swift Kafka client](https://github.com/swift-server/swift-kafka-client) | 1.0.0 | Native librdkafka wrapper; retain its graph's native/TLS/compression notices |
-| [Swift Log](https://github.com/apple/swift-log) | 1.17.0 | Logging interface; Apache-2.0 |
+| [Swift Log](https://github.com/apple/swift-log) | 1.17.2 | Logging interface; Apache-2.0 |
 
 SwiftPM resolves 26 pinned packages. Not every transitive source component is linked into every artifact. Kafka uses the stable 1.0 API and is isolated behind an adapter. No office/reference runtime or Java bundle is shipped. MQTT/AMQP use first-party bounded codecs and Apple's Network framework; HTTP and native UI use Apple platform APIs.
 
@@ -28,6 +28,8 @@ SwiftPM resolves 26 pinned packages. Not every transitive source component is li
 The [dated dependency audit](dependency-audit.json) records published advisory-database matches by exact public revision as of its review date. It is not a continuing monitoring service or proof of vulnerability absence; vendored components need separate review.
 
 [SwiftProtobuf 1.41.0](https://github.com/apple/swift-protobuf/releases/tag/1.41.0) was reviewed on 23 November 2026 at revision `fed2f76413026cb0ae90999a8c9116949dfe6aa6`. The release rejects duplicate singular TextFormat fields, fixes `Any` depth budgeting, and expands accepted JSON Timestamp offsets. Regenerated notices accompany the exact pin.
+
+[Swift Log 1.17.2](https://github.com/apple/swift-log/releases/tag/1.17.2) was reviewed on 23 November 2026 at revision `c7413d967b97aae67c46452bf7645bdb7b200e8e`. The patch fixes replacement of an initializer metadata provider through the multiplex handler setter. Regenerated notices accompany the exact pin.
 
 ## Upgrade process
 
